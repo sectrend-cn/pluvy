@@ -115,15 +115,24 @@ class SemanticNodes(ABC):
     def implicit_receivers(self) -> tuple[str, ...]:
         return self.receiver_names
 
-    def receivers(self, node: Node) -> tuple[tuple[Node, Node | None], ...]:
+    def receivers(self, node: Node) -> tuple[tuple[Node | None, Node | None], ...]:
+        """Return receiver declarations as name and type annotation node pairs.
+
+        An unnamed receiver (Go value or pointer form) holds None as its name, and this
+        syntax always supplies the annotation.
+        """
         receiver = field(node, "receiver")
         if receiver is None:
             return ()
-        return tuple(
-            (name, field(entry, "type"))
-            for entry in receiver.named_children
-            for name in entry.children_by_field_name("name")
-        )
+        declared: list[tuple[Node | None, Node | None]] = []
+        for entry in receiver.named_children:
+            annotation = field(entry, "type")
+            names = entry.children_by_field_name("name")
+            if names:
+                declared.extend((name, annotation) for name in names)
+            else:
+                declared.append((None, annotation))
+        return tuple(declared)
 
     def assignment(self, node: Node) -> tuple[Node | None, Node | None]:
         if node.type in self.assignments:
@@ -170,6 +179,14 @@ class SemanticNodes(ABC):
     def element_type(self, node: Node) -> Node | None:
         """Languages opt in to reducing container annotations to their element type."""
         return None
+
+    def element_inferred(self, node: Node | None) -> bool:
+        """Languages opt in containers whose type evidence comes from their elements.
+
+        Answering True obliges the language to derive that evidence through
+        `value_type_node` from those very elements, so that an element write can withdraw it.
+        """
+        return False
 
     def is_call(self, node: Node) -> bool:
         """Report call syntax; languages without calls answer no."""

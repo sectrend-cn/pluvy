@@ -75,15 +75,45 @@ class JavaScriptSemanticSyntax(SemanticNodes):
     block_scopes = frozenset({"statement_block", "catch_clause"})
 
     def value_type_node(self, node: Node) -> Node | None:
-        """Use the first array element's constructor name without skipping holes."""
+        """Use an array's element constructor name only when every element constructs it."""
         if node.type != "array":
             return None
-        first = next(
-            (child for child in node.children if child.type not in {"[", "]", "comment"}), None
-        )
-        if first is None or first.type not in {"new_expression", "call_expression"}:
+        elements = self._array_elements(node)
+        names = tuple(self._element_type_name(child) for child in elements)
+        first = names[0] if names else None
+        if first is None:
             return None
-        name = field(first, "constructor") or field(first, "function")
+        if any(name is None or name.text != first.text for name in names):
+            return None
+        return first
+
+    def element_inferred(self, node: Node | None) -> bool:
+        """Report array values whose type evidence comes from their elements."""
+        return node is not None and node.type == "array"
+
+    def _array_elements(self, node: Node) -> tuple[Node, ...]:
+        """Collect array elements and reject holes that carry no type evidence."""
+        elements: list[Node] = []
+        expecting = True
+        for child in node.children:
+            if child.type in {"[", "]", "comment"}:
+                continue
+            if child.type == ",":
+                if expecting:
+                    return ()
+                expecting = True
+                continue
+            if not expecting:
+                return ()
+            elements.append(child)
+            expecting = False
+        return tuple(elements)
+
+    def _element_type_name(self, node: Node) -> Node | None:
+        """Return a call's identifier constructor name; other elements carry no spelling."""
+        if node.type not in {"new_expression", "call_expression"}:
+            return None
+        name = field(node, "constructor") or field(node, "function")
         return name if name is not None and name.type == "identifier" else None
 
     def base_receiver(self, node: Node) -> bool:

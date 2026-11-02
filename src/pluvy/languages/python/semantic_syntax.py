@@ -69,13 +69,27 @@ class PythonSemanticSyntax(PythonResultSyntax):
     block_scopes = frozenset[str]()
 
     def value_type_node(self, node: Node) -> Node | None:
-        """Use only the first list element's explicit constructor name as evidence."""
+        """Use a list's element constructor name only when every element constructs it."""
         if node.type != "list":
             return None
-        first = next((child for child in node.named_children if child.type != "comment"), None)
-        if first is None or first.type != "call":
+        elements = [child for child in node.named_children if child.type != "comment"]
+        names = tuple(self._element_type_name(child) for child in elements)
+        first = names[0] if names else None
+        if first is None:
             return None
-        name = field(first, "function")
+        if any(name is None or name.text != first.text for name in names):
+            return None
+        return first
+
+    def element_inferred(self, node: Node | None) -> bool:
+        """Report list values whose type evidence comes from their elements."""
+        return node is not None and node.type == "list"
+
+    def _element_type_name(self, node: Node) -> Node | None:
+        """Return a call's identifier constructor name; other elements carry no spelling."""
+        if node.type != "call":
+            return None
+        name = field(node, "function")
         return name if name is not None and name.type == "identifier" else None
 
     def inherited_types(self, node: Node) -> tuple[Node, ...]:

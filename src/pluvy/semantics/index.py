@@ -22,7 +22,7 @@ class SemanticIndex:
         self.imported_classes: dict[str, Scope] = {}
         self.peer_symbols: dict[str, Symbol] = {}
         self.unresolved_reads: set[str] = set()
-        self.attached_members: set[int] = set()
+        self.attached_members: dict[int, Symbol] = {}
         self._declare(context.root, 0)
         self._imports()
         self._receivers()
@@ -35,12 +35,20 @@ class SemanticIndex:
         return spelling(node, self.context.source)
 
     def symbols(self) -> tuple[Symbol, ...]:
-        declarations = {
-            symbol.node.id: symbol
-            for scope in self.scopes
-            for symbol in (*scope.symbols.values(), *scope.static_symbols.values())
-        }
+        """Collect each declaration and attached method this snapshot owns once."""
+        declarations: dict[int, Symbol] = {}
+        for scope in self.scopes:
+            for symbol in (*scope.symbols.values(), *scope.static_symbols.values()):
+                if self.owns(symbol):
+                    declarations[symbol.node.id] = symbol
+        for method in self.attached_members.values():
+            if self.owns(method):
+                declarations[method.node.id] = method
         return tuple(declarations.values())
+
+    def owns(self, symbol: Symbol) -> bool:
+        """Report whether this index's snapshot owns the symbol's declaration."""
+        return self._same_tree(symbol.node)
 
     def lookup(self, name: str, scope: int) -> Symbol | None:
         current: int | None = scope
@@ -141,6 +149,7 @@ class SemanticIndex:
             self.scopes[scope].symbols[symbol.name] = symbol
 
     def _receivers(self) -> None:
+        self.attached_members.clear()
         for scope_id, scope in enumerate(self.scopes):
             self._implicit_receiver(scope_id, scope)
             self._explicit_receivers(scope_id, scope)
@@ -162,13 +171,20 @@ class SemanticIndex:
 
     def _explicit_receivers(self, scope_id: int, scope: Scope) -> None:
         for name, annotation in self.syntax.receivers(scope.node):
-            symbol = scope.symbols.get(self.text(name)) or self._bind(name, "variable", scope_id)
-            symbol.annotation = annotation
-            owner = self.class_scope(self._declared_type(symbol.annotation))
-            method = self.functions.get(scope.node.id)
-            if owner is not None and method is not None:
-                owner.symbols[method.name] = method
-                self.attached_members.add(method.node.id)
+            if name is not None:
+                symbol = scope.symbols.get(self.text(name)) or self._bind(
+                    name, "variable", scope_id
+                )
+                symbol.annotation = annotation
+            self._attached_method(scope, annotation)
+
+    def _attached_method(self, scope: Scope, annotation: Node | None) -> None:
+        """Attach the declared method to the type its receiver names."""
+        owner = self.class_scope(self._declared_type(annotation))
+        method = self.functions.get(scope.node.id)
+        if owner is not None and method is not None:
+            owner.symbols[method.name] = method
+            self.attached_members[method.node.id] = method
 
     def _annotation_scope(self, node: Node | None) -> Scope | None:
         if node is None:
@@ -204,6 +220,7 @@ class SemanticIndex:
             if target not in symbol.writes:
                 symbol.writes.append(target)
             if self.syntax.element_target(target):
+                self._element_write(symbol, value)
                 return
             if symbol.kind != "function":
                 symbol.value = value
@@ -212,6 +229,68 @@ class SemanticIndex:
             symbol.class_scope = self._annotation_scope(symbol.annotation) or self.value_scope(
                 value
             )
+            self._kept_element_conflict(symbol, value)
+
+    def _element_write(self, symbol: Symbol, value: Node | None) -> None:
+        """Withdraw container evidence a conflicting element write can no longer support."""
+        record = symbol.value
+        if record is None or symbol.annotation is not None:
+            return
+        if not self.syntax.element_inferred(self.syntax.single_value(record)):
+            return
+        written = self._value_type(value)
+        if written and written == symbol.type_name:
+            return
+        symbol.type_name = ""
+        symbol.class_scope = None
+        symbol.element_conflict = self._element_record(symbol, record)
+
+    def _element_record(self, symbol: Symbol, record: Node) -> Node:
+        """Choose the withdrawn record an element write leaves behind.
+
+        Element writes replay in document order, so a record naming a later container of the
+        same tree already outlives this write and stays. Records from another tree stay
+        withdrawn as well, matching the conservative reading of an unprovable order.
+        """
+        conflict = symbol.element_conflict
+        if conflict is None or conflict.id == record.id:
+            return record
+        if not self._same_tree(conflict) or not self._same_tree(record):
+            return conflict
+        return conflict if conflict.start_byte > record.start_byte else record
+
+    def _kept_element_conflict(self, symbol: Symbol, value: Node | None) -> None:
+        """Keep withdrawn container evidence withdrawn until a later assignment replaces it.
+
+        A later assignment in the same tree provably replaces the container and may clear the
+        record. Unprovable order stays withdrawn.
+        """
+        conflict = symbol.element_conflict
+        if conflict is None:
+            return
+        if symbol.annotation is not None:
+            symbol.element_conflict = None
+            return
+        if value is None:
+            return
+        if value.id == conflict.id:
+            symbol.type_name = ""
+            symbol.class_scope = None
+            return
+        if not self._same_tree(conflict):
+            symbol.type_name = ""
+            symbol.class_scope = None
+            return
+        if value.start_byte <= conflict.start_byte:
+            return
+        symbol.element_conflict = None
+
+    def _same_tree(self, node: Node) -> bool:
+        """Report whether the node belongs to this snapshot's syntax tree."""
+        root = node
+        while root.parent is not None:
+            root = root.parent
+        return root == self.context.root
 
     def _assignment_symbol(self, target: Node) -> Symbol | None:
         scope = self.locations.get(target.id, 0)
