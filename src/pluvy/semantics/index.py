@@ -22,7 +22,7 @@ class SemanticIndex:
         self.imported_classes: dict[str, Scope] = {}
         self.peer_symbols: dict[str, Symbol] = {}
         self.unresolved_reads: set[str] = set()
-        self.attached_members: set[int] = set()
+        self.attached_members: dict[int, Symbol] = {}
         self._declare(context.root, 0)
         self._imports()
         self._receivers()
@@ -35,12 +35,15 @@ class SemanticIndex:
         return spelling(node, self.context.source)
 
     def symbols(self) -> tuple[Symbol, ...]:
-        """Collect the declarations this index's own snapshot owns."""
+        """Collect each declaration and attached method this snapshot owns once."""
         declarations: dict[int, Symbol] = {}
         for scope in self.scopes:
             for symbol in (*scope.symbols.values(), *scope.static_symbols.values()):
                 if self.declares(symbol):
                     declarations[symbol.node.id] = symbol
+        for method in self.attached_members.values():
+            if self.declares(method):
+                declarations[method.node.id] = method
         return tuple(declarations.values())
 
     def declares(self, symbol: Symbol) -> bool:
@@ -149,6 +152,7 @@ class SemanticIndex:
             self.scopes[scope].symbols[symbol.name] = symbol
 
     def _receivers(self) -> None:
+        self.attached_members.clear()
         for scope_id, scope in enumerate(self.scopes):
             self._implicit_receiver(scope_id, scope)
             self._explicit_receivers(scope_id, scope)
@@ -183,7 +187,7 @@ class SemanticIndex:
         method = self.functions.get(scope.node.id)
         if owner is not None and method is not None:
             owner.symbols[method.name] = method
-            self.attached_members.add(method.node.id)
+            self.attached_members[method.node.id] = method
 
     def _annotation_scope(self, node: Node | None) -> Scope | None:
         if node is None:

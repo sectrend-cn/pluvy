@@ -17,6 +17,16 @@ _TYPES = (
 _CALLED = _TYPES.replace("_ = makeItems()", "makeItems()[0].render()")
 _UNUSED = _TYPES.replace("_ = makeItems()", "_ = makeItems()[0]")
 _METHOD = "package main\n\nfunc (value item) render() { println(&value) }\n"
+_SAME_NAME_TYPES = (
+    "package main\n\n"
+    "type alpha struct{}\n\ntype beta struct{}\n\n"
+    "func main() {\n\t_ = alpha{}\n\t_ = beta{}\n}\n"
+)
+_SAME_NAME_METHODS = (
+    "package main\n\n"
+    "func (a alpha) render() { println(&a) }\n\n"
+    "func (b beta) render() { println(&b) }\n"
+)
 
 
 def _git(root: Path, *arguments: str) -> None:
@@ -26,18 +36,28 @@ def _git(root: Path, *arguments: str) -> None:
     assert result.returncode == 0
 
 
-@pytest.fixture
-def repository(tmp_path: Path) -> Path:
+def _repository(tmp_path: Path, files: dict[str, str]) -> Path:
+    """Create a git repository whose initial commit holds the given Go files."""
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "gate@example.invalid")
     _git(tmp_path, "config", "user.name", "Gate Test")
     (tmp_path / ".pluvy").mkdir()
     (tmp_path / ".pluvy/pluvy.json").write_text("{}\n")
-    (tmp_path / "types.go").write_text(_TYPES)
-    (tmp_path / "methods.go").write_text("package main\n")
+    for name, text in files.items():
+        (tmp_path / name).write_text(text)
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "initial Go package")
     return tmp_path
+
+
+@pytest.fixture
+def repository(tmp_path: Path) -> Path:
+    return _repository(tmp_path, {"types.go": _TYPES, "methods.go": "package main\n"})
+
+
+@pytest.fixture
+def same_name_repository(tmp_path: Path) -> Path:
+    return _repository(tmp_path, {"types.go": _SAME_NAME_TYPES, "methods.go": "package main\n"})
 
 
 def _revise(root: Path, types: str) -> None:
@@ -68,4 +88,20 @@ def test_unused_method_across_files_is_reported_once_in_every_snapshot_mode(
     report = Report.model_validate_json(capsys.readouterr().out)
     assert [(f.path, f.line, f.column, f.rule) for f in report.findings] == [
         ("methods.go", 3, 19, "unused.function")
+    ]
+
+
+@pytest.mark.parametrize("mode", [("--all",), ("--base", "HEAD"), ("--staged",)])
+def test_same_name_methods_report_each_declaration_in_every_snapshot_mode(
+    same_name_repository: Path,
+    capsys: pytest.CaptureFixture[str],
+    mode: tuple[str, ...],
+) -> None:
+    (same_name_repository / "methods.go").write_text(_SAME_NAME_METHODS)
+    _git(same_name_repository, "add", "methods.go")
+    assert main(["--root", str(same_name_repository), *mode, "--format", "json"]) == 1
+    report = Report.model_validate_json(capsys.readouterr().out)
+    assert [(f.path, f.line, f.column, f.rule) for f in report.findings] == [
+        ("methods.go", 3, 16, "unused.function"),
+        ("methods.go", 5, 15, "unused.function"),
     ]

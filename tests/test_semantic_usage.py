@@ -535,6 +535,80 @@ def test_go_method_usage_in_one_file_matches_split_files(
     assert Report.model_validate_json(capsys.readouterr().out).findings == ()
 
 
+def _same_name_method_project(
+    tmp_path: Path, *, split: bool, receivers: tuple[str, str], call: str
+) -> str:
+    """Write one same-named method per type and return the method file name."""
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
+    methods = (
+        "package main\n\n"
+        f'func {receivers[0]} render() {{ println("first") }}\n\n'
+        f'func {receivers[1]} render() {{ println("second") }}\n'
+    )
+    declarations = (
+        "type alpha struct{}\n\n"
+        "type beta struct{}\n\n"
+        "func main() {\n"
+        f"{call}"
+        "\t_ = alpha{}\n"
+        "\t_ = beta{}\n"
+        "}\n"
+    )
+    if split:
+        (tmp_path / "methods.go").write_text(methods)
+        (tmp_path / "types.go").write_text("package main\n\n" + declarations)
+        return "methods.go"
+    (tmp_path / "main.go").write_text(methods + "\n" + declarations)
+    return "main.go"
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        pytest.param(("", (3, 5)), id="unused"),
+        pytest.param(("\talpha{}.render()\n", (5,)), id="composite-call"),
+        pytest.param(("\tvalue := alpha{}\n\tvalue.render()\n", (5,)), id="variable-call"),
+        pytest.param(("\t_ = alpha{}\n\tbeta{}.render()\n", (3,)), id="second-called"),
+        pytest.param(("\talpha{}.render()\n\tbeta{}.render()\n", ()), id="both-called"),
+    ],
+)
+@pytest.mark.parametrize("split", [True, False], ids=["split", "single"])
+@pytest.mark.parametrize(
+    "receivers",
+    [("(a alpha)", "(b beta)"), ("(alpha)", "(b beta)"), ("(alpha)", "(beta)")],
+    ids=["named", "unnamed-then-named", "unnamed"],
+)
+def test_same_name_methods_report_each_declaration_on_its_own(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    split: bool,
+    receivers: tuple[str, str],
+    case: tuple[str, tuple[int, ...]],
+) -> None:
+    """Same-named methods on distinct types keep exactly their own read evidence."""
+    call, expected_lines = case
+    path = _same_name_method_project(tmp_path, split=split, receivers=receivers, call=call)
+    columns = {3: len(f"func {receivers[0]} ") + 1, 5: len(f"func {receivers[1]} ") + 1}
+    expected = [(path, line, columns[line], "unused.function") for line in expected_lines]
+    assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == (1 if expected else 0)
+    report = Report.model_validate_json(capsys.readouterr().out)
+    assert [(f.path, f.line, f.column, f.rule) for f in report.findings] == expected
+
+
+def test_same_scope_redefinitions_stay_shadowed() -> None:
+    """A later same-scope Python definition does not revive the shadowed one."""
+    definitions = "def _run() -> int:\n    return 1\n\n\ndef _run() -> int:\n    return 2\n"
+    reported = [f for f in _findings(definitions, Language.PYTHON) if f.rule == "unused.function"]
+    assert [(f.line, f.column, f.severity) for f in reported] == [(5, 5, "error")]
+    called = [
+        f
+        for f in _findings(definitions + "\n_run()\n", Language.PYTHON)
+        if f.rule == "unused.function"
+    ]
+    assert called == []
+
+
 @pytest.mark.parametrize(
     ("language", "code"),
     [
