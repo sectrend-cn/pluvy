@@ -10,7 +10,7 @@ from pluvy.languages.typescript.semantic_syntax import TypeScriptSemanticSyntax
 from pluvy.plugins.builtins import tree_parser
 from pluvy.policy.models import Policy
 from pluvy.semantics.index import SemanticIndex
-from pluvy.semantics.model import SemanticSyntax
+from pluvy.semantics.model import SemanticSyntax, Symbol
 from pluvy.semantics.project import ProjectUsage
 from pluvy.semantics.usage import UsageRule
 from pluvy.source import Language, Source
@@ -621,6 +621,10 @@ def _member_reads(index: SemanticIndex, owner: str, name: str) -> tuple[int, ...
     return tuple(read.start_point.row + 1 for read in scope.symbols[name].reads)
 
 
+def _declared(index: SemanticIndex, name: str) -> Symbol:
+    return next(symbol for symbol in index.symbols() if symbol.name == name)
+
+
 def _usage(index: SemanticIndex) -> tuple[tuple[str, int, str], ...]:
     return tuple(
         (finding.rule, finding.line, finding.message) for finding in UsageRule().evaluate(index)
@@ -688,7 +692,7 @@ def test_parenthesized_container_write_withdraws_the_element_evidence(
             Language.JAVASCRIPT,
             _source(
                 _JAVASCRIPT_RENDER_INT_ITEM + _JAVASCRIPT_RENDER_OTHER,
-                "const items = [new Item(), new Item()];\n"
+                "let items = [new Item(), new Item()];\n"
                 "items[0] = new Other();\n"
                 "items = [new Item(), new Item()];\n"
                 "items[1].render();",
@@ -699,7 +703,7 @@ def test_parenthesized_container_write_withdraws_the_element_evidence(
             Language.TYPESCRIPT,
             _source(
                 _TYPESCRIPT_RENDER_INT_ITEM + _TYPESCRIPT_RENDER_OTHER,
-                "const items = [new Item(), new Item()];\n"
+                "let items = [new Item(), new Item()];\n"
                 "items[0] = new Other();\n"
                 "items = [new Item(), new Item()];\n"
                 "items[1].render();",
@@ -761,3 +765,138 @@ def test_repeated_refresh_keeps_parenthesized_element_evidence_withdrawn(
     index.refresh()
     index.refresh()
     assert _usage(index) == first == ()
+    assert "render" in index.unresolved_reads
+    assert _member_reads(index, "Item", "render") == ()
+    assert _member_reads(index, "Other", "render") == ()
+    container = _declared(index, "items")
+    assert (container.type_name, container.class_scope) == ("", None)
+
+
+@pytest.mark.parametrize(
+    ("language", "code"),
+    [
+        pytest.param(
+            Language.PYTHON,
+            _source(
+                _PYTHON_RENDER_INT_ITEM + _PYTHON_RENDER_OTHER,
+                "items = [Item(), Item()]\n"
+                "items = [Item(), Item()]\n"
+                "items[0] = Other()\n"
+                "items = [Item(), Item()]\n"
+                "items[1].render()",
+            ),
+            id="python",
+        ),
+        pytest.param(
+            Language.JAVASCRIPT,
+            _source(
+                _JAVASCRIPT_RENDER_INT_ITEM + _JAVASCRIPT_RENDER_OTHER,
+                "let items = [new Item(), new Item()];\n"
+                "items = [new Item(), new Item()];\n"
+                "items[0] = new Other();\n"
+                "items = [new Item(), new Item()];\n"
+                "items[1].render();",
+            ),
+            id="javascript",
+        ),
+        pytest.param(
+            Language.TYPESCRIPT,
+            _source(
+                _TYPESCRIPT_RENDER_INT_ITEM + _TYPESCRIPT_RENDER_OTHER,
+                "let items = [new Item(), new Item()];\n"
+                "items = [new Item(), new Item()];\n"
+                "items[0] = new Other();\n"
+                "items = [new Item(), new Item()];\n"
+                "items[1].render();",
+            ),
+            id="typescript",
+        ),
+    ],
+)
+def test_later_assignment_replaces_the_conflicting_element_write(
+    language: Language, code: str
+) -> None:
+    findings = _findings(code, language)
+    assert _reported(findings) == (
+        ("unused.function", _unused("render")),
+        ("unused.return", "Return value from 'render' is discarded"),
+    )
+    assert findings[0].line == _line_of(code, "class Other") + 1
+    assert findings[1].line == _line_of(code, "items[1].render")
+
+
+@pytest.mark.parametrize(
+    ("language", "code"),
+    [
+        pytest.param(
+            Language.PYTHON,
+            _source(
+                _PYTHON_RENDER_INT_ITEM + _PYTHON_RENDER_OTHER,
+                "items = [Item(), Item()]\n"
+                "items = [Item(), Item()]\n"
+                "items[0] = Other()\n"
+                "items[1].render()",
+            ),
+            id="python",
+        ),
+        pytest.param(
+            Language.JAVASCRIPT,
+            _source(
+                _JAVASCRIPT_RENDER_INT_ITEM + _JAVASCRIPT_RENDER_OTHER,
+                "let items = [new Item(), new Item()];\n"
+                "items = [new Item(), new Item()];\n"
+                "items[0] = new Other();\n"
+                "items[1].render();",
+            ),
+            id="javascript",
+        ),
+        pytest.param(
+            Language.TYPESCRIPT,
+            _source(
+                _TYPESCRIPT_RENDER_INT_ITEM + _TYPESCRIPT_RENDER_OTHER,
+                "let items = [new Item(), new Item()];\n"
+                "items = [new Item(), new Item()];\n"
+                "items[0] = new Other();\n"
+                "items[1].render();",
+            ),
+            id="typescript",
+        ),
+    ],
+)
+def test_repeated_container_assignment_without_replacement_defers_the_member(
+    language: Language, code: str
+) -> None:
+    index = _index(code, language)
+    assert _findings(code, language) == ()
+    assert "render" in index.unresolved_reads
+    container = _declared(index, "items")
+    assert (container.type_name, container.class_scope) == ("", None)
+
+
+def test_foreign_tree_conflict_evidence_stays_withdrawn() -> None:
+    declaring = _index(
+        _source(_PYTHON_RENDER_INT_ITEM, "items = [Item(), Item()]"), Language.PYTHON
+    )
+    peer = _index(_source(_PYTHON_RENDER_INT_ITEM, "items = [Item(), Item()]"), Language.PYTHON)
+    container = _declared(declaring, "items")
+    foreign = _declared(peer, "items").value
+    assert foreign is not None
+    container.element_conflict = foreign
+    container.type_name = "Item"
+    container.class_scope = declaring.class_scope("Item")
+    declaring._kept_element_conflict(container, container.value)
+    assert (container.type_name, container.class_scope) == ("", None)
+    assert container.element_conflict is foreign
+
+
+def test_annotation_clears_the_element_conflict_record() -> None:
+    declaring = _index(
+        _source(_PYTHON_RENDER_INT_ITEM, "items: list[Item] = [Item(), Item()]"),
+        Language.PYTHON,
+    )
+    peer = _index(_source(_PYTHON_RENDER_INT_ITEM, "items = [Item(), Item()]"), Language.PYTHON)
+    container = _declared(declaring, "items")
+    assert container.annotation is not None
+    container.element_conflict = _declared(peer, "items").value
+    declaring._kept_element_conflict(container, container.value)
+    assert container.element_conflict is None

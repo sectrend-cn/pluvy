@@ -48,10 +48,7 @@ class SemanticIndex:
 
     def owns(self, symbol: Symbol) -> bool:
         """Report whether this index's snapshot owns the symbol's declaration."""
-        node = symbol.node
-        while node.parent is not None:
-            node = node.parent
-        return node == self.context.root
+        return self._same_tree(symbol.node)
 
     def lookup(self, name: str, scope: int) -> Symbol | None:
         current: int | None = scope
@@ -247,7 +244,11 @@ class SemanticIndex:
         symbol.element_conflict = symbol.value
 
     def _kept_element_conflict(self, symbol: Symbol, value: Node | None) -> None:
-        """Keep withdrawn container evidence withdrawn until the container itself is replaced."""
+        """Keep withdrawn container evidence withdrawn until a later assignment replaces it.
+
+        A later assignment in the same tree provably replaces the container and may clear the
+        record. Unprovable order stays withdrawn.
+        """
         conflict = symbol.element_conflict
         if conflict is None:
             return
@@ -255,7 +256,23 @@ class SemanticIndex:
             symbol.type_name = ""
             symbol.class_scope = None
             return
+        if symbol.annotation is not None or value is None:
+            symbol.element_conflict = None
+            return
+        if not self._same_tree(conflict):
+            symbol.type_name = ""
+            symbol.class_scope = None
+            return
+        if value.start_byte <= conflict.start_byte:
+            return
         symbol.element_conflict = None
+
+    def _same_tree(self, node: Node) -> bool:
+        """Report whether the node belongs to this snapshot's syntax tree."""
+        root = node
+        while root.parent is not None:
+            root = root.parent
+        return root == self.context.root
 
     def _assignment_symbol(self, target: Node) -> Symbol | None:
         scope = self.locations.get(target.id, 0)
