@@ -7,6 +7,8 @@ import pytest
 from tree_sitter import Node
 
 from pluvy.cli import main
+from pluvy.diagnostics import Finding
+from pluvy.engine import registry
 from pluvy.languages.javascript.semantic_syntax import JavaScriptSemanticSyntax
 from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
 from pluvy.languages.typescript.semantic_syntax import TypeScriptSemanticSyntax
@@ -127,6 +129,29 @@ _PARENTHESIZED_DECLARATIONS: dict[Language, str] = {
     Language.TYPESCRIPT: _TYPESCRIPT_PARENTHESIZED_DECLARATIONS,
 }
 
+_PYTHON_INTERLEAVED_ITEMS = (
+    "\nitems = [Item(), Item()]\nitems[0] = Other()\nitems = [Item(), Item()]\n"
+)
+
+_SCRIPT_INTERLEAVED_ITEMS = (
+    "\nexport let items = [new Item(), new Item()];\n"
+    "items[0] = new Other();\n"
+    "items = [new Item(), new Item()];\n"
+)
+
+_SCRIPT_UNINITIALIZED_ITEMS = "\nexport let items;\nitems = [new Item(), new Item()];\n"
+
+_INTERLEAVED_DECLARATIONS: dict[Language, str] = {
+    Language.PYTHON: _PYTHON_CLASSES + _PYTHON_INTERLEAVED_ITEMS,
+    Language.JAVASCRIPT: _JAVASCRIPT_CLASSES + _SCRIPT_INTERLEAVED_ITEMS,
+    Language.TYPESCRIPT: _TYPESCRIPT_CLASSES + _SCRIPT_INTERLEAVED_ITEMS,
+}
+
+_UNINITIALIZED_DECLARATIONS: dict[Language, str] = {
+    Language.JAVASCRIPT: _JAVASCRIPT_CLASSES + _SCRIPT_UNINITIALIZED_ITEMS,
+    Language.TYPESCRIPT: _TYPESCRIPT_CLASSES + _SCRIPT_UNINITIALIZED_ITEMS,
+}
+
 _WRITES: dict[Language, str] = {
     Language.PYTHON: _PYTHON_WRITES,
     Language.JAVASCRIPT: _JAVASCRIPT_WRITES,
@@ -144,6 +169,23 @@ _DECLARING_MODULE_PLACEHOLDER = "module_name"
 _ORDERS = (
     pytest.param(Language.PYTHON, "a_declares.py", "b_writes.py", id="python-declaration-first"),
     pytest.param(Language.PYTHON, "b_declares.py", "a_writes.py", id="python-write-first"),
+    pytest.param(
+        Language.JAVASCRIPT,
+        "a_declares.js",
+        "b_writes.js",
+        id="javascript-declaration-first",
+    ),
+    pytest.param(Language.JAVASCRIPT, "b_declares.js", "a_writes.js", id="javascript-write-first"),
+    pytest.param(
+        Language.TYPESCRIPT,
+        "a_declares.ts",
+        "b_writes.ts",
+        id="typescript-declaration-first",
+    ),
+    pytest.param(Language.TYPESCRIPT, "b_declares.ts", "a_writes.ts", id="typescript-write-first"),
+)
+
+_UNINITIALIZED_ORDERS = (
     pytest.param(
         Language.JAVASCRIPT,
         "a_declares.js",
@@ -343,3 +385,137 @@ def test_full_audit_keeps_a_reassigned_container_withdrawn(
     assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == 0
     report = Report.model_validate_json(capsys.readouterr().out)
     assert (report.files, report.findings) == (2, ())
+
+
+def _sources(language: Language, files: Iterable[tuple[str, str]]) -> tuple[Source, ...]:
+    return tuple(Source(path, code.encode(), language) for path, code in files)
+
+
+def _findings_in_every_order(
+    language: Language, files: tuple[tuple[str, str], ...]
+) -> tuple[tuple[Finding, ...], ...]:
+    declaring, writing = _sources(language, files)
+    policy = Policy()
+    return (
+        registry().analyze_sources((declaring, writing), policy),
+        registry().analyze_sources((writing, declaring), policy),
+        registry().analyze_sources((writing,), policy, (declaring, writing)),
+    )
+
+
+def _declared_reads(index: SemanticIndex, owner: str) -> tuple[int, ...]:
+    scope = index.class_scope(owner)
+    assert scope is not None
+    return tuple(read.start_point.row + 1 for read in scope.symbols["render"].reads)
+
+
+@pytest.mark.parametrize(("language", "declaring", "writing"), _ORDERS)
+def test_interleaved_element_write_stays_withdrawn_in_both_file_orders(
+    language: Language, declaring: str, writing: str
+) -> None:
+    indexes = _indexes(
+        _project(
+            language,
+            declaring,
+            writing,
+            declaring_code=_INTERLEAVED_DECLARATIONS[language],
+        ),
+        language,
+    )
+    assert _usage(indexes, _prepared(indexes)) == ()
+    _withdrawn_container(indexes, declaring, writing)
+    declaration = _of(indexes, declaring)
+    assert (_declared_reads(declaration, "Item"), _declared_reads(declaration, "Other")) == (
+        (),
+        (),
+    )
+
+
+@pytest.mark.parametrize(("language", "declaring", "writing"), _ORDERS)
+def test_interleaved_element_write_is_clean_in_every_analysis_order(
+    language: Language, declaring: str, writing: str
+) -> None:
+    files = _project(
+        language,
+        declaring,
+        writing,
+        declaring_code=_INTERLEAVED_DECLARATIONS[language],
+    )
+    assert _findings_in_every_order(language, files) == ((), (), ())
+
+
+@pytest.mark.parametrize(("language", "declaring", "writing"), _ORDERS)
+def test_repeated_refresh_keeps_an_interleaved_element_write_withdrawn(
+    language: Language, declaring: str, writing: str
+) -> None:
+    indexes = _indexes(
+        _project(
+            language,
+            declaring,
+            writing,
+            declaring_code=_INTERLEAVED_DECLARATIONS[language],
+        ),
+        language,
+    )
+    project = _prepared(indexes)
+    for _ in range(2):
+        for index in indexes:
+            index.refresh()
+    assert _usage(indexes, project) == ()
+    _withdrawn_container(indexes, declaring, writing)
+
+
+@pytest.mark.parametrize(("language", "declaring", "writing"), _UNINITIALIZED_ORDERS)
+def test_uninitialized_container_declaration_stays_withdrawn_in_both_file_orders(
+    language: Language, declaring: str, writing: str
+) -> None:
+    indexes = _indexes(
+        _project(
+            language,
+            declaring,
+            writing,
+            declaring_code=_UNINITIALIZED_DECLARATIONS[language],
+        ),
+        language,
+    )
+    assert _usage(indexes, _prepared(indexes)) == ()
+    _withdrawn_container(indexes, declaring, writing)
+    declaration = _of(indexes, declaring)
+    assert (_declared_reads(declaration, "Item"), _declared_reads(declaration, "Other")) == (
+        (),
+        (),
+    )
+
+
+@pytest.mark.parametrize(("language", "declaring", "writing"), _UNINITIALIZED_ORDERS)
+def test_uninitialized_container_declaration_is_clean_in_every_analysis_order(
+    language: Language, declaring: str, writing: str
+) -> None:
+    files = _project(
+        language,
+        declaring,
+        writing,
+        declaring_code=_UNINITIALIZED_DECLARATIONS[language],
+    )
+    assert _findings_in_every_order(language, files) == ((), (), ())
+
+
+@pytest.mark.parametrize(("language", "declaring", "writing"), _UNINITIALIZED_ORDERS)
+def test_repeated_refresh_keeps_an_uninitialized_container_withdrawn(
+    language: Language, declaring: str, writing: str
+) -> None:
+    indexes = _indexes(
+        _project(
+            language,
+            declaring,
+            writing,
+            declaring_code=_UNINITIALIZED_DECLARATIONS[language],
+        ),
+        language,
+    )
+    project = _prepared(indexes)
+    for _ in range(2):
+        for index in indexes:
+            index.refresh()
+    assert _usage(indexes, project) == ()
+    _withdrawn_container(indexes, declaring, writing)

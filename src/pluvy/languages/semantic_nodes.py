@@ -181,7 +181,11 @@ class SemanticNodes(ABC):
         return None
 
     def element_inferred(self, node: Node | None) -> bool:
-        """Languages opt in containers whose type evidence comes from their elements."""
+        """Languages opt in containers whose type evidence comes from their elements.
+
+        Answering True obliges the language to derive that evidence through
+        `value_type_node` from those very elements, so that an element write can withdraw it.
+        """
         return False
 
     def is_call(self, node: Node) -> bool:

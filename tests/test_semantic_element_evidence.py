@@ -594,6 +594,59 @@ def test_java_array_creation_element_write_keeps_the_spelled_owner() -> None:
     assert [(finding.rule, finding.line) for finding in findings] == [("unused.return", 13)]
 
 
+_GO_LEGAL_ELEMENT_WRITE = """package main
+
+type Item struct{}
+
+type Other struct{}
+
+func newItem() *Item { return &Item{} }
+
+func (i *Item) render() int { return 1 }
+
+func (o Other) render() int { return 2 }
+
+func main() {
+	b := []*Item{newItem(), newItem()}
+	b[1] = newItem()
+	b[0].render()
+}
+"""
+
+
+def test_go_legal_element_write_keeps_the_spelled_owner() -> None:
+    findings = _findings(_GO_LEGAL_ELEMENT_WRITE, Language.GO)
+    assert [(finding.rule, finding.line) for finding in findings] == [
+        ("unused.function", 11),
+        ("unused.return", 16),
+    ]
+
+
+_JAVA_LEGAL_ELEMENT_WRITE = """class Sample {
+    static class Item {
+        int render() { return 1; }
+    }
+
+    static class Other {
+        int render() { return 2; }
+    }
+
+    static Item newItem() { return new Item(); }
+
+    void run() {
+        Item[] b = new Item[]{newItem(), newItem()};
+        b[1] = newItem();
+        b[0].render();
+    }
+}
+"""
+
+
+def test_java_legal_element_write_keeps_the_spelled_owner() -> None:
+    findings = _findings(_JAVA_LEGAL_ELEMENT_WRITE, Language.JAVA)
+    assert [(finding.rule, finding.line) for finding in findings] == [("unused.return", 15)]
+
+
 _SEMANTIC_SYNTAX: dict[Language, SemanticSyntax] = {
     Language.PYTHON: PythonSemanticSyntax(),
     Language.JAVASCRIPT: JavaScriptSemanticSyntax(),
