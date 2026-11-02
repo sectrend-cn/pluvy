@@ -7,30 +7,30 @@ from pathlib import Path
 import pytest
 from tree_sitter import Node
 
-from code_harness.analysis.analyzer import SyntaxFailure, TypedAnalyzer
-from code_harness.analysis.context import TreeContext
-from code_harness.analysis.contracts import ContextParser
-from code_harness.analysis.requirements import RuleRequirements
-from code_harness.analysis.session import AnalysisSession
-from code_harness.cli import main
-from code_harness.diagnostics import AnalysisError, Finding, ParseWarning
-from code_harness.languages.python import PythonLanguage
-from code_harness.languages.python.semantic_syntax import PythonSemanticSyntax
-from code_harness.languages.python.syntax import PythonSuppressions
-from code_harness.parsing.treesitter import TreeParser
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.plugins.bundles import BundleRegistry
-from code_harness.plugins.profiles import AnalysisProfile
-from code_harness.plugins.registry import AnalyzerRegistry
-from code_harness.policy.models import (
+from pluvy.analysis.analyzer import SyntaxFailure, TypedAnalyzer
+from pluvy.analysis.context import TreeContext
+from pluvy.analysis.contracts import ContextParser
+from pluvy.analysis.requirements import RuleRequirements
+from pluvy.analysis.session import AnalysisSession
+from pluvy.cli import main
+from pluvy.diagnostics import AnalysisError, Finding, ParseWarning
+from pluvy.languages.python import PythonLanguage
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.languages.python.syntax import PythonSuppressions
+from pluvy.parsing.treesitter import TreeParser
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.plugins.bundles import BundleRegistry
+from pluvy.plugins.profiles import AnalysisProfile
+from pluvy.plugins.registry import AnalyzerRegistry
+from pluvy.policy.models import (
     BroadTypeOptions,
     Checkers,
     FunctionSizeOptions,
     Policy,
 )
-from code_harness.snapshots import Selection, sources
-from code_harness.source import Language, LanguageDefinition, Source
-from code_harness.suppressions import SuppressionRule
+from pluvy.snapshots import Selection, sources
+from pluvy.source import Language, LanguageDefinition, Source
+from pluvy.suppressions import SuppressionRule
 
 _COUNTER = Language("counter")
 
@@ -121,8 +121,8 @@ def test_new_language_runs_through_cli_and_discovery(
 ) -> None:
     registry = AnalyzerRegistry()
     registry.register(_counter_analyzer())
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text('{"version": 2}')
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text('{"version": 2}')
     path = tmp_path / "example.count"
     path.write_text("count = 7")
     assert main(["--root", str(tmp_path), "--all"], registry) == 1
@@ -207,8 +207,8 @@ def test_new_rule_extends_builtin_without_engine_dispatch(
     analyzer.bundles.register(TreeModuleRule())
     registry = AnalyzerRegistry()
     registry.register(analyzer)
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text('{"version": 2}')
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text('{"version": 2}')
     (tmp_path / "app.py").write_text("value: int = 1\n")
     assert main(["--root", str(tmp_path), "--all"], registry) == 1
     assert "test.python.module: Module has 1 statements" in capsys.readouterr().out
@@ -255,8 +255,8 @@ def test_plugin_failure_reaches_cli_as_error(
     )
     registry = AnalyzerRegistry()
     registry.register(analyzer)
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text('{"version": 2}')
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text('{"version": 2}')
     (tmp_path / "example.count").write_text("count = 2")
     assert main(["--root", str(tmp_path), "--all"], registry) == 2
     assert "parser unavailable" in capsys.readouterr().err
@@ -412,8 +412,8 @@ def test_semantic_preparation_failure_reaches_cli_as_tool_error(
     )
     registry = AnalyzerRegistry()
     registry.register(analyzer)
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text('{"version": 2}')
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text('{"version": 2}')
     (tmp_path / "app.py").write_text("def run(value: int) -> int:\n    return value\n")
     assert main(["--root", str(tmp_path), "--all"], registry) == 2
     assert "semantic fixture unavailable" in capsys.readouterr().err

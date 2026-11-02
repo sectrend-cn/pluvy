@@ -1,4 +1,4 @@
-# Code Harness
+# Pluvy
 
 A read-only engineering policy gate for Python, Go, Java, JavaScript/JSX and
 TypeScript/TSX. No run mode modifies, stashes, stages, restores, deletes or
@@ -21,9 +21,9 @@ The repository development checks are listed in `AGENTS.md` and run in
 Run from any directory:
 
 ```sh
-code-harness --root /path/to/project --all
-code-harness --root /path/to/project --base BASE_COMMIT --format json
-code-harness --root /path/to/project --staged
+pluvy --root /path/to/project --all
+pluvy --root /path/to/project --base BASE_COMMIT --format json
+pluvy --root /path/to/project --staged
 ```
 
 `--all` reads all selected working files including Git-ignored ones. `--base`
@@ -34,14 +34,14 @@ modes require the repository root.
 Build the image from this checkout:
 
 ```sh
-docker build -t code-harness:0.1.0 .
+docker build -t pluvy:0.1.0 .
 ```
 
 Run a one-line full audit from a target repository containing
-`.codeharness/code-harness.json`:
+`.pluvy/pluvy.json`:
 
 ```sh
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace:ro" code-harness:0.1.0 code-harness --all
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace:ro" pluvy:0.1.0 pluvy --all
 ```
 
 The image installs the locked runtime dependencies and Git. It does not contain a
@@ -51,8 +51,8 @@ complete Git metadata mounted too.
 
 ## Policy
 
-Every target repository owns and commits its `.codeharness/code-harness.json`
-policy. Copy [the example policy](examples/.codeharness/code-harness.json) to that
+Every target repository owns and commits its `.pluvy/pluvy.json`
+policy. Copy [the example policy](examples/.pluvy/pluvy.json) to that
 path and adapt it; paths inside the policy are relative to the repository root.
 
 `include` and `exclude` control global file selection. All checkers are enabled by
@@ -62,7 +62,7 @@ Exit codes: **0** pass or warnings only for the reported scope, **1** error
 findings, **2** configuration, encoding, filesystem or Git failure.
 
 Repeated conditional field copies are checked in every supported language through
-[`structure.guarded_projection`](.agents/skills/code-harness/references/checkers/structure.guarded_projection.md);
+[`structure.guarded_projection`](.agents/skills/pluvy/references/checkers/structure.guarded_projection.md);
 it defaults to three distinct destination fields in one local cluster.
 
 See [Checker configuration](docs/checker-configuration.md) for all options,
@@ -89,7 +89,7 @@ repository runs the same engineering checks in GitHub Actions; see
 
 To run the gate image in a container, see the [Run section](#run) above.
 
-A pre-commit hook may run `uv run --no-sync code-harness --staged` after the policy
+A pre-commit hook may run `uv run --no-sync pluvy --staged` after the policy
 is committed. Install hooks explicitly; this tool never changes Git configuration.
 
 ## Documentation

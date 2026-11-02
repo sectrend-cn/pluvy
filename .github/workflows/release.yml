@@ -82,7 +82,7 @@ jobs:
               else:
                   sys.exit(f"unexpected artifact {name}")
               parts = stem.split("-")
-              if len(parts) < 2 or parts[0] != "code_harness":
+              if len(parts) < 2 or parts[0] != "pluvy":
                   sys.exit(f"unexpected artifact name {name}")
               try:
                   versions.add(Version(parts[1]))
@@ -98,7 +98,7 @@ jobs:
         run: |
           uv sync --locked --no-dev
           uv pip install --no-deps dist/*.whl
-          uv run --no-sync code-harness --help
+          uv run --no-sync pluvy --help
       - name: Upload the distributions
         uses: actions/upload-artifact@v7
         with:

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.models import Report
+from pluvy.cli import main
+from pluvy.models import Report
 
 
 def _git(root: Path, *arguments: str) -> str:
@@ -21,10 +21,10 @@ def repository(tmp_path: Path) -> Path:
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "gate@example.invalid")
     _git(tmp_path, "config", "user.name", "Gate Test")
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}\n")
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}\n")
     (tmp_path / "app.py").write_text("def run() -> int:\n    return 1\n")
-    _git(tmp_path, "add", ".codeharness/code-harness.json", "app.py")
+    _git(tmp_path, "add", ".pluvy/pluvy.json", "app.py")
     _git(tmp_path, "commit", "-qm", "fixture")
     return tmp_path
 
@@ -68,15 +68,15 @@ def test_deleted_sources_do_not_fail_or_get_read(repository: Path) -> None:
 
 
 def test_staged_policy_changes_require_full_review(repository: Path) -> None:
-    (repository / ".codeharness/code-harness.json").write_text('{"include": []}')
-    _git(repository, "add", ".codeharness/code-harness.json")
+    (repository / ".pluvy/pluvy.json").write_text('{"include": []}')
+    _git(repository, "add", ".pluvy/pluvy.json")
     assert main(["--root", str(repository), "--staged"]) == 2
 
 
 def test_unstaged_policy_cannot_weaken_staged_gate(repository: Path) -> None:
     (repository / "app.py").write_text("def run(value):\n    return value")
     _git(repository, "add", "app.py")
-    (repository / ".codeharness/code-harness.json").write_text('{"include": []}')
+    (repository / ".pluvy/pluvy.json").write_text('{"include": []}')
     assert main(["--root", str(repository), "--staged"]) == 1
 
 
@@ -91,7 +91,7 @@ def test_unstaged_policy_cannot_weaken_staged_gate(repository: Path) -> None:
     ],
 )
 def test_malformed_or_unsupported_policy_is_an_error(repository: Path, policy: str) -> None:
-    (repository / ".codeharness/code-harness.json").write_text(policy)
+    (repository / ".pluvy/pluvy.json").write_text(policy)
     assert main(["--root", str(repository), "--all"]) == 2
 
 
@@ -101,7 +101,7 @@ def test_unknown_base_and_missing_policy_are_errors(repository: Path) -> None:
 
 
 def test_empty_audit_and_outside_config_are_errors(repository: Path) -> None:
-    (repository / ".codeharness/code-harness.json").write_text('{"include": []}')
+    (repository / ".pluvy/pluvy.json").write_text('{"include": []}')
     assert main(["--root", str(repository), "--all"]) == 2
     assert main(["--root", str(repository), "--all", "--config", "../policy.json"]) == 2
 
@@ -140,7 +140,7 @@ def test_public_cli_reports_metric_violation(
 def test_public_cli_reports_architecture_violation(
     repository: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (repository / ".codeharness/code-harness.json").write_text(
+    (repository / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"architecture.import":{"boundaries":[{"name":"domain",'
         '"sources":["src/domain/*"],"forbidden_imports":["blocked/*"]}]}}}\n'
     )
@@ -155,34 +155,34 @@ def test_public_cli_reports_architecture_violation(
 def test_unstaged_disable_does_not_change_staged_enforcement(repository: Path) -> None:
     (repository / "app.py").write_text("def run(value):\n    return value")
     _git(repository, "add", "app.py")
-    (repository / ".codeharness/code-harness.json").write_text(
+    (repository / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"type.signature":{"enabled":false}}}'
     )
     assert main(["--root", str(repository), "--all"]) == 0
     assert main(["--root", str(repository), "--staged"]) == 1
-    _git(repository, "add", ".codeharness/code-harness.json")
+    _git(repository, "add", ".pluvy/pluvy.json")
     assert main(["--root", str(repository), "--staged"]) == 2
 
 
 def test_default_policy_does_not_fall_back_to_root(tmp_path: Path) -> None:
-    (tmp_path / "code-harness.json").write_text('{"version": 2}')
+    (tmp_path / "pluvy.json").write_text('{"version": 2}')
     (tmp_path / "app.py").write_text("value: int = 1\n")
     assert main(["--root", str(tmp_path), "--all"]) == 2
-    assert main(["--root", str(tmp_path), "--all", "--config", "code-harness.json"]) == 0
+    assert main(["--root", str(tmp_path), "--all", "--config", "pluvy.json"]) == 0
 
 
 def test_explicit_policy_overrides_default(repository: Path) -> None:
-    (repository / "code-harness.json").write_text('{"include": []}')
+    (repository / "pluvy.json").write_text('{"include": []}')
     assert main(["--root", str(repository), "--all"]) == 0
-    assert main(["--root", str(repository), "--all", "--config", "code-harness.json"]) == 2
+    assert main(["--root", str(repository), "--all", "--config", "pluvy.json"]) == 2
 
 
 def test_example_policy_enforces_root_relative_boundaries(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    example = Path(__file__).parents[1] / "examples/.codeharness/code-harness.json"
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_bytes(example.read_bytes())
+    example = Path(__file__).parents[1] / "examples/.pluvy/pluvy.json"
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_bytes(example.read_bytes())
     source = tmp_path / "src/domain/feature.ts"
     source.parent.mkdir(parents=True)
     source.write_text("export const value: number = 1;\n")
@@ -217,12 +217,12 @@ def test_staged_usage_reads_unchanged_consumers_from_index(
 def test_staged_structure_uses_index_paths_despite_working_tree_move(
     repository: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (repository / ".codeharness/code-harness.json").write_text(
+    (repository / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"architecture.structure":{"placements":['
         '{"name":"language rules","paths":["*_rules.py"],'
         '"allowed_paths":["languages/*"]}]}}}'
     )
-    assert _git(repository, "add", ".codeharness/code-harness.json") == ""
+    assert _git(repository, "add", ".pluvy/pluvy.json") == ""
     assert _git(repository, "commit", "-qm", "configure structure") == ""
     source = repository / "python_rules.py"
     source.write_text("value: int = 1\n")
@@ -393,7 +393,7 @@ def test_global_exclusion_keeps_other_files_in_the_audit(
     (repository / "deferred").mkdir()
     (repository / "deferred/bad.py").write_text("value: object = None\n")
     (repository / "app.py").write_text("value: object = None\n")
-    (repository / ".codeharness/code-harness.json").write_text('{"exclude":["deferred/*"]}')
+    (repository / ".pluvy/pluvy.json").write_text('{"exclude":["deferred/*"]}')
     assert main(["--root", str(repository), "--all", "--format", "json"]) == 1
     report = Report.model_validate_json(capsys.readouterr().out)
     assert report.files == 1
@@ -401,7 +401,7 @@ def test_global_exclusion_keeps_other_files_in_the_audit(
 
 
 def test_checker_path_exclusions_are_not_silently_accepted(repository: Path) -> None:
-    (repository / ".codeharness/code-harness.json").write_text(
+    (repository / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"type.broad":{"exclude":["deferred/*"]}}}'
     )
     assert main(["--root", str(repository), "--all"]) == 2
@@ -411,13 +411,13 @@ def test_changed_file_obligations_are_not_filtered_by_finding_line(
     repository: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    policy = repository / ".codeharness/code-harness.json"
+    policy = repository / ".pluvy/pluvy.json"
     policy.write_text(
         '{"checkers":{"architecture.owner":{"owners":[{"name":"other","paths":["other/*"]}]},'
         '"architecture.structure":{"placements":[{"name":"app","paths":["app.py"],'
         '"allowed_paths":["src/*"]}]}}}'
     )
-    _git(repository, "add", ".codeharness/code-harness.json")
+    _git(repository, "add", ".pluvy/pluvy.json")
     _git(repository, "commit", "-qm", "file policy fixture")
     (repository / "app.py").write_text("def run() -> int:\n    return 2\n")
     assert main(["--root", str(repository), "--base", "HEAD", "--format", "json"]) == 1
@@ -429,12 +429,12 @@ def test_changed_file_obligations_are_not_filtered_by_finding_line(
 def test_staged_encoding_configuration_uses_index_policy(repository: Path) -> None:
     (repository / "app.py").write_text("import codec\nvalue = codec.encode({})\n")
     _git(repository, "add", "app.py")
-    (repository / ".codeharness/code-harness.json").write_text(
+    (repository / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"type.broad":{"encoding":{"encoders":["codec.encode"]}}}}'
     )
     assert main(["--root", str(repository), "--all"]) == 1
     assert main(["--root", str(repository), "--staged"]) == 0
-    _git(repository, "add", ".codeharness/code-harness.json")
+    _git(repository, "add", ".pluvy/pluvy.json")
     assert main(["--root", str(repository), "--staged"]) == 2
 
 
@@ -446,7 +446,7 @@ def test_changed_suppression_selects_following_target(
     mode: str,
     operation: str,
 ) -> None:
-    directive = "// code-harness: ignore-next-line type.broad -- Serialized fixture.\n"
+    directive = "// pluvy: ignore-next-line type.broad -- Serialized fixture.\n"
     prefix = "export const unrelated = 1;\n"
     target = "const input = JSON.stringify(payload) as Payload;\n"
     source = repository / "test.ts"
@@ -472,7 +472,7 @@ def test_unstaged_directive_cannot_suppress_index_finding(
     target = "const input = JSON.stringify(payload);\n"
     source.write_text(target)
     assert _git(repository, "add", "test.ts") == ""
-    source.write_text("// code-harness: ignore-next-line type.broad -- Fixture.\n" + target)
+    source.write_text("// pluvy: ignore-next-line type.broad -- Fixture.\n" + target)
     assert main(["--root", str(repository), "--staged", "--format", "json"]) == 1
     report = Report.model_validate_json(capsys.readouterr().out)
     assert [(f.path, f.line, f.rule) for f in report.findings] == [("test.ts", 1, "type.broad")]
@@ -483,7 +483,7 @@ def test_staged_directive_is_independent_of_disk_removal(
 ) -> None:
     source = repository / "test.ts"
     target = "const input = JSON.stringify(payload);\n"
-    source.write_text("// code-harness: ignore-next-line type.broad -- Fixture.\n" + target)
+    source.write_text("// pluvy: ignore-next-line type.broad -- Fixture.\n" + target)
     assert _git(repository, "add", "test.ts") == ""
     source.write_text(target)
     assert main(["--root", str(repository), "--staged", "--format", "json"]) == 0
@@ -506,19 +506,19 @@ class _SuppressionSource:
 _PYTHON_SUPPRESSION = _SuppressionSource(
     "test.py",
     "from typing import Any\n",
-    "# code-harness: ignore-next-line type.annotation -- Serialized fixture.\n",
+    "# pluvy: ignore-next-line type.annotation -- Serialized fixture.\n",
     "x: Any = 1\n",
 )
 _GO_SUPPRESSION = _SuppressionSource(
     "test.go",
     "package sample\n",
-    "// code-harness: ignore-next-line type.broad -- Serialized fixture.\n",
+    "// pluvy: ignore-next-line type.broad -- Serialized fixture.\n",
     "type Input any\n",
 )
 _JAVA_SUPPRESSION = _SuppressionSource(
     "Sample.java",
     "class Sample {\n",
-    "// code-harness: ignore-next-line type.broad -- Serialized fixture.\n",
+    "// pluvy: ignore-next-line type.broad -- Serialized fixture.\n",
     "void run(Object value) { consume(value); }\n}\n",
 )
 
@@ -641,7 +641,7 @@ def test_staged_directive_is_independent_of_disk_removal_in_any_language(
 def test_directive_marker_in_diff_filename_does_not_expand_scope(
     repository: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    filename = "code-harness:example.ts"
+    filename = "pluvy:example.ts"
     source = repository / filename
     source.write_text("type Old = any;\nexport const changed = 1;\n")
     assert _git(repository, "add", filename) == ""

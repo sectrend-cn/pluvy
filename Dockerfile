@@ -6,7 +6,7 @@ ENV SETUPTOOLS_SCM_PRETEND_VERSION=${PACKAGE_VERSION}
 
 RUN python -m pip install --no-cache-dir uv==0.8.22
 
-WORKDIR /opt/code-harness
+WORKDIR /opt/pluvy
 ENV UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
@@ -19,10 +19,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /opt/code-harness/.venv /opt/code-harness/.venv
-ENV PATH="/opt/code-harness/.venv/bin:$PATH" \
+COPY --from=builder /opt/pluvy/.venv /opt/pluvy/.venv
+ENV PATH="/opt/pluvy/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /workspace
-CMD ["code-harness", "--help"]
+CMD ["pluvy", "--help"]

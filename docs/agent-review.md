@@ -58,12 +58,12 @@ checks. Agent review is not enabled automatically, and no agent executable or
 provider is selected implicitly.
 
 ```python
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.plugins.registry import AnalyzerRegistry
-from code_harness.review.acp import AcpCommand, AcpReviewAgent
-from code_harness.review.contracts import ReviewGuideline
-from code_harness.review.rules import PromptReviewRule
-from code_harness.source import Language
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.plugins.registry import AnalyzerRegistry
+from pluvy.review.acp import AcpCommand, AcpReviewAgent
+from pluvy.review.contracts import ReviewGuideline
+from pluvy.review.rules import PromptReviewRule
+from pluvy.source import Language
 
 agent = AcpReviewAgent(AcpCommand(
     executable="/absolute/path/to/acp-agent",

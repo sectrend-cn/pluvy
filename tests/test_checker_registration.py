@@ -3,14 +3,14 @@
 import pytest
 from pydantic import Field, ValidationError
 
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.policy.contracts import (
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.policy.contracts import (
     CheckerConfiguration,
     CheckerDefinition,
     CheckerOptions,
     CheckerState,
 )
-from code_harness.policy.models import Checkers, Policy
+from pluvy.policy.models import Checkers, Policy
 
 _EXTENSION = CheckerDefinition("project.module_size", ("module.lines", "module.statements"))
 
@@ -148,18 +148,18 @@ def test_unregistered_options_fail_closed() -> None:
 
 
 def test_package_rule_exports_remain_available() -> None:
-    from code_harness.architecture import ArchitectureRule
-    from code_harness.architecture.rules import ArchitectureRule as CanonicalArchitectureRule
-    from code_harness.metrics import MetricRule
-    from code_harness.metrics.rules import MetricRule as CanonicalMetricRule
+    from pluvy.architecture import ArchitectureRule
+    from pluvy.architecture.rules import ArchitectureRule as CanonicalArchitectureRule
+    from pluvy.metrics import MetricRule
+    from pluvy.metrics.rules import MetricRule as CanonicalMetricRule
 
     assert ArchitectureRule is CanonicalArchitectureRule
     assert MetricRule is CanonicalMetricRule
 
 
 def test_lazy_package_exports_reject_unknown_names() -> None:
-    from code_harness.architecture import __getattr__ as architecture_export
-    from code_harness.metrics import __getattr__ as metrics_export
+    from pluvy.architecture import __getattr__ as architecture_export
+    from pluvy.metrics import __getattr__ as metrics_export
 
     with pytest.raises(AttributeError, match="has no attribute 'missing'"):
         assert architecture_export("missing").__name__ == "missing"

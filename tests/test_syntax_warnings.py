@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.diagnostics import Report
-from code_harness.engine import check
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.diagnostics import Report
+from pluvy.engine import check
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 
 @pytest.mark.parametrize(
@@ -61,8 +61,8 @@ def test_python_type_comments_preserve_metrics_and_architecture(
 def test_cli_warns_on_stderr_and_continues_other_files(
     tmp_path: Path, output: str, defect: bool
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     broken = tmp_path / "broken.py"
     broken.write_text("def broken(:\n")
     content = "type Payload = any;" if defect else "const value: number = 1;"
@@ -71,7 +71,7 @@ def test_cli_warns_on_stderr_and_continues_other_files(
         (
             sys.executable,
             "-m",
-            "code_harness",
+            "pluvy",
             "--root",
             str(tmp_path),
             "--all",

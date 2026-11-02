@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27,<2", "hatch-vcs>=0.4,<1"]
 build-backend = "hatchling.build"
 
 [project]
-name = "code-harness"
+name = "pluvy"
 dynamic = ["version"]
 description = "Read-only, parser-backed engineering policy gate for Python, Go, Java, JavaScript and TypeScript"
 requires-python = ">=3.12"
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-code-harness = "code_harness.cli:main"
+pluvy = "pluvy.cli:main"
 
 [tool.hatch.version]
 source = "vcs"

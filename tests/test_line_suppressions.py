@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 import pytest
 
-from code_harness.diagnostics import Finding
-from code_harness.engine import check
-from code_harness.models import Language, Policy, Source
+from pluvy.diagnostics import Finding
+from pluvy.engine import check
+from pluvy.models import Language, Policy, Source
 
-_DIRECTIVE = "// code-harness: ignore-next-line type.broad -- Serialized test input.\n"
+_DIRECTIVE = "// pluvy: ignore-next-line type.broad -- Serialized test input.\n"
 
 
 def _findings(
@@ -35,7 +35,7 @@ class _LanguageFixture:
 
     def directive(self, rule: str | None = None, reason: str = "Reason.") -> str:
         selected = self.rule if rule is None else rule
-        return f"{self.marker} code-harness: ignore-next-line {selected} -- {reason}\n"
+        return f"{self.marker} pluvy: ignore-next-line {selected} -- {reason}\n"
 
     def source(self, middle: str, target_override: str | None = None) -> str:
         selected = self.target if target_override is None else target_override
@@ -172,18 +172,18 @@ def test_nested_multiline_encoding_keeps_later_diagnostic() -> None:
 @pytest.mark.parametrize(
     "comment",
     [
-        "// code-harness: ignore-next-line missing.rule -- Reason.",
-        "// code-harness: ignore-next-line * -- Reason.",
-        "// code-harness: ignore-next-line type.broad,type.assertion -- Reason.",
-        "// code-harness: ignore-next-line type.broad type.assertion -- Reason.",
-        "// code-harness: ignore-next-line type.suppression -- Reason.",
-        "// code-harness: ignore-next-line type.broad",
-        "// code-harness: ignore-next-line type.broad --   ",
-        "// code-harness: ignore-next-line -- Reason.",
-        "// code-harness: ignore-file type.broad -- Reason.",
-        "// code-harness: ignore-next-line type.broad - Reason.",
-        "/* code-harness: ignore-next-line type.broad -- Reason. */",
-        "const previous = 1; // code-harness: ignore-next-line type.broad -- Reason.",
+        "// pluvy: ignore-next-line missing.rule -- Reason.",
+        "// pluvy: ignore-next-line * -- Reason.",
+        "// pluvy: ignore-next-line type.broad,type.assertion -- Reason.",
+        "// pluvy: ignore-next-line type.broad type.assertion -- Reason.",
+        "// pluvy: ignore-next-line type.suppression -- Reason.",
+        "// pluvy: ignore-next-line type.broad",
+        "// pluvy: ignore-next-line type.broad --   ",
+        "// pluvy: ignore-next-line -- Reason.",
+        "// pluvy: ignore-file type.broad -- Reason.",
+        "// pluvy: ignore-next-line type.broad - Reason.",
+        "/* pluvy: ignore-next-line type.broad -- Reason. */",
+        "const previous = 1; // pluvy: ignore-next-line type.broad -- Reason.",
     ],
 )
 def test_invalid_directives_fail_closed(comment: str) -> None:
@@ -214,8 +214,8 @@ def test_stale_directive_is_an_error(target: str) -> None:
 @pytest.mark.parametrize(
     "code",
     [
-        'const text = "// code-harness: ignore-next-line type.broad -- Reason.";\n',
-        "const text = `\n// code-harness: ignore-next-line type.broad -- Reason.\n`;\n",
+        'const text = "// pluvy: ignore-next-line type.broad -- Reason.";\n',
+        "const text = `\n// pluvy: ignore-next-line type.broad -- Reason.\n`;\n",
     ],
 )
 def test_literal_directive_text_has_no_effect(code: str) -> None:
@@ -244,17 +244,13 @@ def test_another_registered_diagnostic_can_be_selected() -> None:
         (
             Language.PYTHON,
             "test.py",
-            "from typing import Any\n"
-            "# code-harness: ignore-next-line type.broad -- Reason.\n"
-            "x: Any = 1\n",
+            "from typing import Any\n# pluvy: ignore-next-line type.broad -- Reason.\nx: Any = 1\n",
             [("type.annotation", 3)],
         ),
         (
             Language.JAVA,
             "Test.java",
-            "class Test {\n"
-            "// code-harness: ignore-next-line type.broad -- Reason.\n"
-            "Object value;\n}\n",
+            "class Test {\n// pluvy: ignore-next-line type.broad -- Reason.\nObject value;\n}\n",
             [("unused.field", 3)],
         ),
     ],
@@ -326,7 +322,7 @@ _INVALID_BODIES = (
 @pytest.mark.parametrize("fixture", _NEW_LANGUAGES, ids=_NEW_IDS)
 @pytest.mark.parametrize("body", _INVALID_BODIES)
 def test_malformed_directive_forms_are_rejected(fixture: _LanguageFixture, body: str) -> None:
-    middle = f"{fixture.marker} code-harness: {body.format(rule=fixture.rule)}\n"
+    middle = f"{fixture.marker} pluvy: {body.format(rule=fixture.rule)}\n"
     assert [(f.rule, f.line) for f in _analyze(fixture, middle)] == [
         ("type.suppression", fixture.directive_line),
         (fixture.rule, fixture.target_line),
@@ -335,7 +331,7 @@ def test_malformed_directive_forms_are_rejected(fixture: _LanguageFixture, body:
 
 @pytest.mark.parametrize("fixture", (_GO, _JAVA), ids=(Language.GO.value, Language.JAVA.value))
 def test_block_comment_directive_is_rejected(fixture: _LanguageFixture) -> None:
-    middle = f"/* code-harness: ignore-next-line {fixture.rule} -- Reason. */\n"
+    middle = f"/* pluvy: ignore-next-line {fixture.rule} -- Reason. */\n"
     assert [(f.rule, f.line) for f in _analyze(fixture, middle)] == [
         ("type.suppression", fixture.directive_line),
         (fixture.rule, fixture.target_line),
@@ -348,15 +344,14 @@ def test_block_comment_directive_is_rejected(fixture: _LanguageFixture) -> None:
         (
             Language.PYTHON,
             "test.py",
-            "previous = 1  # code-harness: ignore-next-line type.annotation -- Reason.\n"
-            "x: object = 1\n",
+            "previous = 1  # pluvy: ignore-next-line type.annotation -- Reason.\nx: object = 1\n",
             {("type.suppression", 1), ("type.annotation", 2)},
         ),
         (
             Language.GO,
             "test.go",
             "package sample\n"
-            "var previous = 1 // code-harness: ignore-next-line type.broad -- Reason.\n"
+            "var previous = 1 // pluvy: ignore-next-line type.broad -- Reason.\n"
             "type Input any\n",
             {("type.suppression", 2), ("type.broad", 3)},
         ),
@@ -365,7 +360,7 @@ def test_block_comment_directive_is_rejected(fixture: _LanguageFixture) -> None:
             "Test.java",
             "class Test {\n"
             "void run(Object value) { consume(value); } "
-            "// code-harness: ignore-next-line type.broad -- Reason.\n}\n",
+            "// pluvy: ignore-next-line type.broad -- Reason.\n}\n",
             {("type.suppression", 2), ("type.broad", 2)},
         ),
     ],
@@ -384,7 +379,7 @@ def test_trailing_directive_is_rejected(
         (
             Language.PYTHON,
             "test.py",
-            'TEXT = "# code-harness: ignore-next-line type.annotation -- Reason."\nx: object = 1\n',
+            'TEXT = "# pluvy: ignore-next-line type.annotation -- Reason."\nx: object = 1\n',
             "type.annotation",
             2,
         ),
@@ -392,7 +387,7 @@ def test_trailing_directive_is_rejected(
             Language.PYTHON,
             "test.py",
             "def run() -> None:\n"
-            '    """# code-harness: ignore-next-line type.annotation -- Reason."""\n'
+            '    """# pluvy: ignore-next-line type.annotation -- Reason."""\n'
             "    x: object = 1\n",
             "type.annotation",
             3,
@@ -400,7 +395,7 @@ def test_trailing_directive_is_rejected(
         (
             Language.GO,
             "test.go",
-            'package sample\nvar text = "// code-harness: ignore-next-line type.broad -- Reason."\n'
+            'package sample\nvar text = "// pluvy: ignore-next-line type.broad -- Reason."\n'
             "type Input any\n",
             "type.broad",
             3,
@@ -408,7 +403,7 @@ def test_trailing_directive_is_rejected(
         (
             Language.GO,
             "test.go",
-            "package sample\nvar text = `// code-harness: ignore-next-line type.broad -- Reason.`\n"
+            "package sample\nvar text = `// pluvy: ignore-next-line type.broad -- Reason.`\n"
             "type Input any\n",
             "type.broad",
             3,
@@ -417,7 +412,7 @@ def test_trailing_directive_is_rejected(
             Language.JAVA,
             "Test.java",
             "class Test {\n"
-            'void first() { consume("// code-harness: ignore-next-line type.broad -- Reason."); }\n'
+            'void first() { consume("// pluvy: ignore-next-line type.broad -- Reason."); }\n'
             "void run(Object value) { consume(value); }\n}\n",
             "type.broad",
             3,
@@ -494,7 +489,7 @@ def test_foreign_directives_remain_prohibited_in_every_language(
 def test_java_reason_citing_a_foreign_marker_reports_the_directive_line(marker: str) -> None:
     code = (
         "class Test {\n"
-        f"// code-harness: ignore-next-line type.broad -- Kept inline {marker}.\n"
+        f"// pluvy: ignore-next-line type.broad -- Kept inline {marker}.\n"
         "void run(Object value) { consume(value); }\n}\n"
     )
     findings = check(Source("Test.java", code.encode(), Language.JAVA), Policy())
@@ -503,7 +498,7 @@ def test_java_reason_citing_a_foreign_marker_reports_the_directive_line(marker: 
 
 @pytest.mark.parametrize("touched", [frozenset({1}), frozenset({2}), frozenset({3})])
 def test_malformed_directive_respects_partial_scope(touched: frozenset[int]) -> None:
-    code = "// code-harness: ignore-next-line missing.rule -- Reason.\n"
+    code = "// pluvy: ignore-next-line missing.rule -- Reason.\n"
     code += "const input = JSON.stringify(payload);\nexport const other = 1;\n"
     findings = _findings(code, touched=touched)
     expected = [] if touched == frozenset({3}) else ["type.suppression", "type.broad"]

@@ -1,6 +1,6 @@
 ---
 name: False positive report
-about: Report a diagnostic ID that code-harness reports wrongly for a valid construct
+about: Report a diagnostic ID that pluvy reports wrongly for a valid construct
 title: "False positive: <diagnostic ID> (<language>)"
 ---
 
@@ -12,7 +12,7 @@ title: "False positive: <diagnostic ID> (<language>)"
 
 ## Environment
 
-- Installation: <how code-harness was installed>
+- Installation: <how pluvy was installed>
 - Version: <version visible from that installation, or "unknown">
 - OS: <operating system and version>
 - Scanned source language / runtime: <language and runtime version>
@@ -20,10 +20,10 @@ title: "False positive: <diagnostic ID> (<language>)"
 ## Command line
 
 ```sh
-code-harness --root <root> --config <policy-path> --all --format text
+pluvy --root <root> --config <policy-path> --all --format text
 ```
 
-## Policy (`.codeharness/code-harness.json`)
+## Policy (`.pluvy/pluvy.json`)
 
 ```json
 {}
@@ -35,11 +35,11 @@ Layout:
 
 ```
 <repro>/
-  .codeharness/code-harness.json
+  .pluvy/pluvy.json
   sample.py
 ```
 
-Policy `.codeharness/code-harness.json`:
+Policy `.pluvy/pluvy.json`:
 
 ```json
 {}
@@ -55,7 +55,7 @@ def add(left, right):
 Command:
 
 ```sh
-code-harness --root <repro> --all --format text
+pluvy --root <repro> --all --format text
 ```
 
 Expected behavior: <what the correct result is — for a false positive that

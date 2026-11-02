@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Finding, Report
-from code_harness.engine import check
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.diagnostics import Finding, Report
+from pluvy.engine import check
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 
 def _unused(code: str, language: Language = Language.TYPESCRIPT) -> tuple[Finding, ...]:
@@ -181,8 +181,8 @@ def test_ordinary_constructor_parameter_is_not_a_property() -> None:
 def test_cross_file_reads_preserve_occurrence_identity(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], consumer: str
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "models.ts").write_text(
         "export class Used<T> { constructor(public readonly value: T) {} }\n"
         "export class Unread<T> { constructor(public readonly value: T) {} }\n"

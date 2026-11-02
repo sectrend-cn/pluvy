@@ -1,10 +1,10 @@
-# code-harness getting started
+# pluvy getting started
 
-This guide is for individual developers using code-harness. It covers obtaining and installing the
+This guide is for individual developers using pluvy. It covers obtaining and installing the
 tool, configuring a policy for a target repository, day-to-day runs, triaging existing findings, and
 the continuous gate scenario of running the gate at the end of every code task.
 
-code-harness is a read-only, analysis-driven engineering policy gate: no run mode modifies, stages,
+pluvy is a read-only, analysis-driven engineering policy gate: no run mode modifies, stages,
 restores, deletes or rewrites source files, and none of them changes Git configuration.
 
 A Chinese translation of this page is available at
@@ -21,38 +21,38 @@ A Chinese translation of this page is available at
 
 ### Obtaining the source
 
-Obtain a source checkout of code-harness (clone the repository, or unpack the source archive you
-received). Throughout this page `/path/to/code-harness` refers to that checkout directory. The
+Obtain a source checkout of pluvy (clone the repository, or unpack the source archive you
+received). Throughout this page `/path/to/pluvy` refers to that checkout directory. The
 checkout holds the tool's source, the sample policies under `examples/`, and the
-`.agents/skills/code-harness/` skill.
+`.agents/skills/pluvy/` skill.
 
 ### Local installation
 
 Install the command line from that checkout directory:
 
 ```sh
-uv tool install /path/to/code-harness
+uv tool install /path/to/pluvy
 ```
 
 Without uv, the pip equivalent is:
 
 ```sh
-python -m pip install /path/to/code-harness
+python -m pip install /path/to/pluvy
 ```
 
-The installation places `code-harness` in the user-level executable directory (for example
+The installation places `pluvy` in the user-level executable directory (for example
 `~/.local/bin`), so make sure that directory is on your `PATH`. If a uv tool installation of the same
 name already exists and you need to replace it, pass `--force` to `uv tool install`.
 
 ### Verification
 
 ```sh
-code-harness --help
-code-harness --root /path/to/project --all
+pluvy --help
+pluvy --root /path/to/project --all
 ```
 
 The first confirms the command works and lists the options actually supported: `--root` (default
-`.`), `--config` (default `.codeharness/code-harness.json`), `--format` (`text` or `json`), and the
+`.`), `--config` (default `.pluvy/pluvy.json`), `--format` (`text` or `json`), and the
 required, mutually exclusive `--all` / `--staged` / `--base`. The second runs a full audit against
 the target repository; if the target repository has no policy yet as described in
 [Configuration](#configuration), that command reports that no policy file was found and exits 2,
@@ -65,7 +65,7 @@ To run in a container with the target repository mounted read-only, see
 
 ### Obtaining the skill
 
-The skill that agents use comes from the same source checkout: copy `.agents/skills/code-harness/`
+The skill that agents use comes from the same source checkout: copy `.agents/skills/pluvy/`
 from the checkout to the consuming project's skill location. See
 [Agent integration](#agent-integration) for the integration paths.
 
@@ -73,14 +73,14 @@ from the checkout to the consuming project's skill location. See
 
 ### Establishing a repository policy
 
-Every target repository holds and commits its own `.codeharness/code-harness.json` (the policy path
+Every target repository holds and commits its own `.pluvy/pluvy.json` (the policy path
 resolves relative to `--root`, in Git modes as well). The tool has no command that generates or
 initialises a policy; the file is written and committed by hand: the only options the tool itself
 defines are `--all`, `--staged`, `--base`, `--root`, `--config` and `--format`, plus the
 automatically provided `-h, --help` help option.
 
 There are two ways to start. You can copy the
-[sample policy](../examples/.codeharness/code-harness.json) to `.codeharness/code-harness.json` in
+[sample policy](../examples/.pluvy/pluvy.json) to `.pluvy/pluvy.json` in
 the target repository and then adapt it to that repository's structure; or you can write a minimal
 working policy by hand, in which an empty `checkers` object (or omitting that key) keeps every
 checker enabled by default:
@@ -101,7 +101,7 @@ When you start from a minimal policy, build it up in the order below and take a 
 before deciding the next one:
 
 1. Use `include` / `exclude` to delimit the files that take part in the audit;
-2. Run `code-harness --all` for the first time to get a baseline reading — an existing repository
+2. Run `pluvy --all` for the first time to get a baseline reading — an existing repository
    usually exits 1, which is expected, see
    [First full audit of an existing repository](#first-full-audit-of-an-existing-repository); if no
    supported source file falls inside the range, it exits 2 as a configuration error, so `include`
@@ -141,16 +141,16 @@ exclusive:
 Canonical commands:
 
 ```sh
-code-harness --all
-code-harness --staged
-code-harness --base <commit>
-code-harness --root /path/to/project --all
-code-harness --all --format json
+pluvy --all
+pluvy --staged
+pluvy --base <commit>
+pluvy --root /path/to/project --all
+pluvy --all --format json
 ```
 
 `--root` defaults to the current directory and must be the repository root in Git modes;
-`--config` defaults to `.codeharness/code-harness.json`; the two combine as
-`code-harness --root /path/to/project --config .codeharness/code-harness.json --all`.
+`--config` defaults to `.pluvy/pluvy.json`; the two combine as
+`pluvy --root /path/to/project --config .pluvy/pluvy.json --all`.
 
 Exit codes:
 
@@ -227,17 +227,17 @@ the mode, exit code and findings truthfully, including the error and warning cou
 items; human development follows the same rules. The situation-to-command table (uncommitted
 changes, commits produced by the task, unknown start commit, staged-audit boundary), the three
 policy rules, the supporting self-checks and the report format are authoritative in the
-[code-harness skill](../.agents/skills/code-harness/SKILL.md). Those self-checks include the
+[pluvy skill](../.agents/skills/pluvy/SKILL.md). Those self-checks include the
 files-count check: the report's last line reads `Architecture base: N files`, and N=0 cannot
 count as a pass when the task really changed code.
 
 ## Agent integration
 
-The skill directory comes from `.agents/skills/code-harness/` in the source checkout (with
+The skill directory comes from `.agents/skills/pluvy/` in the source checkout (with
 `SKILL.md` and `references/`). Three integration paths:
 
 1. **Native skills directory**: when the consuming project follows the skills-directory convention,
-   copy `.agents/skills/code-harness/` from the checkout to the project's (or the user-level) skills
+   copy `.agents/skills/pluvy/` from the checkout to the project's (or the user-level) skills
    location, and the agent can route and load it by the skill description.
 2. **Agent-specific directory adaptation**: when an agent reads instructions only from its own
    directory, the integration shape follows from where that directory lives. Inside a repository
@@ -259,10 +259,10 @@ The skill directory comes from `.agents/skills/code-harness/` in the source chec
    rewrite AGENTS.md (it is the user's own policy asset):
 
 ```markdown
-<!-- code-harness skill pointer -->
-When adopting, configuring, or running code-harness, or triaging its findings,
-first read `.agents/skills/code-harness/SKILL.md` and follow it.
+<!-- pluvy skill pointer -->
+When adopting, configuring, or running pluvy, or triaging its findings,
+first read `.agents/skills/pluvy/SKILL.md` and follow it.
 ```
 
 For the general integration paths and limits, see
-[agent integration notes](../.agents/skills/code-harness/references/agent-integration.md).
+[agent integration notes](../.agents/skills/pluvy/references/agent-integration.md).

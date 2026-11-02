@@ -4,18 +4,18 @@ from dataclasses import dataclass
 
 import pytest
 
-from code_harness.diagnostics import AnalysisError, Finding
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.policy.models import Policy
-from code_harness.review.contracts import (
+from pluvy.diagnostics import AnalysisError, Finding
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.policy.models import Policy
+from pluvy.review.contracts import (
     AgentReviewRule,
     ReviewGuideline,
     ReviewRequest,
     ReviewResult,
 )
-from code_harness.review.prompt import ReviewPrompt
-from code_harness.review.rules import PromptReviewRule
-from code_harness.source import Language, Source
+from pluvy.review.prompt import ReviewPrompt
+from pluvy.review.rules import PromptReviewRule
+from pluvy.source import Language, Source
 
 _GUIDELINE = ReviewGuideline(
     "review.ownership",

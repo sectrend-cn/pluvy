@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_harness.cli import main
-from code_harness.diagnostics import Report
-from code_harness.engine import check
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.diagnostics import Report
+from pluvy.engine import check
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 
 @pytest.mark.parametrize(
@@ -122,8 +122,8 @@ def test_syntax_is_not_a_configurable_checker() -> None:
 def test_global_scope_and_disabled_checkers_are_reported(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text(
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text(
         '{"include":["*.py"],"exclude":["excluded.py"],'
         '"checkers":{"type.signature":{"enabled":false}}}'
     )
@@ -195,8 +195,8 @@ def test_function_size_switch_disables_all_metrics_and_preserves_type_checks() -
 def test_function_size_disabled_report_uses_the_checker_name(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text(
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"function_size":{"enabled":false,"lines":1}}}'
     )
     (tmp_path / "app.py").write_text("def run() -> int:\n    return 1\n")

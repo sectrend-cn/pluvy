@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Finding, Report
-from code_harness.engine import check
-from code_harness.policy.models import BroadTypeOptions, CheckerOptions, Checkers, Policy
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.diagnostics import Finding, Report
+from pluvy.engine import check
+from pluvy.policy.models import BroadTypeOptions, CheckerOptions, Checkers, Policy
+from pluvy.source import Language, Source
 
 _DEFAULT_POLICY = Policy()
 
@@ -135,8 +135,8 @@ def test_broad_type_check_is_independent_of_boundary_switch() -> None:
 def test_cli_reports_serialization_and_preserves_source(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     source = tmp_path / "app.py"
     content = b"import json\nvalue = json.dumps({'count': 1})\n"
     source.write_bytes(content)
@@ -198,10 +198,8 @@ def test_broad_switch_groups_json_and_markers_preserving_annotation_checks() -> 
 def test_cli_uses_broad_checker_switch_for_json(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text(
-        '{"checkers":{"type.broad":{"enabled":false}}}'
-    )
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text('{"checkers":{"type.broad":{"enabled":false}}}')
     (tmp_path / "app.py").write_text("import json\nencoded = json.dumps({'count': 1})\n")
     assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == 0
     report = Report.model_validate_json(capsys.readouterr().out)

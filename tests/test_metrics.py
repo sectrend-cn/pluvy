@@ -2,9 +2,9 @@
 
 import pytest
 
-from code_harness.engine import check
-from code_harness.models import Language, Policy, Source
-from code_harness.policy.models import (
+from pluvy.engine import check
+from pluvy.models import Language, Policy, Source
+from pluvy.policy.models import (
     Checkers,
     FunctionSizeOptions,
 )

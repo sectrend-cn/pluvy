@@ -3,12 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from code_harness.diagnostics import Finding
-from code_harness.engine import check
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.policy.models import Checkers, Policy
-from code_harness.semantics.projection.options import GuardedProjectionOptions
-from code_harness.source import Language, Source
+from pluvy.diagnostics import Finding
+from pluvy.engine import check
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.policy.models import Checkers, Policy
+from pluvy.semantics.projection.options import GuardedProjectionOptions
+from pluvy.source import Language, Source
 
 _DEFAULT_POLICY = Policy()
 _SCRIPT_LANGUAGES = (Language.JAVASCRIPT, Language.TYPESCRIPT, Language.TSX)

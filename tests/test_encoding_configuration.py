@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_harness.cli import main
-from code_harness.diagnostics import Finding, Report
-from code_harness.engine import check
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.diagnostics import Finding, Report
+from pluvy.engine import check
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 _POLICY = Policy.model_validate_json("""{
   "checkers": {"type.broad": {"encoding": {
@@ -160,8 +160,8 @@ def test_cli_reads_encoding_policy_without_modifying_source(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    policy = tmp_path / ".codeharness/code-harness.json"
+    (tmp_path / ".pluvy").mkdir()
+    policy = tmp_path / ".pluvy/pluvy.json"
     policy.write_text(_POLICY.model_dump_json(by_alias=True))
     source = tmp_path / "app.py"
     content = "import codec\nvalue = codec.encode({'count': 1})\n"

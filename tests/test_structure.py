@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_harness.cli import main
-from code_harness.diagnostics import Report
-from code_harness.engine import check
-from code_harness.policy.models import (
+from pluvy.cli import main
+from pluvy.diagnostics import Report
+from pluvy.engine import check
+from pluvy.policy.models import (
     Checkers,
     ImportOptions,
     Owner,
@@ -17,7 +17,7 @@ from code_harness.policy.models import (
     SourcePlacement,
     StructureOptions,
 )
-from code_harness.source import Language, Source
+from pluvy.source import Language, Source
 
 _PLACEMENT = SourcePlacement(
     name="language rule modules",
@@ -111,9 +111,9 @@ def test_invalid_placement_configuration_fails_closed(settings: str) -> None:
 
 def test_repository_policy_rejects_python_rules_outside_language_owner() -> None:
     root = Path(__file__).resolve().parents[1]
-    policy = Policy.model_validate_json((root / ".codeharness/code-harness.json").read_bytes())
-    old = Source("src/code_harness/python_rules.py", b"value: int = 1", Language.PYTHON)
-    moved = Source("src/code_harness/languages/python_rules.py", old.content, Language.PYTHON)
+    policy = Policy.model_validate_json((root / ".pluvy/pluvy.json").read_bytes())
+    old = Source("src/pluvy/python_rules.py", b"value: int = 1", Language.PYTHON)
+    moved = Source("src/pluvy/languages/python_rules.py", old.content, Language.PYTHON)
     assert any(finding.rule == "architecture.structure" for finding in check(old, policy))
     assert check(moved, policy) == ()
 
@@ -121,8 +121,8 @@ def test_repository_policy_rejects_python_rules_outside_language_owner() -> None
 def test_cli_reports_and_can_disable_structure_check(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    policy_path = tmp_path / ".codeharness/code-harness.json"
+    (tmp_path / ".pluvy").mkdir()
+    policy_path = tmp_path / ".pluvy/pluvy.json"
     policy_path.write_text(_POLICY.model_dump_json(by_alias=True))
     (tmp_path / "src").mkdir()
     source = tmp_path / "src/python_rules.py"

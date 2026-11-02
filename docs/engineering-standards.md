@@ -160,7 +160,7 @@ serialization filtering or forwarding helpers, and do not weaken optional-field
 types just to pass the gate. Turning assignments into conditional spreads does
 not remove the pattern, and repeated validation of already typed internal fields
 is not remediation. Exact adapter coverage and conservative inference limits are
-documented in `.agents/skills/code-harness/references/checkers/structure.guarded_projection.md`.
+documented in `.agents/skills/pluvy/references/checkers/structure.guarded_projection.md`.
 
 ## Unused declarations and results
 

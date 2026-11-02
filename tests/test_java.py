@@ -4,18 +4,18 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Finding, Report
-from code_harness.engine import check
-from code_harness.plugins.builtins import builtin_registry
-from code_harness.policy.models import (
+from pluvy.cli import main
+from pluvy.diagnostics import Finding, Report
+from pluvy.engine import check
+from pluvy.plugins.builtins import builtin_registry
+from pluvy.policy.models import (
     Boundary,
     Checkers,
     FunctionSizeOptions,
     ImportOptions,
     Policy,
 )
-from code_harness.source import Language, Source
+from pluvy.source import Language, Source
 
 
 def _check(content: str, policy: Policy | None = None) -> tuple[Finding, ...]:
@@ -249,8 +249,8 @@ def test_java_third_party_result_requires_ingress_conversion() -> None:
 def test_java_discovery_and_cli_preserve_source(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}\n")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}\n")
     source = tmp_path / "Example.java"
     content = b"class Example { Object value; }"
     source.write_bytes(content)

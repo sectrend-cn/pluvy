@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Finding, Report
-from code_harness.engine import check
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.diagnostics import Finding, Report
+from pluvy.engine import check
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 
 def _findings(code: str, language: Language, *, external: bool = False) -> tuple[Finding, ...]:
@@ -148,8 +148,8 @@ def test_discarded_returns_are_warnings(language: Language, code: str) -> None:
 def test_warning_only_cli_passes_in_text_and_json(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "app.py").write_text("def result() -> int:\n    return 1\nresult()\n")
     assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == 0
     report = Report.model_validate_json(capsys.readouterr().out)
@@ -424,8 +424,8 @@ def test_callback_returned_object_fields_are_used() -> None:
 def test_cross_file_field_reads_prevent_false_unused_reports(
     tmp_path: Path, model_path: str, model: str, consumer_path: str, consumer: str
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / model_path).write_text(model)
     (tmp_path / consumer_path).write_text(consumer)
     assert main(["--root", str(tmp_path), "--all"]) == 0
@@ -459,8 +459,8 @@ def test_new_checkers_can_be_disabled_independently(checker: str) -> None:
 
 
 def test_go_package_usage_spans_files(tmp_path: Path) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "model.go").write_text(
         "package sample\ntype item struct { value int }; func helper() int { return 1 }\n"
     )
@@ -554,8 +554,8 @@ def test_later_function_definition_shadows_external_import() -> None:
 def test_cross_file_reads_do_not_hide_unread_fields_on_another_class(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg/models.py").write_text(
         "class Used:\n    value: int\nclass Unused:\n    value: int\n"
@@ -2760,8 +2760,8 @@ def test_cross_file_value_inferred_elements_resolve_the_imported_class(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """An imported class keeps element resolution while the unused control still reports."""
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "models.py").write_text(
         "class Item:\n"
         "    def render(self) -> int:\n"

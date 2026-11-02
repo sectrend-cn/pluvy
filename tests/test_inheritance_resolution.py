@@ -2,18 +2,18 @@
 
 import pytest
 
-from code_harness.languages.go import GoLanguage
-from code_harness.languages.go.semantic_syntax import GoSemanticSyntax
-from code_harness.languages.java import JavaLanguage
-from code_harness.languages.java.semantic_syntax import JavaSemanticSyntax
-from code_harness.languages.python import PythonLanguage
-from code_harness.languages.python.semantic_syntax import PythonSemanticSyntax
-from code_harness.languages.typescript import TypeScriptLanguage
-from code_harness.languages.typescript.semantic_syntax import TypeScriptSemanticSyntax
-from code_harness.policy.models import Policy
-from code_harness.semantics.index import SemanticIndex
-from code_harness.semantics.project import ProjectUsage
-from code_harness.source import Language, Source
+from pluvy.languages.go import GoLanguage
+from pluvy.languages.go.semantic_syntax import GoSemanticSyntax
+from pluvy.languages.java import JavaLanguage
+from pluvy.languages.java.semantic_syntax import JavaSemanticSyntax
+from pluvy.languages.python import PythonLanguage
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.languages.typescript import TypeScriptLanguage
+from pluvy.languages.typescript.semantic_syntax import TypeScriptSemanticSyntax
+from pluvy.policy.models import Policy
+from pluvy.semantics.index import SemanticIndex
+from pluvy.semantics.project import ProjectUsage
+from pluvy.source import Language, Source
 
 
 def _typescript(code: str, path: str) -> SemanticIndex:
