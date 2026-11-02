@@ -233,15 +233,31 @@ class SemanticIndex:
 
     def _element_write(self, symbol: Symbol, value: Node | None) -> None:
         """Withdraw container evidence a conflicting element write can no longer support."""
-        container = self.syntax.single_value(symbol.value) if symbol.value is not None else None
-        if symbol.annotation is not None or not self.syntax.element_inferred(container):
+        record = symbol.value
+        if record is None or symbol.annotation is not None:
+            return
+        if not self.syntax.element_inferred(self.syntax.single_value(record)):
             return
         written = self._value_type(value)
         if written and written == symbol.type_name:
             return
         symbol.type_name = ""
         symbol.class_scope = None
-        symbol.element_conflict = symbol.value
+        symbol.element_conflict = self._element_record(symbol, record)
+
+    def _element_record(self, symbol: Symbol, record: Node) -> Node:
+        """Choose the withdrawn record an element write leaves behind.
+
+        Element writes replay in document order, so a record naming a later container of the
+        same tree already outlives this write and stays. Records from another tree stay
+        withdrawn as well, matching the conservative reading of an unprovable order.
+        """
+        conflict = symbol.element_conflict
+        if conflict is None or conflict.id == record.id:
+            return record
+        if not self._same_tree(conflict) or not self._same_tree(record):
+            return conflict
+        return conflict if conflict.start_byte > record.start_byte else record
 
     def _kept_element_conflict(self, symbol: Symbol, value: Node | None) -> None:
         """Keep withdrawn container evidence withdrawn until a later assignment replaces it.
@@ -252,12 +268,14 @@ class SemanticIndex:
         conflict = symbol.element_conflict
         if conflict is None:
             return
-        if symbol.annotation is None and value is not None and value.id == conflict.id:
+        if symbol.annotation is not None:
+            symbol.element_conflict = None
+            return
+        if value is None:
+            return
+        if value.id == conflict.id:
             symbol.type_name = ""
             symbol.class_scope = None
-            return
-        if symbol.annotation is not None or value is None:
-            symbol.element_conflict = None
             return
         if not self._same_tree(conflict):
             symbol.type_name = ""
