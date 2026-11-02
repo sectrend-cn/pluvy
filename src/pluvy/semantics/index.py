@@ -35,12 +35,20 @@ class SemanticIndex:
         return spelling(node, self.context.source)
 
     def symbols(self) -> tuple[Symbol, ...]:
-        declarations = {
-            symbol.node.id: symbol
-            for scope in self.scopes
-            for symbol in (*scope.symbols.values(), *scope.static_symbols.values())
-        }
+        """Collect the declarations this index's own snapshot owns."""
+        declarations: dict[int, Symbol] = {}
+        for scope in self.scopes:
+            for symbol in (*scope.symbols.values(), *scope.static_symbols.values()):
+                if self.declares(symbol):
+                    declarations[symbol.node.id] = symbol
         return tuple(declarations.values())
+
+    def declares(self, symbol: Symbol) -> bool:
+        """Report whether the symbol's declaration belongs to this index's snapshot."""
+        node = symbol.node
+        while node.parent is not None:
+            node = node.parent
+        return node == self.context.root
 
     def lookup(self, name: str, scope: int) -> Symbol | None:
         current: int | None = scope
@@ -162,13 +170,20 @@ class SemanticIndex:
 
     def _explicit_receivers(self, scope_id: int, scope: Scope) -> None:
         for name, annotation in self.syntax.receivers(scope.node):
-            symbol = scope.symbols.get(self.text(name)) or self._bind(name, "variable", scope_id)
-            symbol.annotation = annotation
-            owner = self.class_scope(self._declared_type(symbol.annotation))
-            method = self.functions.get(scope.node.id)
-            if owner is not None and method is not None:
-                owner.symbols[method.name] = method
-                self.attached_members.add(method.node.id)
+            if name is not None:
+                symbol = scope.symbols.get(self.text(name)) or self._bind(
+                    name, "variable", scope_id
+                )
+                symbol.annotation = annotation
+            self._attached_method(scope, annotation)
+
+    def _attached_method(self, scope: Scope, annotation: Node | None) -> None:
+        """Attach the declared method to the type its receiver names."""
+        owner = self.class_scope(self._declared_type(annotation))
+        method = self.functions.get(scope.node.id)
+        if owner is not None and method is not None:
+            owner.symbols[method.name] = method
+            self.attached_members.add(method.node.id)
 
     def _annotation_scope(self, node: Node | None) -> Scope | None:
         if node is None:

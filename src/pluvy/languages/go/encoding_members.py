@@ -30,7 +30,10 @@ class GoInstanceOutputs:
             return None
         method = self.index.scopes[symbol.scope].node
         declared = self.index.syntax.receivers(method)
-        if len(declared) != 1 or declared[0][0] != symbol.node:
+        if len(declared) != 1:
+            return None
+        name = declared[0][0]
+        if name is None or name != symbol.node:
             return None
         return symbol.class_scope
 
@@ -67,5 +70,6 @@ class GoInstanceOutputs:
         receivers = self.index.syntax.receivers(node)
         if declared is None or self.index.text(declared) != name or len(receivers) != 1:
             return False
-        symbol = self.index.resolve(receivers[0][0])
+        receiver = receivers[0][0]
+        symbol = self.index.resolve(receiver) if receiver is not None else None
         return symbol is not None and symbol.class_scope is owner

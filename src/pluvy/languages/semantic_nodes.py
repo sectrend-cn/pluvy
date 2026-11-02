@@ -115,15 +115,19 @@ class SemanticNodes(ABC):
     def implicit_receivers(self) -> tuple[str, ...]:
         return self.receiver_names
 
-    def receivers(self, node: Node) -> tuple[tuple[Node, Node | None], ...]:
+    def receivers(self, node: Node) -> tuple[tuple[Node | None, Node | None], ...]:
         receiver = field(node, "receiver")
         if receiver is None:
             return ()
-        return tuple(
-            (name, field(entry, "type"))
-            for entry in receiver.named_children
-            for name in entry.children_by_field_name("name")
-        )
+        declared: list[tuple[Node | None, Node | None]] = []
+        for entry in receiver.named_children:
+            annotation = field(entry, "type")
+            names = entry.children_by_field_name("name")
+            if names:
+                declared.extend((name, annotation) for name in names)
+            else:
+                declared.append((None, annotation))
+        return tuple(declared)
 
     def assignment(self, node: Node) -> tuple[Node | None, Node | None]:
         if node.type in self.assignments:

@@ -470,6 +470,71 @@ def test_go_package_usage_spans_files(tmp_path: Path) -> None:
     assert main(["--root", str(tmp_path), "--all"]) == 0
 
 
+def _go_receiver_project(tmp_path: Path, receiver: str, call: str) -> None:
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
+    (tmp_path / "methods.go").write_text(
+        f'package main\n\nfunc {receiver} render() {{ println("rendered") }}\n'
+    )
+    (tmp_path / "types.go").write_text(
+        "package main\n\ntype item struct{}\n\n"
+        f"func makeItems() []item {{ return []item{{{{}}}} }}\n\nfunc main() {{ {call} }}\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("receiver", "call"),
+    [
+        ("(item)", "makeItems()[0].render()"),
+        ("(*item)", "value := makeItems()[0]\n\tvalue.render()"),
+        ("(value item)", "makeItems()[0].render()"),
+        ("(value *item)", "value := makeItems()[0]\n\tvalue.render()"),
+    ],
+)
+def test_go_receiver_method_calls_are_used(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    receiver: str,
+    call: str,
+) -> None:
+    _go_receiver_project(tmp_path, receiver, call)
+    assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == 0
+    assert Report.model_validate_json(capsys.readouterr().out).findings == ()
+
+
+@pytest.mark.parametrize(
+    ("receiver", "column"),
+    [("(item)", 13), ("(*item)", 14), ("(value item)", 19), ("(value *item)", 20)],
+)
+def test_go_unused_receiver_methods_are_reported_once(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    receiver: str,
+    column: int,
+) -> None:
+    _go_receiver_project(tmp_path, receiver, "_ = makeItems()[0]")
+    assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == 1
+    report = Report.model_validate_json(capsys.readouterr().out)
+    assert [(f.path, f.line, f.column, f.rule) for f in report.findings] == [
+        ("methods.go", 3, column, "unused.function")
+    ]
+
+
+def test_go_method_usage_in_one_file_matches_split_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
+    (tmp_path / "main.go").write_text(
+        "package main\n\ntype item struct{}\n\n"
+        "func makeItems() []item { return []item{{}} }\n\n"
+        "func (value item) render() { println(&value) }\n\n"
+        "func main() { makeItems()[0].render() }\n"
+    )
+    assert main(["--root", str(tmp_path), "--all", "--format", "json"]) == 0
+    assert Report.model_validate_json(capsys.readouterr().out).findings == ()
+
+
 @pytest.mark.parametrize(
     ("language", "code"),
     [
