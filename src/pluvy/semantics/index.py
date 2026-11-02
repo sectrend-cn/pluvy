@@ -232,16 +232,30 @@ class SemanticIndex:
             symbol.class_scope = self._annotation_scope(symbol.annotation) or self.value_scope(
                 value
             )
+            self._kept_element_conflict(symbol, value)
 
     def _element_write(self, symbol: Symbol, value: Node | None) -> None:
         """Withdraw container evidence a conflicting element write can no longer support."""
-        if symbol.annotation is not None or not self.syntax.element_inferred(symbol.value):
+        container = self.syntax.single_value(symbol.value) if symbol.value is not None else None
+        if symbol.annotation is not None or not self.syntax.element_inferred(container):
             return
         written = self._value_type(value)
         if written and written == symbol.type_name:
             return
         symbol.type_name = ""
         symbol.class_scope = None
+        symbol.element_conflict = symbol.value
+
+    def _kept_element_conflict(self, symbol: Symbol, value: Node | None) -> None:
+        """Keep withdrawn container evidence withdrawn until the container itself is replaced."""
+        conflict = symbol.element_conflict
+        if conflict is None:
+            return
+        if symbol.annotation is None and value is not None and value.id == conflict.id:
+            symbol.type_name = ""
+            symbol.class_scope = None
+            return
+        symbol.element_conflict = None
 
     def _assignment_symbol(self, target: Node) -> Symbol | None:
         scope = self.locations.get(target.id, 0)

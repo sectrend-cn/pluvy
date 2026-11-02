@@ -13,7 +13,8 @@ type SymbolKind = Literal["parameter", "function", "field", "variable", "class",
 
 @dataclass
 class Symbol:
-    """A lexical declaration and its observed reads, writes and external escape."""
+    """A lexical declaration, its observed reads, writes and external escape, and the
+    container value whose element-derived type evidence a conflicting write withdrew."""
 
     name: str
     node: Node
@@ -28,6 +29,7 @@ class Symbol:
     value: Node | None = None
     annotation: Node | None = None
     annotation_text: str = ""
+    element_conflict: Node | None = None
     class_scope: "Scope | None" = None
     target: "Symbol | None" = None
 

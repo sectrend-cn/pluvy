@@ -4,7 +4,15 @@ import pytest
 
 from pluvy.diagnostics import Finding
 from pluvy.engine import check
+from pluvy.languages.javascript.semantic_syntax import JavaScriptSemanticSyntax
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.languages.typescript.semantic_syntax import TypeScriptSemanticSyntax
+from pluvy.plugins.builtins import tree_parser
 from pluvy.policy.models import Policy
+from pluvy.semantics.index import SemanticIndex
+from pluvy.semantics.model import SemanticSyntax
+from pluvy.semantics.project import ProjectUsage
+from pluvy.semantics.usage import UsageRule
 from pluvy.source import Language, Source
 
 _PYTHON_RENDER_ITEM = """class Item:
@@ -584,3 +592,172 @@ _JAVA_ARRAY_CREATION_ELEMENT_WRITE = """class Sample {
 def test_java_array_creation_element_write_keeps_the_spelled_owner() -> None:
     findings = _findings(_JAVA_ARRAY_CREATION_ELEMENT_WRITE, Language.JAVA)
     assert [(finding.rule, finding.line) for finding in findings] == [("unused.return", 13)]
+
+
+_SEMANTIC_SYNTAX: dict[Language, SemanticSyntax] = {
+    Language.PYTHON: PythonSemanticSyntax(),
+    Language.JAVASCRIPT: JavaScriptSemanticSyntax(),
+    Language.TYPESCRIPT: TypeScriptSemanticSyntax(),
+}
+
+_SAMPLE_PATHS: dict[Language, str] = {
+    Language.PYTHON: "sample.py",
+    Language.JAVASCRIPT: "sample.js",
+    Language.TYPESCRIPT: "sample.ts",
+}
+
+
+def _index(code: str, language: Language) -> SemanticIndex:
+    source = Source(_SAMPLE_PATHS[language], code.encode(), language)
+    context = tree_parser(language).parse(source, Policy())
+    index = SemanticIndex(context, _SEMANTIC_SYNTAX[language])
+    ProjectUsage((index,)).prepare()
+    return index
+
+
+def _member_reads(index: SemanticIndex, owner: str, name: str) -> tuple[int, ...]:
+    scope = index.class_scope(owner)
+    assert scope is not None
+    return tuple(read.start_point.row + 1 for read in scope.symbols[name].reads)
+
+
+def _usage(index: SemanticIndex) -> tuple[tuple[str, int, str], ...]:
+    return tuple(
+        (finding.rule, finding.line, finding.message) for finding in UsageRule().evaluate(index)
+    )
+
+
+@pytest.mark.parametrize(
+    ("language", "code"),
+    [
+        pytest.param(
+            Language.PYTHON,
+            _source(
+                _PYTHON_RENDER_ITEM + _PYTHON_RENDER_OTHER,
+                "items = ([Item(), Item()])\nitems[0] = Other()\nitems[0].render()",
+            ),
+            id="python",
+        ),
+        pytest.param(
+            Language.JAVASCRIPT,
+            _source(
+                _JAVASCRIPT_RENDER_ITEM + _JAVASCRIPT_RENDER_OTHER,
+                "const items = ([new Item(), new Item()]);\n"
+                "items[0] = new Other();\n"
+                "items[0].render();",
+            ),
+            id="javascript",
+        ),
+        pytest.param(
+            Language.TYPESCRIPT,
+            _source(
+                _TYPESCRIPT_RENDER_ITEM + _TYPESCRIPT_RENDER_OTHER,
+                "const items = ([new Item(), new Item()]);\n"
+                "items[0] = new Other();\n"
+                "items[0].render();",
+            ),
+            id="typescript",
+        ),
+    ],
+)
+def test_parenthesized_container_write_withdraws_the_element_evidence(
+    language: Language, code: str
+) -> None:
+    assert _findings(code, language) == ()
+    index = _index(code, language)
+    assert "render" in index.unresolved_reads
+    assert _member_reads(index, "Item", "render") == ()
+    assert _member_reads(index, "Other", "render") == ()
+
+
+@pytest.mark.parametrize(
+    ("language", "code"),
+    [
+        pytest.param(
+            Language.PYTHON,
+            _source(
+                _PYTHON_RENDER_INT_ITEM + _PYTHON_RENDER_OTHER,
+                "items = [Item(), Item()]\n"
+                "items[0] = Other()\n"
+                "items = [Item(), Item()]\n"
+                "items[1].render()",
+            ),
+            id="python",
+        ),
+        pytest.param(
+            Language.JAVASCRIPT,
+            _source(
+                _JAVASCRIPT_RENDER_INT_ITEM + _JAVASCRIPT_RENDER_OTHER,
+                "const items = [new Item(), new Item()];\n"
+                "items[0] = new Other();\n"
+                "items = [new Item(), new Item()];\n"
+                "items[1].render();",
+            ),
+            id="javascript",
+        ),
+        pytest.param(
+            Language.TYPESCRIPT,
+            _source(
+                _TYPESCRIPT_RENDER_INT_ITEM + _TYPESCRIPT_RENDER_OTHER,
+                "const items = [new Item(), new Item()];\n"
+                "items[0] = new Other();\n"
+                "items = [new Item(), new Item()];\n"
+                "items[1].render();",
+            ),
+            id="typescript",
+        ),
+    ],
+)
+def test_container_reassignment_restores_the_element_evidence(
+    language: Language, code: str
+) -> None:
+    findings = _findings(code, language)
+    assert _reported(findings) == (
+        ("unused.function", _unused("render")),
+        ("unused.return", "Return value from 'render' is discarded"),
+    )
+    assert findings[0].line == _line_of(code, "class Other") + 1
+    assert findings[1].line == _line_of(code, "items[1].render")
+
+
+@pytest.mark.parametrize(
+    ("language", "code"),
+    [
+        pytest.param(
+            Language.PYTHON,
+            _source(
+                _PYTHON_RENDER_ITEM + _PYTHON_RENDER_OTHER,
+                "items = ([Item(), Item()])\nitems[0] = Other()\nitems[0].render()",
+            ),
+            id="python",
+        ),
+        pytest.param(
+            Language.JAVASCRIPT,
+            _source(
+                _JAVASCRIPT_RENDER_ITEM + _JAVASCRIPT_RENDER_OTHER,
+                "const items = ([new Item(), new Item()]);\n"
+                "items[0] = new Other();\n"
+                "items[0].render();",
+            ),
+            id="javascript",
+        ),
+        pytest.param(
+            Language.TYPESCRIPT,
+            _source(
+                _TYPESCRIPT_RENDER_ITEM + _TYPESCRIPT_RENDER_OTHER,
+                "const items = ([new Item(), new Item()]);\n"
+                "items[0] = new Other();\n"
+                "items[0].render();",
+            ),
+            id="typescript",
+        ),
+    ],
+)
+def test_repeated_refresh_keeps_parenthesized_element_evidence_withdrawn(
+    language: Language, code: str
+) -> None:
+    index = _index(code, language)
+    first = _usage(index)
+    index.refresh()
+    index.refresh()
+    assert _usage(index) == first == ()
