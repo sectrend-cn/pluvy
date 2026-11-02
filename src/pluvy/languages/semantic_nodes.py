@@ -116,6 +116,11 @@ class SemanticNodes(ABC):
         return self.receiver_names
 
     def receivers(self, node: Node) -> tuple[tuple[Node | None, Node | None], ...]:
+        """Return receiver declarations as name and type annotation node pairs.
+
+        An unnamed receiver (Go value or pointer form) holds None as its name, and this
+        syntax always supplies the annotation.
+        """
         receiver = field(node, "receiver")
         if receiver is None:
             return ()

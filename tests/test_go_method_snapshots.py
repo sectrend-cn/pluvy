@@ -67,11 +67,12 @@ def _revise(root: Path, types: str) -> None:
 
 
 @pytest.mark.parametrize("mode", [("--all",), ("--base", "HEAD"), ("--staged",)])
-def test_called_method_usage_across_files_in_every_snapshot_mode(
+def test_chained_method_call_is_not_reported_in_every_snapshot_mode(
     repository: Path,
     capsys: pytest.CaptureFixture[str],
     mode: tuple[str, ...],
 ) -> None:
+    """A chained call keeps its method unreported through name-based conservative suppression."""
     _revise(repository, _CALLED)
     assert main(["--root", str(repository), *mode, "--format", "json"]) == 0
     assert Report.model_validate_json(capsys.readouterr().out).findings == ()

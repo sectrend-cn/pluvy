@@ -39,15 +39,15 @@ class SemanticIndex:
         declarations: dict[int, Symbol] = {}
         for scope in self.scopes:
             for symbol in (*scope.symbols.values(), *scope.static_symbols.values()):
-                if self.declares(symbol):
+                if self.owns(symbol):
                     declarations[symbol.node.id] = symbol
         for method in self.attached_members.values():
-            if self.declares(method):
+            if self.owns(method):
                 declarations[method.node.id] = method
         return tuple(declarations.values())
 
-    def declares(self, symbol: Symbol) -> bool:
-        """Report whether the symbol's declaration belongs to this index's snapshot."""
+    def owns(self, symbol: Symbol) -> bool:
+        """Report whether this index's snapshot owns the symbol's declaration."""
         node = symbol.node
         while node.parent is not None:
             node = node.parent
