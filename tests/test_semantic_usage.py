@@ -1513,39 +1513,42 @@ def test_element_write_controls_keep_unused_methods_reported(
         pytest.param(
             Language.GO,
             _GO_ELEMENT_DIFFERENT_NAME,
-            (("unused.function", 9, "write"), ("unused.return", 14, "render")),
+            (
+                ("unused.function", 9, "error", "write"),
+                ("unused.return", 14, "warning", "render"),
+            ),
             id="go",
         ),
         pytest.param(
             Language.PYTHON,
             _PYTHON_ELEMENT_DIFFERENT_NAME,
-            (("unused.function", 7, "write"),),
+            (("unused.function", 7, "error", "write"),),
             id="python",
         ),
         pytest.param(
             Language.JAVASCRIPT,
             _JAVASCRIPT_ELEMENT_DIFFERENT_NAME,
-            (("unused.function", 2, "write"),),
+            (("unused.function", 2, "error", "write"),),
             id="javascript",
         ),
         pytest.param(
             Language.TYPESCRIPT,
             _TYPESCRIPT_ELEMENT_DIFFERENT_NAME,
-            (("unused.function", 2, "write"),),
+            (("unused.function", 2, "error", "write"),),
             id="typescript",
         ),
     ],
 )
 def test_different_element_write_types_follow_the_container_evidence(
-    language: Language, code: str, expected: tuple[tuple[str, int, str], ...]
+    language: Language, code: str, expected: tuple[tuple[str, int, str, str], ...]
 ) -> None:
     findings = _findings(code, language)
-    assert tuple((f.rule, f.line) for f in findings) == tuple(
-        (rule, line) for rule, line, _ in expected
+    assert tuple((f.rule, f.line, f.severity) for f in findings) == tuple(
+        (rule, line, severity) for rule, line, severity, _ in expected
     )
     assert all(
         f"'{name}'" in finding.message
-        for finding, (_, _, name) in zip(findings, expected, strict=True)
+        for finding, (_, _, _, name) in zip(findings, expected, strict=True)
     )
 
 
@@ -2148,34 +2151,34 @@ items[1].render();
 
 
 @pytest.mark.parametrize(
-    ("language", "code", "expected", "discarded"),
+    ("language", "code", "expected", "returns"),
     [
         pytest.param(
             Language.PYTHON,
             _PYTHON_PARENTHESIZED_ELEMENT_INGRESS,
             (("type.boundary", 10, 5, "error"),),
-            False,
+            (),
             id="python",
         ),
         pytest.param(
             Language.GO,
             _GO_PARENTHESIZED_ELEMENT_INGRESS,
             (("type.boundary", 10, 2, "error"), ("unused.return", 12, 2, "warning")),
-            True,
+            ("Return value from 'render' is discarded",),
             id="go",
         ),
         pytest.param(
             Language.JAVASCRIPT,
             _JAVASCRIPT_PARENTHESIZED_ELEMENT_INGRESS,
             (("type.boundary", 3, 7, "error"),),
-            False,
+            (),
             id="javascript",
         ),
         pytest.param(
             Language.TYPESCRIPT,
             _TYPESCRIPT_PARENTHESIZED_ELEMENT_INGRESS,
             (("type.boundary", 3, 7, "error"),),
-            False,
+            (),
             id="typescript",
         ),
     ],
@@ -2184,13 +2187,13 @@ def test_parenthesized_element_write_restores_ingress_and_follows_evidence(
     language: Language,
     code: str,
     expected: tuple[tuple[str, int, int, str], ...],
-    discarded: bool,
+    returns: tuple[str, ...],
 ) -> None:
     findings = _findings(code, language, external=True)
     assert tuple((f.rule, f.line, f.column, f.severity) for f in findings) == expected
     assert not any(f.rule == "unused.function" for f in findings)
     assert findings[0].message == "Convert the third-party result into a typed object at ingress"
-    assert any(f.rule == "unused.return" for f in findings) is discarded
+    assert tuple(f.message for f in findings if f.rule == "unused.return") == returns
 
 
 _PYTHON_SHADOW_CLASSES = """\
