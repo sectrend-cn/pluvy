@@ -1,11 +1,11 @@
-# code-harness 快速入门
+# pluvy 快速入门
 
 > 本页为译文，权威版本为 [../getting-started.md](../getting-started.md)。
 
-本指南面向使用 code-harness 的个人开发者，覆盖获取安装、为目标仓库配置策略、日常运行、
+本指南面向使用 pluvy 的个人开发者，覆盖获取安装、为目标仓库配置策略、日常运行、
 存量告警处置，以及「每个代码任务结束后运行门禁」这一持续门禁场景。
 
-code-harness 是只读的解析型工程策略门禁：任何运行模式都不修改、暂存、还原、删除或重写源
+pluvy 是只读的解析型工程策略门禁：任何运行模式都不修改、暂存、还原、删除或重写源
 文件，也不改动 Git 配置。命令、策略示例和契约原文保持英文原文，说明文字使用中文。
 
 ## Installation
@@ -18,36 +18,36 @@ code-harness 是只读的解析型工程策略门禁：任何运行模式都不�
 
 ### 获取源码
 
-获取 code-harness 源码检出（clone 仓库，或解压拿到的源码包）。下文统一用
-`/path/to/code-harness` 指代该检出目录。检出中同时包含工具源码、`examples/` 下的样例策略，
-以及 `.agents/skills/code-harness/` skill。
+获取 pluvy 源码检出（clone 仓库，或解压拿到的源码包）。下文统一用
+`/path/to/pluvy` 指代该检出目录。检出中同时包含工具源码、`examples/` 下的样例策略，
+以及 `.agents/skills/pluvy/` skill。
 
 ### 本地安装
 
 从该检出目录本地安装命令行：
 
 ```sh
-uv tool install /path/to/code-harness
+uv tool install /path/to/pluvy
 ```
 
 不使用 uv 时，pip 等价安装：
 
 ```sh
-python -m pip install /path/to/code-harness
+python -m pip install /path/to/pluvy
 ```
 
-安装把 `code-harness` 放到用户级可执行目录（例如 `~/.local/bin`），请确认该目录在 `PATH`
+安装把 `pluvy` 放到用户级可执行目录（例如 `~/.local/bin`），请确认该目录在 `PATH`
 中。若已存在同名的 uv 工具安装，需要替换时给 `uv tool install` 加 `--force`。
 
 ### 验证
 
 ```sh
-code-harness --help
-code-harness --root /path/to/project --all
+pluvy --help
+pluvy --root /path/to/project --all
 ```
 
 第一条确认命令可用，并列出实际支持的选项：`--root`（默认 `.`）、`--config`
-（默认 `.codeharness/code-harness.json`）、`--format`（`text` 或 `json`），以及必选互斥的
+（默认 `.pluvy/pluvy.json`）、`--format`（`text` 或 `json`），以及必选互斥的
 `--all` / `--staged` / `--base`。第二条对目标仓库执行一次全量审计；若目标仓库还没有按
 [Configuration](#configuration) 建立策略，该命令以 exit 2 报告找不到策略文件，这属于预期
 行为，先完成配置再回来验证。
@@ -59,20 +59,20 @@ code-harness --root /path/to/project --all
 
 ### skill 获取
 
-agent 使用的 skill 与工具来自同一份源码检出：把检出中的 `.agents/skills/code-harness/`
+agent 使用的 skill 与工具来自同一份源码检出：把检出中的 `.agents/skills/pluvy/`
 复制到消费项目的 skill 位置即可，接入路径见 [Agent integration](#agent-integration)。
 
 ## Configuration
 
 ### 建立仓库策略
 
-每个目标仓库自己持有并提交一份 `.codeharness/code-harness.json`（策略路径相对 `--root`
+每个目标仓库自己持有并提交一份 `.pluvy/pluvy.json`（策略路径相对 `--root`
 解析，Git 模式同样如此）。工具没有生成或初始化策略的命令，文件由使用者手写并提交：
 工具自身定义的选项只有 `--all`、`--staged`、`--base`、`--root`、`--config` 与 `--format`，
 另有自动提供的 `-h, --help` 帮助选项。
 
-起步方式有两种。可以把 [样例策略](../../examples/.codeharness/code-harness.json) 复制到目标仓库的
-`.codeharness/code-harness.json`，再按该仓库的结构调整；也可以直接手写一份最小可用策略，
+起步方式有两种。可以把 [样例策略](../../examples/.pluvy/pluvy.json) 复制到目标仓库的
+`.pluvy/pluvy.json`，再按该仓库的结构调整；也可以直接手写一份最小可用策略，
 其中 `checkers` 为空对象（或省略该键）时，全部 checker 保持默认启用：
 
 ```json
@@ -90,7 +90,7 @@ agent 使用的 skill 与工具来自同一份源码检出：把检出中的 `.a
 从最小策略起步时，按下面的顺序逐步建立，每一步都先拿到读数再决定下一步：
 
 1. 用 `include` / `exclude` 圈定参与审计的文件范围；
-2. 首次执行 `code-harness --all` 取得基线读数——存量仓库通常返回 exit 1，属预期，见
+2. 首次执行 `pluvy --all` 取得基线读数——存量仓库通常返回 exit 1，属预期，见
    [存量仓库的首次全量审计](#存量仓库的首次全量审计)；若范围内没有任何受支持源文件，则按配置
    错误返回 exit 2，需要先修正 `include`；
 3. 为被选中的文件补 `architecture.owner` 的 `owners`；
@@ -120,16 +120,16 @@ bootstrap 首版和每次修订都需要另行执行全量审计 `--all` 并复�
 规范命令：
 
 ```sh
-code-harness --all
-code-harness --staged
-code-harness --base <commit>
-code-harness --root /path/to/project --all
-code-harness --all --format json
+pluvy --all
+pluvy --staged
+pluvy --base <commit>
+pluvy --root /path/to/project --all
+pluvy --all --format json
 ```
 
 `--root` 默认当前目录（Git 模式必须是仓库根），`--config` 默认
-`.codeharness/code-harness.json`；两者可以组合成
-`code-harness --root /path/to/project --config .codeharness/code-harness.json --all`。
+`.pluvy/pluvy.json`；两者可以组合成
+`pluvy --root /path/to/project --config .pluvy/pluvy.json --all`。
 
 退出码：
 
@@ -192,17 +192,17 @@ warning 不影响 exit 0。
 每个代码任务结束、在报告任务完成之前运行一次门禁，并如实报告模式、退出码和 findings
 （error/warning 计数与关键项）；人工开发按同样口径执行。情形与命令对照表（改动未提交、
 任务已产生 commit、起始 commit 不可知、staged 审计边界）、三条政策规则、配套自检与报告
-格式的权威在 [code-harness skill](../../.agents/skills/code-harness/SKILL.md)。配套自检含
+格式的权威在 [pluvy skill](../../.agents/skills/pluvy/SKILL.md)。配套自检含
 files-count 自检：报告末行形如 `Architecture base: N files`，N=0 而任务确有改动时不得视为
 通过。
 
 ## Agent integration
 
-skill 目录来自源码检出中的 `.agents/skills/code-harness/`（含 `SKILL.md` 与 `references/`）。
+skill 目录来自源码检出中的 `.agents/skills/pluvy/`（含 `SKILL.md` 与 `references/`）。
 三条接入路径：
 
 1. **原生 skills 目录**：消费项目符合 skills 目录约定时，把检出中的
-   `.agents/skills/code-harness/` 复制到该项目（或用户级）的 skills 位置，agent 便可按 skill
+   `.agents/skills/pluvy/` 复制到该项目（或用户级）的 skills 位置，agent 便可按 skill
    描述路由加载。
 2. **agent 专属目录适配**：agent 只从自己的目录读取指令时，接入形态由目标目录的位置决定。
    仓库内（`--root` 之内）**禁用目录 symlink 接入**：门禁在 include/exclude 筛选之前就会拒绝
@@ -218,10 +218,10 @@ skill 目录来自源码检出中的 `.agents/skills/code-harness/`（含 `SKILL
    文件。接入为手动粘贴，不自动改写 AGENTS.md（它属于用户自己的政策资产）：
 
 ```markdown
-<!-- code-harness skill pointer -->
-When adopting, configuring, or running code-harness, or triaging its findings,
-first read `.agents/skills/code-harness/SKILL.md` and follow it.
+<!-- pluvy skill pointer -->
+When adopting, configuring, or running pluvy, or triaging its findings,
+first read `.agents/skills/pluvy/SKILL.md` and follow it.
 ```
 
 通用接入路径与限制见
-[载体接入说明](../../.agents/skills/code-harness/references/agent-integration.md)。
+[载体接入说明](../../.agents/skills/pluvy/references/agent-integration.md)。

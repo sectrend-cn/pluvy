@@ -1,16 +1,16 @@
 # Checker configuration
 
-`.codeharness/code-harness.json` is the policy used when checking a target repository. It does
+`.pluvy/pluvy.json` is the policy used when checking a target repository. It does
 not modify application behavior or rewrite source. Error findings return exit code 1; warning-only results return 0;
 invalid configuration and analysis failures return exit code 2.
 
 Each repository commits its own policy at this default path. Start with
-[the example](../examples/.codeharness/code-harness.json) and adapt it to the
+[the example](../examples/.pluvy/pluvy.json) and adapt it to the
 repository's architecture. All selection and checker paths are relative to the
-repository root, not `.codeharness/`.
+repository root, not `.pluvy/`.
 
 The bundled agent skill repeats these facts per checker under
-[the checker index](../.agents/skills/code-harness/references/checkers.md), one
+[the checker index](../.agents/skills/pluvy/references/checkers.md), one
 page per checker in `references/checkers/`; change both carriers in the same batch.
 
 `--config` selects the policy path; it stays relative to `--root` in every mode and
@@ -84,7 +84,7 @@ they do not remove files from other checkers.
 
 The schema covers 18 logical checkers, which produce 22 built-in diagnostic IDs.
 Language syntax, region boundaries and a configuration example are documented in
-[the guarded projection checker reference](../.agents/skills/code-harness/references/checkers/structure.guarded_projection.md).
+[the guarded projection checker reference](../.agents/skills/pluvy/references/checkers/structure.guarded_projection.md).
 Custom plugin settings continue
 to belong to their typed plugin constructors; arbitrary custom checker names in
 this JSON are rejected.
@@ -399,15 +399,15 @@ modules and each language's `rules.py` — to live with the language plugins:
 "architecture.structure": {
   "placements": [{
     "name": "language rule modules belong with language plugins",
-    "paths": ["src/code_harness/*_rules.py", "src/code_harness/languages/*/rules.py"],
-    "allowed_paths": ["src/code_harness/languages/*"]
+    "paths": ["src/pluvy/*_rules.py", "src/pluvy/languages/*/rules.py"],
+    "allowed_paths": ["src/pluvy/languages/*"]
   }]
 }
 ```
 
-`src/code_harness/python_rules.py` fails this constraint even if another policy
-assigns it a valid owner. `src/code_harness/languages/python/rules.py` passes:
-the `src/code_harness/languages/*/rules.py` pattern covers that path. Application
+`src/pluvy/python_rules.py` fails this constraint even if another policy
+assigns it a valid owner. `src/pluvy/languages/python/rules.py` passes:
+the `src/pluvy/languages/*/rules.py` pattern covers that path. Application
 composition in `plugins/builtins.py` imports `PythonTypeRule` from this module:
 the language owner covers that path, and existing dependency restrictions and
 object-model checks apply to it.
@@ -483,7 +483,7 @@ omitted lists do not remove built-in encoders, decoders or output checks.
 }
 ```
 
-The [example policy](../examples/.codeharness/code-harness.json) contains a smaller
+The [example policy](../examples/.pluvy/pluvy.json) contains a smaller
 version of this configuration. Choose API names from the actual target project.
 
 - `encoders`: exact qualified functions whose result is serialized data. Their

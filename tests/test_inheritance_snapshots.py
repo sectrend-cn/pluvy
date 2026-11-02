@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Report
+from pluvy.cli import main
+from pluvy.diagnostics import Report
 
 _BASE = (
     "export abstract class Base {\n"
@@ -40,8 +40,8 @@ def repository(tmp_path: Path) -> Path:
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "gate@example.invalid")
     _git(tmp_path, "config", "user.name", "Gate Test")
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}\n")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}\n")
     (tmp_path / "base.ts").write_text(_BASE)
     (tmp_path / "middle.ts").write_text(_MIDDLE)
     (tmp_path / "leaf.ts").write_text(_LEAF.replace("'used'", "'initial'"))

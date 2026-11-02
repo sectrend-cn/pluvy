@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Report
+from pluvy.cli import main
+from pluvy.diagnostics import Report
 
 _PROJECTION = """export function project(source, target) {
     if (source.a !== undefined) target.x = source.a;
@@ -26,10 +26,10 @@ def projection_repository(tmp_path: Path) -> Path:
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "projection@example.invalid")
     _git(tmp_path, "config", "user.name", "Projection Test")
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}\n")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}\n")
     (tmp_path / "app.ts").write_text("export function project() { return {}; }\n")
-    _git(tmp_path, "add", ".codeharness/code-harness.json", "app.ts")
+    _git(tmp_path, "add", ".pluvy/pluvy.json", "app.ts")
     _git(tmp_path, "commit", "-qm", "baseline")
     return tmp_path
 
@@ -43,7 +43,7 @@ def test_projection_cli_modes_preserve_source_policy_and_index(
     source.write_text(_PROJECTION)
     _git(root, "add", "app.ts")
     source.write_text(_PROJECTION + "\nexport const unstaged = 1;\n")
-    policy = root / ".codeharness/code-harness.json"
+    policy = root / ".pluvy/pluvy.json"
     index = root / ".git/index"
     before = (source.read_bytes(), policy.read_bytes(), index.read_bytes())
     assert main(["--root", str(root), *mode, "--format", "json"]) == 1
@@ -91,7 +91,7 @@ def test_disabled_projection_is_reported_by_cli(
 ) -> None:
     root = projection_repository
     (root / "app.ts").write_text(_PROJECTION)
-    (root / ".codeharness/code-harness.json").write_text(
+    (root / ".pluvy/pluvy.json").write_text(
         '{"checkers":{"structure.guarded_projection":{"enabled":false}}}'
     )
     assert main(["--root", str(root), "--all", "--format", "json"]) == 0

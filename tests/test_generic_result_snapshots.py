@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import Report
+from pluvy.cli import main
+from pluvy.diagnostics import Report
 
 _LIBRARY = "export class State {\n transaction<R>(work: () => R): R { return work(); }\n}\n"
 _CALLBACK = "function effect(): void {}\nexport function callback() { return effect(); }\n"
@@ -31,8 +31,8 @@ def repository(tmp_path: Path) -> Path:
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "gate@example.invalid")
     _git(tmp_path, "config", "user.name", "Gate Test")
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}\n")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}\n")
     (tmp_path / "library.ts").write_text(_LIBRARY)
     (tmp_path / "callback.ts").write_text(_CALLBACK)
     _git(tmp_path, "add", ".")
@@ -88,8 +88,8 @@ def test_staged_signature_change_invalidates_previous_result_evidence(
 def test_python_imported_generic_method_and_callback(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / ".codeharness").mkdir()
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir()
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "library.py").write_text(
         "from typing import Callable\nclass State:\n"
         "    def transaction[R](self, work: Callable[[], R]) -> R:\n        return work()\n"

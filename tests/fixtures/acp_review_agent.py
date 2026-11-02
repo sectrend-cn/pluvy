@@ -22,7 +22,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from pydantic import BaseModel
 
-from code_harness.review.wire import (
+from pluvy.review.wire import (
     ErrorReply,
     InitializeCall,
     PermissionReply,

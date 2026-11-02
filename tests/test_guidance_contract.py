@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import _arguments
+from pluvy.cli import _arguments
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 GUIDE_PATH = REPOSITORY_ROOT / "docs/getting-started.md"
 README_PATH = REPOSITORY_ROOT / "README.md"
-SKILL_PATH = REPOSITORY_ROOT / ".agents/skills/code-harness/SKILL.md"
-FEEDBACK_SKILL_PATH = REPOSITORY_ROOT / ".agents/skills/code-harness-feedback/SKILL.md"
+SKILL_PATH = REPOSITORY_ROOT / ".agents/skills/pluvy/SKILL.md"
+FEEDBACK_SKILL_PATH = REPOSITORY_ROOT / ".agents/skills/pluvy-feedback/SKILL.md"
 ISSUE_TEMPLATE_PATH = REPOSITORY_ROOT / ".github/ISSUE_TEMPLATE/false-positive.md"
 ISSUE_TEMPLATE_FENCE = "````markdown"
 ISSUE_TEMPLATE_CLOSING_FENCE = "````"
@@ -21,7 +21,7 @@ ISSUE_TEMPLATE_NAME = "False positive report"
 ISSUE_TEMPLATE_FRONTMATTER_KEYS = frozenset({"name", "about", "title"})
 ISSUE_TEMPLATE_FORBIDDEN_KEYS = ("labels:", "assignees:")
 AGENT_REFERENCE_PATH = SKILL_PATH.parent / "references/agent-integration.md"
-AGENT_REFERENCE_LINK = "../.agents/skills/code-harness/references/agent-integration.md"
+AGENT_REFERENCE_LINK = "../.agents/skills/pluvy/references/agent-integration.md"
 CHECKER_REFERENCE_PATH = SKILL_PATH.parent / "references/checkers.md"
 CHECKER_REFERENCE_LINK = "references/checkers.md"
 SUPPRESSION_REFERENCE_PATH = SKILL_PATH.parent / "references/comment-suppressions.md"
@@ -105,12 +105,12 @@ CONTRACT_ANCHORS = frozenset(
 )
 
 POINTER_SNIPPET = (
-    "<!-- code-harness skill pointer -->\n"
-    "When adopting, configuring, or running code-harness, or triaging its findings,\n"
-    "first read `.agents/skills/code-harness/SKILL.md` and follow it.\n"
+    "<!-- pluvy skill pointer -->\n"
+    "When adopting, configuring, or running pluvy, or triaging its findings,\n"
+    "first read `.agents/skills/pluvy/SKILL.md` and follow it.\n"
 )
 
-COMMAND_IN_CODE_SPAN = re.compile(r"`(code-harness[^`]*)`")
+COMMAND_IN_CODE_SPAN = re.compile(r"`(pluvy[^`]*)`")
 PLACEHOLDER = re.compile(r"<[^<>]+>")
 LINK_TARGET = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 SECOND_LEVEL_HEADING = re.compile(r"^##[ \t]+(.+?)[ \t]*$", re.MULTILINE)
@@ -134,7 +134,7 @@ def _documented_commands(text: str) -> list[str]:
             fenced = not fenced
             continue
         if fenced:
-            commands.extend([stripped] if stripped.startswith("code-harness ") else [])
+            commands.extend([stripped] if stripped.startswith("pluvy ") else [])
             continue
         commands.extend(
             candidate.strip()
@@ -258,7 +258,7 @@ def test_feedback_skill_commands_parse_with_shipped_cli() -> None:
 
 
 def test_feedback_skill_targets_the_issue_tracker() -> None:
-    assert "https://github.com/sectrend-cn/codeharness/issues/new" in FEEDBACK_SKILL_PATH.read_text(
+    assert "https://github.com/sectrend-cn/pluvy/issues/new" in FEEDBACK_SKILL_PATH.read_text(
         encoding="utf-8"
     )
 

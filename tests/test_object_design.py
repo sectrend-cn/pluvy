@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.engine import check
-from code_harness.policy.models import Checkers, ObjectModelOptions, Policy
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.engine import check
+from pluvy.policy.models import Checkers, ObjectModelOptions, Policy
+from pluvy.source import Language, Source
 
 
 @pytest.mark.parametrize(
@@ -79,8 +79,8 @@ def test_methods_helpers_and_compatibility_guards_pass(language: Language, code:
 
 
 def test_cli_enforces_class_policy(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text(
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text(
         '{"version": 2, "checkers": {"architecture.object_model": {"paths": ["rules.py"]}}}'
     )
     (tmp_path / "rules.py").write_text("def check() -> None:\n    pass\n")

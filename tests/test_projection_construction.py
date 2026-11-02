@@ -2,9 +2,9 @@
 
 import pytest
 
-from code_harness.engine import check
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.engine import check
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 
 def _count(code: str, language: Language) -> int:

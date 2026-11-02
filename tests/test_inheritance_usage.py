@@ -2,10 +2,10 @@
 
 import pytest
 
-from code_harness.diagnostics import Finding
-from code_harness.engine import check, registry
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.diagnostics import Finding
+from pluvy.engine import check, registry
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 _TRACE = """abstract class TraceNodeView {
     render(): string {

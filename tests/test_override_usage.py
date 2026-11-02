@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.engine import check, registry
-from code_harness.policy.models import Policy
-from code_harness.source import Language, Source
+from pluvy.engine import check, registry
+from pluvy.policy.models import Policy
+from pluvy.source import Language, Source
 
 
 def _unread(code: str, language: Language = Language.PYTHON) -> tuple[str, ...]:
@@ -27,9 +27,9 @@ def test_override_read_preserves_the_shared_parameter(bodies: tuple[str, str]) -
 def test_metric_implementations_share_node_and_source_parameters() -> None:
     root = Path(__file__).parents[1]
     paths = (
-        "src/code_harness/languages/metric_syntax.py",
-        "src/code_harness/languages/python/syntax.py",
-        "src/code_harness/languages/go/syntax.py",
+        "src/pluvy/languages/metric_syntax.py",
+        "src/pluvy/languages/python/syntax.py",
+        "src/pluvy/languages/go/syntax.py",
     )
     sources = tuple(Source(path, (root / path).read_bytes(), Language.PYTHON) for path in paths)
     findings = registry().analyze_sources((sources[0],), Policy(), sources)

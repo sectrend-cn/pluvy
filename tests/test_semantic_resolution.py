@@ -8,24 +8,24 @@ import tree_sitter_javascript
 import tree_sitter_python
 from tree_sitter import Language as Grammar
 
-from code_harness.analysis.context import TreeContext
-from code_harness.analysis.contracts import RuleBundle
-from code_harness.analysis.session import AnalysisSession, SemanticBinding
-from code_harness.diagnostics import AnalysisError, Finding
-from code_harness.languages.go.semantic_syntax import GoSemanticSyntax
-from code_harness.languages.javascript.semantic_syntax import JavaScriptSemanticSyntax
-from code_harness.languages.python.encoding import PythonEncodingSyntax
-from code_harness.languages.python.rules import PythonTypeRule
-from code_harness.languages.python.semantic_syntax import PythonSemanticSyntax
-from code_harness.parsing.treesitter import TreeParser
-from code_harness.policy.models import Policy
-from code_harness.semantics.boundaries import BoundaryEvidence, BoundaryRule
-from code_harness.semantics.encoding import EncodingRule
-from code_harness.semantics.index import SemanticIndex
-from code_harness.semantics.model import Symbol
-from code_harness.semantics.project import ProjectUsage
-from code_harness.semantics.usage import UsageRule
-from code_harness.source import Language, Source
+from pluvy.analysis.context import TreeContext
+from pluvy.analysis.contracts import RuleBundle
+from pluvy.analysis.session import AnalysisSession, SemanticBinding
+from pluvy.diagnostics import AnalysisError, Finding
+from pluvy.languages.go.semantic_syntax import GoSemanticSyntax
+from pluvy.languages.javascript.semantic_syntax import JavaScriptSemanticSyntax
+from pluvy.languages.python.encoding import PythonEncodingSyntax
+from pluvy.languages.python.rules import PythonTypeRule
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.parsing.treesitter import TreeParser
+from pluvy.policy.models import Policy
+from pluvy.semantics.boundaries import BoundaryEvidence, BoundaryRule
+from pluvy.semantics.encoding import EncodingRule
+from pluvy.semantics.index import SemanticIndex
+from pluvy.semantics.model import Symbol
+from pluvy.semantics.project import ProjectUsage
+from pluvy.semantics.usage import UsageRule
+from pluvy.source import Language, Source
 
 
 def _index(code: str, path: str = "sample.py") -> SemanticIndex:

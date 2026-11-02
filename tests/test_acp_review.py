@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.cli import main
-from code_harness.diagnostics import AnalysisError
-from code_harness.plugins.builtins import builtin_analyzers
-from code_harness.plugins.registry import AnalyzerRegistry
-from code_harness.review.acp import AcpCommand, AcpReviewAgent
-from code_harness.review.contracts import ReviewGuideline, ReviewRequest
-from code_harness.review.rules import PromptReviewRule
-from code_harness.review.wire import InitializeCall
-from code_harness.source import Language, Source
+from pluvy.cli import main
+from pluvy.diagnostics import AnalysisError
+from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.plugins.registry import AnalyzerRegistry
+from pluvy.review.acp import AcpCommand, AcpReviewAgent
+from pluvy.review.contracts import ReviewGuideline, ReviewRequest
+from pluvy.review.rules import PromptReviewRule
+from pluvy.review.wire import InitializeCall
+from pluvy.source import Language, Source
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "acp_review_agent.py"
 _GUIDELINE = ReviewGuideline(
@@ -113,8 +113,8 @@ def test_registered_acp_rule_runs_through_cli(
     )
     registry = AnalyzerRegistry()
     registry.register(analyzer)
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "app.py").write_bytes(_REQUEST.source.content)
     assert main(["--root", str(tmp_path), "--all"], registry) == 1
     assert "review.ownership: Shared mutable state" in capsys.readouterr().out
@@ -161,8 +161,8 @@ def test_incomplete_tool_review_fails_cli(tmp_path: Path, mode: str) -> None:
     analyzer.bundles.register(PromptReviewRule("ownership", _GUIDELINE, _agent(tmp_path, mode)))
     registry = AnalyzerRegistry()
     registry.register(analyzer)
-    (tmp_path / ".codeharness").mkdir(exist_ok=True)
-    (tmp_path / ".codeharness/code-harness.json").write_text("{}")
+    (tmp_path / ".pluvy").mkdir(exist_ok=True)
+    (tmp_path / ".pluvy/pluvy.json").write_text("{}")
     (tmp_path / "app.py").write_bytes(_REQUEST.source.content)
     assert main(["--root", str(tmp_path), "--all"], registry) == 2
 

@@ -2,22 +2,22 @@
 
 import pytest
 
-from code_harness.analysis.analyzer import TypedAnalyzer
-from code_harness.analysis.context import TreeContext
-from code_harness.analysis.contracts import ContextParser
-from code_harness.diagnostics import AnalysisError, ParseWarning, SyntaxFailure
-from code_harness.engine import check
-from code_harness.imports import PythonImports, RelativeImportResolver, TreeImports
-from code_harness.languages.javascript.plugin import JavaScriptLanguage
-from code_harness.languages.python.semantic_syntax import PythonSemanticSyntax
-from code_harness.plugins.builtins import builtin_registry, tree_parser
-from code_harness.plugins.bundles import BundleRegistry
-from code_harness.plugins.languages import LanguageRegistry
-from code_harness.plugins.profiles import AnalysisProfile
-from code_harness.plugins.registry import AnalyzerRegistry
-from code_harness.policy.models import Boundary, Checkers, ImportOptions, Policy
-from code_harness.semantics.boundaries import BoundaryRule
-from code_harness.source import Language, LanguageDefinition, Source
+from pluvy.analysis.analyzer import TypedAnalyzer
+from pluvy.analysis.context import TreeContext
+from pluvy.analysis.contracts import ContextParser
+from pluvy.diagnostics import AnalysisError, ParseWarning, SyntaxFailure
+from pluvy.engine import check
+from pluvy.imports import PythonImports, RelativeImportResolver, TreeImports
+from pluvy.languages.javascript.plugin import JavaScriptLanguage
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.plugins.builtins import builtin_registry, tree_parser
+from pluvy.plugins.bundles import BundleRegistry
+from pluvy.plugins.languages import LanguageRegistry
+from pluvy.plugins.profiles import AnalysisProfile
+from pluvy.plugins.registry import AnalyzerRegistry
+from pluvy.policy.models import Boundary, Checkers, ImportOptions, Policy
+from pluvy.semantics.boundaries import BoundaryRule
+from pluvy.source import Language, LanguageDefinition, Source
 
 
 def test_language_discovery_registers_without_any_rules() -> None:

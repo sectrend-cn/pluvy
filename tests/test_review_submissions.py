@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from code_harness.diagnostics import AnalysisError
-from code_harness.review.mcp_server import ReviewSubmissionServer
-from code_harness.review.submission_models import (
+from pluvy.diagnostics import AnalysisError
+from pluvy.review.mcp_server import ReviewSubmissionServer
+from pluvy.review.submission_models import (
     FindingSubmission,
     ReviewCompletion,
     ReviewScope,
 )
-from code_harness.review.submissions import SubmissionStore
+from pluvy.review.submissions import SubmissionStore
 
 
 @pytest.fixture

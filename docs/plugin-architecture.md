@@ -110,7 +110,7 @@ imports no language implementation and selects no language identity. Built-in
 composition requires this diagnostic for Python, Go, Java, JS, TS and TSX, and a
 new language must supply equivalent adapters and behavioral tests before claiming
 coverage. Exact syntax coverage and conservative limits are documented in
-[the guarded projection checker reference](../.agents/skills/code-harness/references/checkers/structure.guarded_projection.md).
+[the guarded projection checker reference](../.agents/skills/pluvy/references/checkers/structure.guarded_projection.md).
 
 ## Changed-scope capability
 

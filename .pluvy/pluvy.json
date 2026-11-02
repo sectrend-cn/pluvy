@@ -1,0 +1,267 @@
+{
+  "version": 2,
+  "include": [
+    "src/*",
+    "tests/*"
+  ],
+  "exclude": [],
+  "third_party_modules": ["pydantic"],
+  "checkers": {
+    "function_size": {
+      "lines": 50,
+      "statements": 50,
+      "complexity": 10,
+      "nesting": 3,
+      "parameters": 5
+    },
+    "architecture.owner": {
+      "owners": [
+        {
+          "name": "source and diagnostic contracts",
+          "paths": [
+            "src/pluvy/source.py",
+            "src/pluvy/diagnostics.py"
+          ]
+        },
+        {
+          "name": "policy",
+          "paths": [
+            "src/pluvy/policy/*"
+          ]
+        },
+        {
+          "name": "parsing",
+          "paths": [
+            "src/pluvy/parsing/*",
+            "src/pluvy/syntax.py"
+          ]
+        },
+        {
+          "name": "analysis",
+          "paths": [
+            "src/pluvy/analysis/*",
+            "src/pluvy/engine.py"
+          ]
+        },
+        {
+          "name": "agent review",
+          "paths": [
+            "src/pluvy/review/*"
+          ]
+        },
+        {
+          "name": "language plugins",
+          "paths": [
+            "src/pluvy/languages/*"
+          ]
+        },
+        {
+          "name": "plugins",
+          "paths": [
+            "src/pluvy/plugins/*"
+          ]
+        },
+        {
+          "name": "shared semantic and suppression policy",
+          "paths": [
+            "src/pluvy/suppressions.py",
+            "src/pluvy/semantics/*"
+          ]
+        },
+        {
+          "name": "metrics",
+          "paths": [
+            "src/pluvy/metrics/*"
+          ]
+        },
+        {
+          "name": "architecture",
+          "paths": [
+            "src/pluvy/architecture/*",
+            "src/pluvy/architecture.py",
+            "src/pluvy/imports.py"
+          ]
+        },
+        {
+          "name": "CLI and snapshots",
+          "paths": [
+            "src/pluvy/cli.py",
+            "src/pluvy/snapshots.py"
+          ]
+        },
+        {
+          "name": "compatibility exports",
+          "paths": [
+            "src/pluvy/models.py"
+          ]
+        },
+        {
+          "name": "application entry points",
+          "paths": [
+            "src/pluvy/__init__.py",
+            "src/pluvy/__main__.py"
+          ]
+        },
+        {
+          "name": "verification",
+          "paths": [
+            "tests/*"
+          ]
+        }
+      ]
+    },
+    "architecture.structure": {
+      "placements": [
+        {
+          "name": "language rule modules belong with language plugins",
+          "paths": ["src/pluvy/*_rules.py", "src/pluvy/languages/*/rules.py"],
+          "allowed_paths": ["src/pluvy/languages/*"]
+        }
+      ]
+    },
+    "architecture.import": {
+      "boundaries": [
+        {
+          "name": "analysis uses tree-sitter instead of a second Python AST",
+          "sources": ["src/*"],
+          "forbidden_imports": ["ast", "ast.*"]
+        },
+        {
+          "name": "application composition owns analyzer and rule assembly",
+          "sources": ["src/pluvy/languages/*"],
+          "forbidden_imports": [
+            "pluvy.analysis.analyzer",
+            "pluvy.analysis.analyzer.*",
+            "pluvy.plugins.bundles",
+            "pluvy.plugins.bundles.*",
+            "pluvy.plugins.registry",
+            "pluvy.plugins.registry.*",
+            "pluvy.plugins.profiles",
+            "pluvy.plugins.profiles.*",
+            "pluvy.plugins.languages.LanguageRegistry",
+            "pluvy.plugins.builtins",
+            "pluvy.plugins.builtins.*",
+            "pluvy.architecture.rules",
+            "pluvy.architecture.rules.*",
+            "pluvy.architecture.design",
+            "pluvy.architecture.design.*",
+            "pluvy.metrics.MetricRule",
+            "pluvy.metrics.rules",
+            "pluvy.metrics.rules.*",
+            "pluvy.semantics.usage.UsageRule",
+            "pluvy.semantics.projection.rules",
+            "pluvy.semantics.projection.rules.*",
+            "pluvy.semantics.boundaries.BoundaryRule",
+            "pluvy.suppressions.SuppressionRule"
+          ]
+        },
+        {
+          "name": "review rules do not depend on ACP transport",
+          "sources": [
+            "src/pluvy/review/contracts.py",
+            "src/pluvy/review/rules.py",
+            "src/pluvy/review/prompt.py",
+            "src/pluvy/review/submission_models.py",
+            "src/pluvy/review/submissions.py"
+          ],
+          "forbidden_imports": [
+            "acp",
+            "acp.*",
+            "mcp",
+            "mcp.*",
+            "pluvy.review.mcp_server",
+            "pluvy.review.acp",
+            "pluvy.review.channel",
+            "pluvy.review.wire"
+          ]
+        },
+        {
+          "name": "shared analysis and rules do not select concrete languages",
+          "sources": [
+            "src/pluvy/analysis/*",
+            "src/pluvy/plugins/registry.py",
+            "src/pluvy/plugins/bundles.py",
+            "src/pluvy/plugins/languages.py",
+            "src/pluvy/plugins/profiles.py",
+            "src/pluvy/parsing/*",
+            "src/pluvy/metrics/*",
+            "src/pluvy/suppressions.py",
+            "src/pluvy/semantics/*",
+            "src/pluvy/architecture/*"
+          ],
+          "forbidden_imports": [
+            "pluvy.languages",
+            "pluvy.languages.*",
+            "pluvy.plugins.builtins",
+            "pluvy.engine",
+            "pluvy.syntax",
+            "tree_sitter_python",
+            "tree_sitter_go",
+            "tree_sitter_java",
+            "tree_sitter_javascript",
+            "tree_sitter_typescript"
+          ]
+        },
+        {
+          "name": "runtime does not depend on tests",
+          "sources": [
+            "src/*"
+          ],
+          "forbidden_imports": [
+            "tests",
+            "tests.*",
+            "pytest"
+          ]
+        },
+        {
+          "name": "domain contracts do not depend on implementation",
+          "sources": [
+            "src/pluvy/source.py",
+            "src/pluvy/diagnostics.py",
+            "src/pluvy/policy/contracts.py",
+            "src/pluvy/architecture/models.py"
+          ],
+          "forbidden_imports": [
+            "pluvy.*"
+          ]
+        },
+        {
+          "name": "analysis does not depend on CLI or snapshot infrastructure",
+          "sources": [
+            "src/pluvy/analysis/*",
+            "src/pluvy/engine.py",
+            "src/pluvy/plugins/*",
+            "src/pluvy/languages/*",
+            "src/pluvy/review/*",
+            "src/pluvy/suppressions.py",
+            "src/pluvy/semantics/*",
+            "src/pluvy/metrics/*",
+            "src/pluvy/architecture/*",
+            "src/pluvy/architecture.py",
+            "src/pluvy/imports.py",
+            "src/pluvy/syntax.py",
+            "src/pluvy/parsing/*"
+          ],
+          "forbidden_imports": [
+            "pluvy.cli",
+            "pluvy.snapshots",
+            "pluvy.cli.*",
+            "pluvy.snapshots.*"
+          ]
+        }
+      ]
+    },
+    "architecture.object_model": {
+      "paths": [
+        "src/pluvy/suppressions.py",
+        "src/pluvy/semantics/*",
+        "src/pluvy/metrics/*",
+        "src/pluvy/architecture/rules.py",
+        "src/pluvy/architecture/design.py",
+        "src/pluvy/analysis/analyzer.py",
+        "src/pluvy/languages/*",
+        "src/pluvy/review/*"
+      ]
+    }
+  }
+}

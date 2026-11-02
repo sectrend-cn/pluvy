@@ -4,18 +4,18 @@ from dataclasses import dataclass
 
 import pytest
 
-from code_harness.analysis.context import TreeContext
-from code_harness.analysis.contracts import Analyzer
-from code_harness.analysis.requirements import RuleRequirements
-from code_harness.analysis.session import AnalysisSession, SemanticBinding
-from code_harness.diagnostics import AnalysisError, Finding
-from code_harness.languages.python import PythonLanguage
-from code_harness.plugins.bundles import BundleRegistry
-from code_harness.plugins.profiles import AnalysisProfile
-from code_harness.plugins.registry import AnalyzerRegistry
-from code_harness.policy.models import Policy
-from code_harness.source import Language, LanguageDefinition, Source
-from code_harness.syntax import parse as parse_tree
+from pluvy.analysis.context import TreeContext
+from pluvy.analysis.contracts import Analyzer
+from pluvy.analysis.requirements import RuleRequirements
+from pluvy.analysis.session import AnalysisSession, SemanticBinding
+from pluvy.diagnostics import AnalysisError, Finding
+from pluvy.languages.python import PythonLanguage
+from pluvy.plugins.bundles import BundleRegistry
+from pluvy.plugins.profiles import AnalysisProfile
+from pluvy.plugins.registry import AnalyzerRegistry
+from pluvy.policy.models import Policy
+from pluvy.source import Language, LanguageDefinition, Source
+from pluvy.syntax import parse as parse_tree
 
 
 @dataclass(frozen=True)
