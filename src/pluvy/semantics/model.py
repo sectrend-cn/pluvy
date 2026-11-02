@@ -13,8 +13,7 @@ type SymbolKind = Literal["parameter", "function", "field", "variable", "class",
 
 @dataclass
 class Symbol:
-    """A lexical declaration, its observed reads, writes and external escape, and the
-    container value whose element-derived type evidence a conflicting write withdrew."""
+    """A lexical declaration, its observed reads, writes, external escape and element conflict."""
 
     name: str
     node: Node
