@@ -223,6 +223,7 @@ class SemanticIndex:
             if target not in symbol.writes:
                 symbol.writes.append(target)
             if self.syntax.element_target(target):
+                self._element_write(symbol, value)
                 return
             if symbol.kind != "function":
                 symbol.value = value
@@ -231,6 +232,16 @@ class SemanticIndex:
             symbol.class_scope = self._annotation_scope(symbol.annotation) or self.value_scope(
                 value
             )
+
+    def _element_write(self, symbol: Symbol, value: Node | None) -> None:
+        """Withdraw container evidence a conflicting element write can no longer support."""
+        if symbol.annotation is not None or not self.syntax.element_inferred(symbol.value):
+            return
+        written = self._value_type(value)
+        if written and written == symbol.type_name:
+            return
+        symbol.type_name = ""
+        symbol.class_scope = None
 
     def _assignment_symbol(self, target: Node) -> Symbol | None:
         scope = self.locations.get(target.id, 0)

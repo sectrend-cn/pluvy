@@ -180,6 +180,10 @@ class SemanticNodes(ABC):
         """Languages opt in to reducing container annotations to their element type."""
         return None
 
+    def element_inferred(self, node: Node | None) -> bool:
+        """Languages opt in containers whose type evidence comes from their elements."""
+        return False
+
     def is_call(self, node: Node) -> bool:
         """Report call syntax; languages without calls answer no."""
         return node.type in self.calls

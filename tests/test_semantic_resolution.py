@@ -1,6 +1,7 @@
 """Semantic resolution owns reusable evidence independently of rule execution."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import pytest
 import tree_sitter_go
@@ -182,35 +183,42 @@ def _container(index: SemanticIndex, name: str) -> Symbol:
     return next(symbol for symbol in index.symbols() if symbol.name == name)
 
 
-def _assert_element_ownership(index: SemanticIndex, element_type: str) -> tuple[Finding, ...]:
+def _assert_element_ownership(
+    index: SemanticIndex, element_type: str, type_name: str
+) -> tuple[Finding, ...]:
     symbol = _container(index, "items")
     assert [node.type for node in symbol.writes] == ["identifier", element_type]
-    assert symbol.type_name == "Item"
-    assert symbol.class_scope is not None
-    assert symbol.class_scope.owner == "Item"
+    assert symbol.type_name == type_name
+    if type_name:
+        assert symbol.class_scope is not None
+        assert symbol.class_scope.owner == type_name
+    else:
+        assert symbol.class_scope is None
     return UsageRule().evaluate(index)
 
 
 @pytest.mark.parametrize(
-    ("builder", "code", "element_type"),
+    ("builder", "code", "element_type", "type_name"),
     [
-        pytest.param(_go_index, _GO_ELEMENT_WRITE, "index_expression", id="go-value"),
+        pytest.param(_go_index, _GO_ELEMENT_WRITE, "index_expression", "Item", id="go-value"),
         pytest.param(
-            _go_index, _GO_ANNOTATED_ELEMENT_WRITE, "index_expression", id="go-annotation"
+            _go_index, _GO_ANNOTATED_ELEMENT_WRITE, "index_expression", "Item", id="go-annotation"
         ),
-        pytest.param(_index, _PYTHON_ELEMENT_WRITE, "subscript", id="python-value"),
-        pytest.param(_index, _PYTHON_ANNOTATED_ELEMENT_WRITE, "subscript", id="python-annotation"),
+        pytest.param(_index, _PYTHON_ELEMENT_WRITE, "subscript", "", id="python-value"),
+        pytest.param(
+            _index, _PYTHON_ANNOTATED_ELEMENT_WRITE, "subscript", "Item", id="python-annotation"
+        ),
     ],
 )
-def test_element_writes_keep_the_container_symbol_ownership(
-    builder: Callable[[str], SemanticIndex], code: str, element_type: str
+def test_element_writes_follow_the_container_type_evidence(
+    builder: Callable[[str], SemanticIndex], code: str, element_type: str, type_name: str
 ) -> None:
     index = builder(code)
-    first = _assert_element_ownership(index, element_type)
+    first = _assert_element_ownership(index, element_type, type_name)
     assert [finding.rule for finding in first] == ["unused.function"]
     index.refresh()
     index.refresh()
-    assert _assert_element_ownership(index, element_type) == first
+    assert _assert_element_ownership(index, element_type, type_name) == first
 
 
 _GO_PARENTHESIZED_ELEMENT_WRITE = """package main
@@ -242,55 +250,64 @@ def run() -> None:
 """
 
 
+@dataclass(frozen=True)
+class _Ownership:
+    """Expected element target shape, container evidence and unused anchor."""
+
+    element_type: str
+    type_name: str
+    finding_line: int
+
+
 def _assert_parenthesized_element_ownership(
-    index: SemanticIndex, target_type: str, element_type: str, finding_line: int
+    index: SemanticIndex, target_type: str, expected: _Ownership
 ) -> None:
     symbol = _container(index, "items")
     assert [node.type for node in symbol.writes] == ["identifier", target_type]
-    assert index.syntax.single_value(symbol.writes[1]).type == element_type
+    assert index.syntax.single_value(symbol.writes[1]).type == expected.element_type
     assert index.syntax.element_target(symbol.writes[1])
-    assert symbol.type_name == "Item"
-    assert symbol.class_scope is not None
-    assert symbol.class_scope.owner == "Item"
+    assert symbol.type_name == expected.type_name
+    if expected.type_name:
+        assert symbol.class_scope is not None
+        assert symbol.class_scope.owner == expected.type_name
+    else:
+        assert symbol.class_scope is None
     assert [(finding.rule, finding.line) for finding in UsageRule().evaluate(index)] == [
-        ("unused.function", finding_line)
+        ("unused.function", expected.finding_line)
     ]
 
 
 @pytest.mark.parametrize(
-    ("builder", "code", "target_type", "element_type", "finding_line"),
+    ("builder", "code", "target_type", "expected"),
     [
         pytest.param(
             _go_index,
             _GO_PARENTHESIZED_ELEMENT_WRITE,
             "parenthesized_expression",
-            "index_expression",
-            7,
+            _Ownership("index_expression", "Item", 7),
             id="go-parenthesized",
         ),
         pytest.param(
             _index,
             _PYTHON_PARENTHESIZED_ELEMENT_WRITE,
             "subscript",
-            "subscript",
-            6,
+            _Ownership("subscript", "", 6),
             id="python-tuple-pattern",
         ),
     ],
 )
-def test_parenthesized_element_writes_keep_the_container_symbol_ownership(
+def test_parenthesized_element_writes_follow_the_container_type_evidence(
     builder: Callable[[str], SemanticIndex],
     code: str,
     target_type: str,
-    element_type: str,
-    finding_line: int,
+    expected: _Ownership,
 ) -> None:
     index = builder(code)
-    _assert_parenthesized_element_ownership(index, target_type, element_type, finding_line)
+    _assert_parenthesized_element_ownership(index, target_type, expected)
     first = tuple((node.id, node.type) for node in _container(index, "items").writes)
     index.refresh()
     index.refresh()
-    _assert_parenthesized_element_ownership(index, target_type, element_type, finding_line)
+    _assert_parenthesized_element_ownership(index, target_type, expected)
     assert tuple((node.id, node.type) for node in _container(index, "items").writes) == first
 
 
@@ -396,16 +413,12 @@ def _assert_commented_element_ownership(index: SemanticIndex) -> None:
     assert [node.type for node in symbol.writes] == ["identifier", "parenthesized_expression"]
     assert index.syntax.element_target(symbol.writes[1])
     assert index.syntax.single_value(symbol.writes[1]).type == "subscript_expression"
-    assert symbol.type_name == "Item"
-    assert symbol.class_scope is not None
-    assert symbol.class_scope.owner == "Item"
-    assert [(finding.rule, finding.line) for finding in UsageRule().evaluate(index)] == [
-        ("unused.function", 6),
-        ("unused.return", 11),
-    ]
+    assert symbol.type_name == ""
+    assert symbol.class_scope is None
+    assert UsageRule().evaluate(index) == ()
 
 
-def test_commented_element_write_keeps_the_container_ownership() -> None:
+def test_commented_element_write_withdraws_the_container_ownership() -> None:
     """A comment before the element target stays out of the unpacked value (DESIGN §13.2)."""
     index = _javascript_index(_JAVASCRIPT_COMMENTED_ELEMENT_WRITE)
     _assert_commented_element_ownership(index)

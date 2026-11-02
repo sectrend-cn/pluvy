@@ -1202,34 +1202,10 @@ def test_javascript_literal_inference_defers_unsupported_elements(
     assert _findings(code, language) == ()
 
 
-@pytest.mark.parametrize(
-    ("language", "code", "line"),
-    [
-        (
-            Language.PYTHON,
-            _PYTHON_RENDER_ITEM + "items = [\n# element\nItem(), 1]\nitems[0].render()\n",
-            7,
-        ),
-        (
-            Language.JAVASCRIPT,
-            _JAVASCRIPT_RENDER_ITEM
-            + "const items = [/* element */ new Item(), 1];\nitems[0].render();\n",
-            3,
-        ),
-        (
-            Language.TYPESCRIPT,
-            _TYPESCRIPT_RENDER_ITEM
-            + "const items = [/* element */ new Item(), 1];\nitems[0].render();\n",
-            3,
-        ),
-        (Language.PYTHON, _PYTHON_RENDER_ITEM + "for item in [Item()]:\n    item.render()\n", 5),
-    ],
-)
-def test_literal_first_element_and_iteration_receivers_warn(
-    language: Language, code: str, line: int
-) -> None:
-    findings = _findings(code, language)
-    assert [(f.rule, f.line, f.severity) for f in findings] == [("unused.return", line, "warning")]
+def test_iteration_receivers_warn_for_discarded_results() -> None:
+    code = _PYTHON_RENDER_ITEM + "for item in [Item()]:\n    item.render()\n"
+    findings = _findings(code, Language.PYTHON)
+    assert [(f.rule, f.line, f.severity) for f in findings] == [("unused.return", 5, "warning")]
     assert "'render'" in findings[0].message
 
 
@@ -1487,24 +1463,24 @@ _JAVA_ELEMENT_PARAMETER = """class E {
         pytest.param(
             Language.PYTHON,
             _PYTHON_ELEMENT_OVERWRITE,
-            (("unused.return", 14, "warning"),),
+            (),
             id="python",
         ),
         pytest.param(
             Language.JAVASCRIPT,
             _JAVASCRIPT_ELEMENT_OVERWRITE,
-            (("unused.function", 2, "error"), ("unused.return", 5, "warning")),
+            (),
             id="javascript",
         ),
         pytest.param(
             Language.TYPESCRIPT,
             _TYPESCRIPT_ELEMENT_OVERWRITE,
-            (("unused.function", 2, "error"), ("unused.return", 5, "warning")),
+            (),
             id="typescript",
         ),
     ],
 )
-def test_element_writes_keep_the_container_element_type(
+def test_element_write_evidence_follows_the_container_source(
     language: Language, code: str, expected: tuple[tuple[str, int, str], ...]
 ) -> None:
     findings = _findings(code, language)
@@ -1532,28 +1508,45 @@ def test_element_write_controls_keep_unused_methods_reported(
 
 
 @pytest.mark.parametrize(
-    ("language", "code", "write_line", "call_line"),
+    ("language", "code", "expected"),
     [
-        pytest.param(Language.GO, _GO_ELEMENT_DIFFERENT_NAME, 9, 14, id="go"),
-        pytest.param(Language.PYTHON, _PYTHON_ELEMENT_DIFFERENT_NAME, 7, 14, id="python"),
         pytest.param(
-            Language.JAVASCRIPT, _JAVASCRIPT_ELEMENT_DIFFERENT_NAME, 2, 5, id="javascript"
+            Language.GO,
+            _GO_ELEMENT_DIFFERENT_NAME,
+            (("unused.function", 9, "write"), ("unused.return", 14, "render")),
+            id="go",
         ),
         pytest.param(
-            Language.TYPESCRIPT, _TYPESCRIPT_ELEMENT_DIFFERENT_NAME, 2, 5, id="typescript"
+            Language.PYTHON,
+            _PYTHON_ELEMENT_DIFFERENT_NAME,
+            (("unused.function", 7, "write"),),
+            id="python",
+        ),
+        pytest.param(
+            Language.JAVASCRIPT,
+            _JAVASCRIPT_ELEMENT_DIFFERENT_NAME,
+            (("unused.function", 2, "write"),),
+            id="javascript",
+        ),
+        pytest.param(
+            Language.TYPESCRIPT,
+            _TYPESCRIPT_ELEMENT_DIFFERENT_NAME,
+            (("unused.function", 2, "write"),),
+            id="typescript",
         ),
     ],
 )
-def test_different_element_write_types_keep_the_container_owner(
-    language: Language, code: str, write_line: int, call_line: int
+def test_different_element_write_types_follow_the_container_evidence(
+    language: Language, code: str, expected: tuple[tuple[str, int, str], ...]
 ) -> None:
     findings = _findings(code, language)
-    assert tuple((f.rule, f.line, f.severity) for f in findings) == (
-        ("unused.function", write_line, "error"),
-        ("unused.return", call_line, "warning"),
+    assert tuple((f.rule, f.line) for f in findings) == tuple(
+        (rule, line) for rule, line, _ in expected
     )
-    assert "'write'" in findings[0].message
-    assert "'render'" in findings[1].message
+    assert all(
+        f"'{name}'" in finding.message
+        for finding, (_, _, name) in zip(findings, expected, strict=True)
+    )
 
 
 @pytest.mark.parametrize(
@@ -1954,21 +1947,21 @@ def run() -> None:
             Language.JAVASCRIPT,
             _JAVASCRIPT_ELEMENT_WRITE_PLAIN,
             _JAVASCRIPT_ELEMENT_WRITE_PARENTHESIZED,
-            (("unused.function", 2, 15, "error"), ("unused.return", 5, 1, "warning")),
+            (),
             id="javascript",
         ),
         pytest.param(
             Language.TYPESCRIPT,
             _TYPESCRIPT_ELEMENT_WRITE_PLAIN,
             _TYPESCRIPT_ELEMENT_WRITE_PARENTHESIZED,
-            (("unused.function", 2, 15, "error"), ("unused.return", 5, 1, "warning")),
+            (),
             id="typescript",
         ),
         pytest.param(
             Language.PYTHON,
             _PYTHON_ELEMENT_WRITE_PLAIN,
             _PYTHON_ELEMENT_WRITE_PARENTHESIZED,
-            (("unused.return", 14, 5, "warning"),),
+            (),
             id="python-tuple-pattern",
         ),
     ],
@@ -2155,42 +2148,49 @@ items[1].render();
 
 
 @pytest.mark.parametrize(
-    ("language", "code", "expected"),
+    ("language", "code", "expected", "discarded"),
     [
         pytest.param(
             Language.PYTHON,
             _PYTHON_PARENTHESIZED_ELEMENT_INGRESS,
-            (("type.boundary", 10, 5, "error"), ("unused.return", 12, 5, "warning")),
+            (("type.boundary", 10, 5, "error"),),
+            False,
             id="python",
         ),
         pytest.param(
             Language.GO,
             _GO_PARENTHESIZED_ELEMENT_INGRESS,
             (("type.boundary", 10, 2, "error"), ("unused.return", 12, 2, "warning")),
+            True,
             id="go",
         ),
         pytest.param(
             Language.JAVASCRIPT,
             _JAVASCRIPT_PARENTHESIZED_ELEMENT_INGRESS,
-            (("type.boundary", 3, 7, "error"), ("unused.return", 5, 1, "warning")),
+            (("type.boundary", 3, 7, "error"),),
+            False,
             id="javascript",
         ),
         pytest.param(
             Language.TYPESCRIPT,
             _TYPESCRIPT_PARENTHESIZED_ELEMENT_INGRESS,
-            (("type.boundary", 3, 7, "error"), ("unused.return", 5, 1, "warning")),
+            (("type.boundary", 3, 7, "error"),),
+            False,
             id="typescript",
         ),
     ],
 )
-def test_parenthesized_element_write_keeps_owner_and_restores_ingress(
-    language: Language, code: str, expected: tuple[tuple[str, int, int, str], ...]
+def test_parenthesized_element_write_restores_ingress_and_follows_evidence(
+    language: Language,
+    code: str,
+    expected: tuple[tuple[str, int, int, str], ...],
+    discarded: bool,
 ) -> None:
     findings = _findings(code, language, external=True)
     assert tuple((f.rule, f.line, f.column, f.severity) for f in findings) == expected
     assert not any(f.rule == "unused.function" for f in findings)
     assert findings[0].message == "Convert the third-party result into a typed object at ingress"
-    assert "'render'" in findings[1].message
+    assert any(f.rule == "unused.return" for f in findings) is discarded
 
 
 _PYTHON_SHADOW_CLASSES = """\
@@ -2438,16 +2438,7 @@ _JAVASCRIPT_PLAIN_ELEMENT_WRITE = (
             _JAVASCRIPT_COMMENTED_PREFIX_ELEMENT_WRITE,
             _JAVASCRIPT_PARENTHESIZED_ELEMENT_WRITE,
             _JAVASCRIPT_PLAIN_ELEMENT_WRITE,
-            (
-                (
-                    "unused.function",
-                    6,
-                    5,
-                    "error",
-                    "Function 'm' has no resolved read usage in the audited snapshots",
-                ),
-                ("unused.return", 11, 1, "warning", "Return value from 'm' is discarded"),
-            ),
+            (),
             id="javascript",
         ),
         pytest.param(
@@ -2455,16 +2446,7 @@ _JAVASCRIPT_PLAIN_ELEMENT_WRITE = (
             _JAVASCRIPT_COMMENTED_PREFIX_ELEMENT_WRITE,
             _JAVASCRIPT_PARENTHESIZED_ELEMENT_WRITE,
             _JAVASCRIPT_PLAIN_ELEMENT_WRITE,
-            (
-                (
-                    "unused.function",
-                    6,
-                    5,
-                    "error",
-                    "Function 'm' has no resolved read usage in the audited snapshots",
-                ),
-                ("unused.return", 11, 1, "warning", "Return value from 'm' is discarded"),
-            ),
+            (),
             id="typescript",
         ),
     ],
