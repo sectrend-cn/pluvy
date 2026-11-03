@@ -17,6 +17,28 @@ repository and follow it, for example through the AGENTS.md pointer snippet in
 SKILL.md. Nothing here promises that a specific tool will discover or load the
 skill on its own; the concrete integration steps are up to each agent.
 
+## Repository adoption and automatic runs
+
+Skill discovery is separate from repository adoption. Installing this skill at
+user level makes it available across repositories; it does not require every
+repository to run the gate. Follow [the applicability decision](../SKILL.md#decide-whether-the-gate-applies)
+before automatic execution or reporting. A pointer to this skill is a reading
+instruction, not a project requirement to run the gate.
+
+| Repository or task context | Expected agent behavior |
+|---|---|
+| Global executable or skill only; no project policy, requirement or explicit run request | No gate command and no gate notice in the task report |
+| Default project policy exists | Run the post-task gate and report its actual result |
+| Project instructions, scripts or CI explicitly require the gate via a custom `--config` | Use the declared root and config, even without the default policy |
+| Project requires the gate but its policy is missing | Report the configuration failure; do not treat it as non-adoption |
+| Policy is malformed or unreadable | Report the failure; preserve exit code 2 |
+| User explicitly requests a run without a policy | Attempt the requested run and report the configuration failure |
+| User asks about capabilities before adoption | Answer the question without automatically running the gate or creating a policy |
+
+Do not create a policy to silence a post-task warning. Adoption is a separate
+requested task. Repository tests, linting and type checks retain their own
+requirements regardless of whether this gate applies.
+
 ## Adapting agent-specific skill directories
 
 Some agents load skills only from their own directory. Where that directory

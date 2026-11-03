@@ -1,6 +1,6 @@
 ---
 name: pluvy
-description: Run the pluvy gate after code tasks and report the mode, exit code, and findings truthfully. Use when you adopt, install, configure, or run pluvy, run the gate after code tasks, edit `.pluvy/pluvy.json`, triage findings, or need the gate's capability boundaries, supported languages, checker list with per-language coverage, or per-checker options and defaults — covers post-task gating, exit codes, the files-count self-check, and triage paths (fix first, approved line suppression with a reason in every supported language, policy revision via a separate full audit).
+description: Run the pluvy gate after code tasks only in repositories with a project policy or an explicit project requirement, or when the user explicitly requests a run. Use also to adopt, install, configure, or explain pluvy, edit `.pluvy/pluvy.json`, triage findings, inspect checker coverage and options, or use approved line suppression with a reason in every supported language. Global installation or skill availability does not enable a repository; without project adoption or an explicit run request, skip automatic runs and gate reporting.
 ---
 
 # pluvy
@@ -11,16 +11,37 @@ reports findings without fixing anything: no mode modifies, stashes, stages,
 restores, deletes, or rewrites source files, and the tool never changes Git
 configuration.
 
-## When to use this skill
+## Decide whether the gate applies
 
-- You completed a code task in this repository and are about to report it done.
-- You are adopting, installing, or configuring pluvy for a repository.
-- You are triaging pluvy findings or considering a policy change.
+Before any automatic post-task run or gate report, check the target repository
+(the explicit `--root`, or the repository being worked on). The gate applies when
+at least one of these is true:
 
-## Gate policy (binding, quoted verbatim)
+- The repository has `.pluvy/pluvy.json`.
+- Project instructions, scripts or CI explicitly require the gate, including a
+  policy selected through `--config`. Use that project's root and config path.
+- The user explicitly requests a gate run for this task.
 
-1. `After completing a code task, run the pluvy gate before reporting the task done, and report the mode, exit code and findings truthfully.`
-2. `Never claim the gate passed when it was not run, failed with exit code 2, or the tool is not installed; state the reason explicitly instead.`
+A globally installed executable, a discoverable skill, an example policy or a
+skill pointer alone does not enable the gate. Do not run the CLI to discover
+whether the repository has adopted it. If none of the conditions applies, stop
+this gate workflow silently: do not run it, create a policy, suggest setup, or
+include a skipped, missing-config or "not counted as passed" gate notice in the
+task report. Continue the project's own checks normally.
+
+Keep missing or invalid configuration distinct from non-adoption. If the project
+requires the gate or the user requests a run, missing configuration remains a
+failure. An invalid or unreadable policy also remains a failure; do not silently
+skip it or change the CLI's exit-code semantics.
+
+Use this skill for adoption, installation, configuration, explanation and triage
+when requested, even before adoption. Loading it for those purposes does not by
+itself require a gate run or authorize creating a project policy.
+
+## Gate policy (binding)
+
+1. `After completing a code task in a repository where the gate applies, run the pluvy gate before reporting the task done, and report the mode, exit code and findings truthfully.`
+2. `When the gate applies, never claim it passed when it was not run, failed with exit code 2, or the tool is not installed; state the reason explicitly instead. When it does not apply, omit gate execution and reporting.`
 3. `Do not add suppressions or weaken the policy to make the gate appear green; policy changes require a separate full audit and review.`
 
 ## Post-task gate commands
@@ -67,9 +88,12 @@ to the root.
 
 ## Report format
 
-Report the mode you ran, the exit code, and the findings (error/warning counts
-plus the key items). If the gate was not run, exited with code 2, or the tool is
+Apply this section only when the gate applies under the decision above. Report
+the mode you ran, the exit code, and the findings (error/warning counts plus the
+key items). If an applicable gate was not run, exited with code 2, or the tool is
 not installed, state that explicitly — never report the task as gated or passed.
+For a repository where the gate does not apply, omit gate status entirely. Keep
+test-suite execution and its reporting independent of gate applicability.
 
 ## Triage
 
