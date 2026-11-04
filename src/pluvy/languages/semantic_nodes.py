@@ -2,6 +2,10 @@
 
 import posixpath
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pluvy.semantics.index import SemanticIndex
 
 from tree_sitter import Node
 
@@ -95,6 +99,10 @@ class SemanticNodes(ABC):
                 return annotation
             current = current.parent
         return None
+
+    def consumed_fields(self, index: "SemanticIndex") -> frozenset[int]:
+        """Languages opt in to proven implicit field reads."""
+        return frozenset()
 
     def parameter_property_syntax(self) -> SemanticSyntax | None:
         """Opt in to a separate constructor-property evidence graph when supported."""

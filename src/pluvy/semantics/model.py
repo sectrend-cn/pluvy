@@ -1,12 +1,15 @@
 """Concrete declarations and grammar contracts for source-local semantic evidence."""
 
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from tree_sitter import Node
 
 from pluvy.analysis.context import TreeContext
 from pluvy.semantics.results import ResultKind, ResultResolver
+
+if TYPE_CHECKING:
+    from pluvy.semantics.index import SemanticIndex
 
 type SymbolKind = Literal["parameter", "function", "field", "variable", "class", "import"]
 
@@ -152,6 +155,8 @@ class BoundarySyntax(Protocol):
 
 class SemanticSyntax(BindingSyntax, UsageSyntax, BoundarySyntax, Protocol):
     """Language-owned declarations and externally visible entry points."""
+
+    def consumed_fields(self, index: "SemanticIndex") -> frozenset[int]: ...
 
     def parameter_property_syntax(self) -> "SemanticSyntax | None": ...
 

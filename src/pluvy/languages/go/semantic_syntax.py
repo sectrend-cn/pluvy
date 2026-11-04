@@ -3,8 +3,10 @@
 from tree_sitter import Node
 
 from pluvy.analysis.context import TreeContext
+from pluvy.languages.go.consumed_fields import GoConsumedFields
 from pluvy.languages.semantic_nodes import SemanticNodes
 from pluvy.parsing.treesitter import field, spelling, walk
+from pluvy.semantics.index import SemanticIndex
 from pluvy.semantics.model import ImportedName
 
 
@@ -15,7 +17,7 @@ class GoSemanticSyntax(SemanticNodes):
     members = frozenset({"selector_expression"})
     assignments = frozenset({"assignment_statement", "short_var_declaration"})
     functions = frozenset({"function_declaration", "method_declaration", "func_literal"})
-    classes = frozenset({"type_spec"})
+    classes = frozenset({"type_spec", "type_alias"})
     fields = frozenset({"field_declaration"})
     declarations = frozenset({"var_spec", "const_spec"})
     destructuring = frozenset({"expression_list"})
@@ -35,6 +37,9 @@ class GoSemanticSyntax(SemanticNodes):
     dictionary_prefixes = ("map[",)
 
     block_scopes = frozenset({"block"})
+
+    def consumed_fields(self, index: SemanticIndex) -> frozenset[int]:
+        return GoConsumedFields(index).used_declarations()
 
     def input_container(self, node: Node, parent: Node) -> bool:
         if parent.type == "expression_list":

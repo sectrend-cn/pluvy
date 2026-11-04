@@ -43,7 +43,12 @@ class ProjectUsage:
         if not self.prepared:
             raise AnalysisError("Project semantic evidence must be prepared before evaluation")
         contract_reads = (
-            OverrideUsage(self.indexes).used_declarations().union(self._parameter_property_reads())
+            OverrideUsage(self.indexes)
+            .used_declarations()
+            .union(
+                self._parameter_property_reads(),
+                *(index.syntax.consumed_fields(index) for index in self.indexes),
+            )
         )
         unresolved = frozenset(name for index in self.indexes for name in index.unresolved_reads)
         return UsageEvidence(unresolved, contract_reads)
