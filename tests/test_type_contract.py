@@ -649,7 +649,7 @@ def test_comments_between_union_members_do_not_inflate_the_count() -> None:
 @pytest.mark.parametrize("index", range(5))
 def test_union_member_count_is_independent_of_comment_position(index: int) -> None:
     members = ["A", "B", "C", "D", "E"]
-    members.insert(index, "/* note */")
+    members[index] = members[index] + " /* note */"
     code = "type Payload = " + " | ".join(members) + ";\n"
     findings = _contract_findings(code)
     assert len(findings) == 1

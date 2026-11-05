@@ -26,6 +26,7 @@ from pluvy.languages.go.syntax import GoImports, GoMetrics
 from pluvy.languages.go.test_syntax import GoTestSyntax
 from pluvy.languages.java import JavaLanguage
 from pluvy.languages.java.encoding import JavaEncodingSyntax
+from pluvy.languages.java.failure import JavaFailureSyntax
 from pluvy.languages.java.projection import JavaProjection
 from pluvy.languages.java.rules import JavaSuppressions, JavaTypeRule
 from pluvy.languages.java.semantic_syntax import JavaSemanticSyntax
@@ -33,6 +34,7 @@ from pluvy.languages.java.syntax import JavaDesignSyntax, JavaImports, JavaMetri
 from pluvy.languages.java.test_syntax import JavaTestSyntax
 from pluvy.languages.javascript import JavaScriptLanguage
 from pluvy.languages.javascript.encoding import JavaScriptEncodingSyntax
+from pluvy.languages.javascript.failure import JavaScriptFailureSyntax
 from pluvy.languages.javascript.projection import JavaScriptProjection
 from pluvy.languages.javascript.syntax import (
     JavaScriptImports,
@@ -42,6 +44,7 @@ from pluvy.languages.javascript.syntax import (
 from pluvy.languages.javascript.test_syntax import JavaScriptTestSyntax
 from pluvy.languages.python import PythonLanguage
 from pluvy.languages.python.encoding import PythonEncodingSyntax
+from pluvy.languages.python.failure import PythonFailureSyntax
 from pluvy.languages.python.projection import PythonProjection
 from pluvy.languages.python.rules import PythonTypeRule
 from pluvy.languages.python.syntax import PythonImports, PythonMetrics, PythonSuppressions
@@ -75,6 +78,8 @@ from pluvy.policy.type_options import (
 from pluvy.semantics.boundaries import BoundaryRule
 from pluvy.semantics.encoding import EncodingRule
 from pluvy.semantics.encoding_options import BROAD_TYPE
+from pluvy.semantics.failure import FailureFlowRule
+from pluvy.semantics.failure_options import FLOW_HANDLING
 from pluvy.semantics.model import SemanticSyntax
 from pluvy.semantics.options import BOUNDARY, USAGE_RULES
 from pluvy.semantics.projection.contracts import ProjectionSyntax
@@ -177,11 +182,13 @@ def _python_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         ASSERTION.name,
         BROAD_TYPE.name,
         WILDCARD.name,
+        *FLOW_HANDLING.rule_ids,
     )
     directives = comments.DirectiveSyntax(frozenset({"comment"}), "#")
     rules = (
         PythonTypeRule(EncodingRule(PythonEncodingSyntax())),
         SuppressionRule(PythonSuppressions(), directives=directives),
+        FailureFlowRule(PythonFailureSyntax()),
     )
     return _compose(plugin, syntax, rules, required, directives)
 
@@ -223,8 +230,15 @@ def _java_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
     rules = (
         JavaTypeRule(EncodingRule(JavaEncodingSyntax())),
         SuppressionRule(JavaSuppressions(), directives=directives),
+        FailureFlowRule(JavaFailureSyntax()),
     )
-    return _compose(plugin, syntax, rules, (BROAD_TYPE.name, ASSERTION.name), directives)
+    return _compose(
+        plugin,
+        syntax,
+        rules,
+        (BROAD_TYPE.name, ASSERTION.name, *FLOW_HANDLING.rule_ids),
+        directives,
+    )
 
 
 def _javascript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
@@ -241,8 +255,9 @@ def _javascript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
     rules = (
         EncodingRule(JavaScriptEncodingSyntax()),
         SuppressionRule(comments.GrammarComments(), directives=directives),
+        FailureFlowRule(JavaScriptFailureSyntax()),
     )
-    return _compose(plugin, syntax, rules, (BROAD_TYPE.name,), directives)
+    return _compose(plugin, syntax, rules, (BROAD_TYPE.name, *FLOW_HANDLING.rule_ids), directives)
 
 
 def _typescript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
@@ -260,12 +275,13 @@ def _typescript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         TypeScriptTypeRule(EncodingRule(JavaScriptEncodingSyntax())),
         TypeScriptContractRule(),
         SuppressionRule(comments.GrammarComments(), directives=directives),
+        FailureFlowRule(JavaScriptFailureSyntax()),
     )
     return _compose(
         plugin,
         syntax,
         rules,
-        (ASSERTION.name, BROAD_TYPE.name, *TYPE_CONTRACT.rule_ids),
+        (ASSERTION.name, BROAD_TYPE.name, *TYPE_CONTRACT.rule_ids, *FLOW_HANDLING.rule_ids),
         directives,
     )
 

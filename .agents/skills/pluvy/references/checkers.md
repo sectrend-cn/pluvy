@@ -1,9 +1,10 @@
 # Checker reference — pluvy skill
 
-Index of the built-in checkers. The schema has 20 logical checkers, which produce
-26 built-in diagnostic IDs. Some checker keys group related diagnostics:
+Index of the built-in checkers. The schema has 21 logical checkers, which produce
+28 built-in diagnostic IDs. Some checker keys group related diagnostics:
 `function_size` owns the five `size.*` IDs, `test.integrity` owns
-`test.tautology` and `test.vacuous`, and `type.contract` owns `type.nullable`
+`test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
+`flow.fallback`, and `type.contract` owns `type.nullable`
 and `type.union`. Every other checker name matches its diagnostic ID. Each
 checker has its own page under `checkers/`, holding what it reports, which
 analyzers register it, where its behavior differs between languages, every
@@ -56,15 +57,15 @@ Every analyzer registers the same base set of 19 diagnostic IDs:
 - Testing: `test.tautology` and `test.vacuous`, both configured through the
   single `test.integrity` checker.
 
-The remaining seven diagnostic IDs are registered per language:
+The remaining nine diagnostic IDs are registered per language:
 
 | Analyzer | Additional diagnostic IDs |
 | --- | --- |
-| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard` |
+| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard`, `flow.swallow` |
 | Go | `type.broad` |
-| Java | `type.assertion`, `type.broad` |
-| JavaScript and JSX | `type.broad` |
-| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union` |
+| Java | `type.assertion`, `type.broad`, `flow.swallow` |
+| JavaScript and JSX | `type.broad`, `flow.swallow`, `flow.fallback` |
+| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union`, `flow.swallow`, `flow.fallback` |
 
 A registered diagnostic reports only for the analyzer that registered it. For
 example, `type.annotation`, `type.signature` and `imports.wildcard` appear in
@@ -82,6 +83,7 @@ module-level functions; its page records the per-language candidate rules.
 | [`structure.guarded_projection`](checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for `size.lines`, `size.statements`, `size.complexity`, `size.nesting` and `size.parameters` | All |
 | [`test.integrity`](checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for `test.tautology` and `test.vacuous` | All |
+| [`flow.handling`](checkers/flow.handling.md) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals; one switch for `flow.swallow` and `flow.fallback` | Python, Java, JavaScript, JSX, TypeScript, TSX |
 | [`type.contract`](checkers/type.contract.md) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions; one switch for `type.nullable` and `type.union` | TypeScript, TSX |
 | [`type.annotation`](checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |
 | [`type.signature`](checkers/type.signature.md) | Missing Python parameter and return annotations | Python |

@@ -2,7 +2,7 @@
 
 from tree_sitter import Node
 
-from pluvy.parsing.treesitter import field, walk
+from pluvy.parsing.treesitter import field, node_text, walk
 from pluvy.semantics.testing.contracts import TestAssertion, TestDeclaration
 
 _ASSERTION_NAMES = frozenset({"Error", "Errorf", "Fail", "FailNow", "Fatal", "Fatalf"})
@@ -21,11 +21,6 @@ _CONTROL_STATEMENTS = frozenset(
 )
 
 
-def _spelling(node: Node) -> str:
-    """Return the exact parsed spelling without decoding escapes."""
-    return (node.text or b"").decode("utf-8")
-
-
 def _selector_parts(call: Node) -> tuple[str, str]:
     selector = field(call, "function")
     if selector is None or selector.type != "selector_expression":
@@ -33,8 +28,8 @@ def _selector_parts(call: Node) -> tuple[str, str]:
     receiver = field(selector, "operand")
     member = field(selector, "field")
     return (
-        _spelling(receiver) if receiver is not None else "",
-        _spelling(member) if member is not None else "",
+        node_text(receiver) if receiver is not None else "",
+        node_text(member) if member is not None else "",
     )
 
 
@@ -53,11 +48,11 @@ class GoTestSyntax:
 
     def declarations(self, root: Node) -> tuple[TestDeclaration, ...]:
         return tuple(
-            TestDeclaration(node, _spelling(name))
+            TestDeclaration(node, node_text(name))
             for node in walk(root)
             if node.type == "function_declaration"
             for name in (field(node, "name"),)
-            if name is not None and _spelling(name).startswith(_TEST_PREFIX)
+            if name is not None and node_text(name).startswith(_TEST_PREFIX)
         )
 
     def assertions(self, declaration: Node) -> tuple[TestAssertion, ...]:

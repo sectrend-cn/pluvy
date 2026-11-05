@@ -2,7 +2,7 @@
 
 from tree_sitter import Node
 
-from pluvy.parsing.treesitter import field, walk
+from pluvy.parsing.treesitter import field, node_text, walk
 from pluvy.semantics.testing.contracts import TestAssertion, TestDeclaration
 
 _TEST_ANNOTATION = "Test"
@@ -27,11 +27,6 @@ _CONTROL_STATEMENTS = frozenset(
 )
 
 
-def _spelling(node: Node) -> str:
-    """Return the exact parsed spelling without decoding escapes."""
-    return (node.text or b"").decode("utf-8")
-
-
 def _arguments(call: Node) -> tuple[Node, ...]:
     arguments = field(call, "arguments")
     if arguments is None:
@@ -41,7 +36,7 @@ def _arguments(call: Node) -> tuple[Node, ...]:
 
 def _call_name(call: Node) -> str:
     name = field(call, "name")
-    return _spelling(name) if name is not None else ""
+    return node_text(name) if name is not None else ""
 
 
 def _has_test_annotation(method: Node) -> bool:
@@ -51,7 +46,7 @@ def _has_test_annotation(method: Node) -> bool:
     return any(
         node.type in _ANNOTATIONS
         and any(
-            child.type == "identifier" and _spelling(child) == _TEST_ANNOTATION
+            child.type == "identifier" and node_text(child) == _TEST_ANNOTATION
             for child in walk(node)
         )
         for node in walk(modifiers)
@@ -60,7 +55,7 @@ def _has_test_annotation(method: Node) -> bool:
 
 def _pair_mirrored(call: Node) -> bool:
     arguments = _arguments(call)
-    return len(arguments) == 2 and _spelling(arguments[0]) == _spelling(arguments[1])
+    return len(arguments) == 2 and node_text(arguments[0]) == node_text(arguments[1])
 
 
 def _assert_statement_mirrored(statement: Node) -> bool:
@@ -80,7 +75,7 @@ def _assert_statement_mirrored(statement: Node) -> bool:
         and operator.type == "=="
         and left is not None
         and right is not None
-        and _spelling(left) == _spelling(right)
+        and node_text(left) == node_text(right)
     )
 
 
@@ -103,7 +98,7 @@ def _is_print(call: Node) -> bool:
         name.startswith(_PRINT_PREFIX)
         and receiver is not None
         and receiver.type == "field_access"
-        and _spelling(receiver) in _PRINT_RECEIVERS
+        and node_text(receiver) in _PRINT_RECEIVERS
     )
 
 
@@ -112,7 +107,7 @@ class JavaTestSyntax:
 
     def declarations(self, root: Node) -> tuple[TestDeclaration, ...]:
         return tuple(
-            TestDeclaration(node, _spelling(name))
+            TestDeclaration(node, node_text(name))
             for node in walk(root)
             if node.type == "method_declaration"
             for name in (field(node, "name"),)

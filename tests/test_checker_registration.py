@@ -101,7 +101,7 @@ def test_registered_diagnostics_match_all_builtin_analyzer_coverage() -> None:
     }
     executed = {rule for analyzer in builtin_analyzers() for rule in analyzer.rule_ids}
     assert configured == executed
-    assert len(Checkers().checker_states()) == 20
+    assert len(Checkers().checker_states()) == 21
     assert {state.definition.name for state in Checkers().checker_states()} == {
         field.serialization_alias or name for name, field in Checkers.model_fields.items()
     }

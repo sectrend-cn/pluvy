@@ -71,6 +71,11 @@ cycles, shadowing and multiple assignments do not become guessed destinations.
 traversal. Both third-party boundary evidence and serialization checks use this
 same algorithm. An internal use cannot be hidden by another permitted output use.
 
+`semantics/failure.py` owns the separate `builtin.failure` policy bundle, which
+reports swallowed wide captures and coalescing chains that hide failures behind
+literal defaults. It shares no traversal or evidence with `semantics/flow.py`,
+whose carrier forwarding serves encoding output proof.
+
 `EncodingRule` consumes `EncodingSyntax`, which identifies encoders, decoders,
 argument consumers and actual output APIs. Its `argument` capability returns the
 canonical `ParameterSlot` for a payload; this lets shared semantics enforce

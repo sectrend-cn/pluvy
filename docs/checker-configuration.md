@@ -48,7 +48,8 @@ of a checker or an option preserves its default. Flags such as `"false"` or `0`
 are errors. Unknown checker IDs and options are errors, including when a checker
 is disabled. Each entry configures one logical checker. Some checker keys group
 related diagnostics: `function_size` owns the five `size.*` IDs,
-`test.integrity` owns `test.tautology` and `test.vacuous`, and `type.contract`
+`test.integrity` owns `test.tautology` and `test.vacuous`, `flow.handling` owns
+`flow.swallow` and `flow.fallback`, and `type.contract`
 owns `type.nullable` and `type.union`. Every other checker name matches its
 diagnostic ID. There is no need to write `enabled: true` or entries that contain
 only default options.
@@ -58,6 +59,7 @@ only default options.
 | `structure.guarded_projection` | `min_fields: 3` (integer, at least 2) | Repeated guarded field copies in every supported language |
 | `function_size` | `lines: 50`, `statements: 50`, `complexity: 10`, `nesting: 3`, `parameters: 5` | All five function metrics |
 | `test.integrity` | `paths: 20 test-path globs` | Tautological assertions and tests without a meaningful assertion |
+| `flow.handling` | `max_chain: 3` (positive integer) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals |
 | `type.contract` | `max_members: 4`, `optional_fields: 3`, `null_defaults: 3` (positive integers) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions in TypeScript and TSX |
 | `type.annotation` | None | Broad or bare Python annotations |
 | `type.signature` | None | Missing Python parameter/return annotations |
@@ -88,6 +90,12 @@ count equal to its limit passes, and only a greater count is reported.
 `null_defaults` per innermost function body, and `max_members` per union
 expression after `null` and `undefined` members are removed.
 
+`flow.handling.max_chain` is also a positive integer and uses the same strict
+`>`: a `??` chain with as many operators as the limit passes, and only a longer
+chain is reported. A chain is reported only when every direct default is a bare
+non-nullish literal; parenthesized, asserted and called defaults are not
+literals, and a mixed chain stays silent.
+
 `include` and `exclude` are global and cannot be placed inside a checker. They use
 case-sensitive shell matching of root-relative paths, with `*` spanning `/`.
 Architecture-specific paths select where that one architecture check applies;
@@ -101,7 +109,7 @@ Its default is `("test_*.py", "*/test_*.py", "*_test.py", "tests/*", "*/tests/*"
 apply: matching is case-sensitive, `*` spans `/`, and `**` or brace alternation
 have no special meaning. An empty tuple selects no files.
 
-The schema covers 20 logical checkers, which produce 26 built-in diagnostic IDs.
+The schema covers 21 logical checkers, which produce 28 built-in diagnostic IDs.
 Language syntax, region boundaries and a configuration example are documented in
 [the guarded projection checker reference](../.agents/skills/pluvy/references/checkers/structure.guarded_projection.md).
 Custom plugin settings continue
@@ -140,15 +148,15 @@ Every analyzer registers the same base set of 19 diagnostic IDs:
 - Testing: `test.tautology` and `test.vacuous`, both configured through the
   single `test.integrity` checker.
 
-The remaining seven diagnostic IDs are registered per language:
+The remaining nine diagnostic IDs are registered per language:
 
 | Analyzer | Additional diagnostic IDs |
 | --- | --- |
-| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard` |
+| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard`, `flow.swallow` |
 | Go | `type.broad` |
-| Java | `type.assertion`, `type.broad` |
-| JavaScript and JSX | `type.broad` |
-| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union` |
+| Java | `type.assertion`, `type.broad`, `flow.swallow` |
+| JavaScript and JSX | `type.broad`, `flow.swallow`, `flow.fallback` |
+| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union`, `flow.swallow`, `flow.fallback` |
 
 A registered diagnostic can only report for the analyzer that registered it:
 `type.annotation`, `type.signature` and `imports.wildcard` appear in Python files

@@ -234,6 +234,8 @@ Approvals granted in other projects do not transfer here.
 | `unused.return` | Warning for a known non-void result discarded at a call site |
 | `test.tautology` | Mirrored positive-equality assertion operands and literal-true assertions |
 | `test.vacuous` | Always-true matchers, assertion-free test bodies and snapshot-only tests (snapshot-only warnings) |
+| `flow.swallow` | Wide catch/except handler or `.catch` callback whose subtree contains no re-throw |
+| `flow.fallback` | `??` chain whose operator count exceeds `max_chain` while every direct default is a bare non-nullish literal |
 | `type.assertion` | Python typing casts, TS assertions except `as const`, TS non-null assertions, Java reference casts |
 | `type.suppression` | Recognized suppression comments and Python no-type-check markers |
 | `imports.wildcard` | Python wildcard imports |
@@ -256,7 +258,8 @@ for directional examples and semantic resolution limits.
 
 The parser-backed gate is read-only. Checker options are grouped by responsibility;
 `function_size` owns all five function metrics, `test.integrity` owns
-`test.tautology` and `test.vacuous`, and `type.contract` owns `type.nullable`
+`test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
+`flow.fallback`, and `type.contract` owns `type.nullable`
 and `type.union`. Every other checker key matches its diagnostic ID. Only
 `include` and `exclude` control global file selection.
 Every checker defaults to enabled; omit default-only entries and `enabled: true`.

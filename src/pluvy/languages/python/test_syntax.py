@@ -4,7 +4,7 @@ from typing import Literal
 
 from tree_sitter import Node
 
-from pluvy.parsing.treesitter import field, walk
+from pluvy.parsing.treesitter import field, node_text, walk
 from pluvy.semantics.testing.contracts import TestAssertion, TestDeclaration
 
 _EQUALITY_OPERATORS = frozenset({"==", "is"})
@@ -25,11 +25,6 @@ _CONTROL_STATEMENTS = frozenset(
 )
 
 
-def _spelling(node: Node) -> str:
-    """Return the exact parsed spelling without decoding escapes."""
-    return (node.text or b"").decode("utf-8")
-
-
 def _arguments(call: Node) -> tuple[Node, ...]:
     arguments = field(call, "arguments")
     if arguments is None:
@@ -43,8 +38,8 @@ def _callee_name(call: Node) -> str:
         return ""
     if callee.type == "attribute":
         attribute = field(callee, "attribute")
-        return _spelling(attribute) if attribute is not None else ""
-    return _spelling(callee)
+        return node_text(attribute) if attribute is not None else ""
+    return node_text(callee)
 
 
 def _comparison_mirrored(comparison: Node) -> bool:
@@ -54,7 +49,7 @@ def _comparison_mirrored(comparison: Node) -> bool:
         len(operators) == 1
         and operators[0].type in _EQUALITY_OPERATORS
         and len(operands) == 2
-        and _spelling(operands[0]) == _spelling(operands[1])
+        and node_text(operands[0]) == node_text(operands[1])
     )
 
 
@@ -73,7 +68,7 @@ def _call_mirrored(call: Node) -> bool:
     return (
         name in _EQUALITY_CALLS
         and len(arguments) == 2
-        and _spelling(arguments[0]) == _spelling(arguments[1])
+        and node_text(arguments[0]) == node_text(arguments[1])
     )
 
 
@@ -113,8 +108,8 @@ def _decorator_name(decorator: Node) -> str:
         expression = function
     if expression.type == "attribute":
         attribute = field(expression, "attribute")
-        return _spelling(attribute) if attribute is not None else ""
-    return _spelling(expression) if expression.type == "identifier" else ""
+        return node_text(attribute) if attribute is not None else ""
+    return node_text(expression) if expression.type == "identifier" else ""
 
 
 def _fixture_decorated(node: Node) -> bool:
@@ -138,11 +133,11 @@ class PythonTestSyntax:
             if (
                 node.type == "function_definition"
                 and name is not None
-                and _spelling(name).startswith("test_")
+                and node_text(name).startswith("test_")
                 and _declared_at_module_or_class(node)
                 and not _fixture_decorated(node)
             ):
-                declarations.append(TestDeclaration(node, _spelling(name)))
+                declarations.append(TestDeclaration(node, node_text(name)))
         return tuple(declarations)
 
     def assertions(self, declaration: Node) -> tuple[TestAssertion, ...]:

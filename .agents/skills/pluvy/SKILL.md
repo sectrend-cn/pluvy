@@ -158,16 +158,18 @@ What the gate does not do:
 
 ## Checkers and per-language coverage
 
-The schema has 20 logical checkers, which produce 26 built-in diagnostic IDs.
+The schema has 21 logical checkers, which produce 28 built-in diagnostic IDs.
 `function_size` owns the five `size.*` IDs, `test.integrity` owns
-`test.tautology` and `test.vacuous`, and `type.contract` owns `type.nullable`
-and `type.union`; every other checker name matches its diagnostic ID.
+`test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
+`flow.fallback`, and `type.contract` owns `type.nullable` and `type.union`;
+every other checker name matches its diagnostic ID.
 
 | Checker | Reports | Languages |
 |---|---|---|
 | [`structure.guarded_projection`](references/checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](references/checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for five diagnostics | All |
 | [`test.integrity`](references/checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for two diagnostics | All |
+| [`flow.handling`](references/checkers/flow.handling.md) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals; one switch for two diagnostics | Python, Java, JavaScript, JSX, TypeScript, TSX |
 | [`type.contract`](references/checkers/type.contract.md) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions; one switch for two diagnostics | TypeScript, TSX |
 | [`type.annotation`](references/checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |
 | [`type.signature`](references/checkers/type.signature.md) | Missing Python parameter and return annotations | Python |
@@ -194,16 +196,16 @@ Every analyzer registers the same base set of 19 diagnostic IDs:
 `architecture.object_model`, `structure.guarded_projection`, `test.tautology`
 and `test.vacuous`.
 
-The remaining seven diagnostic IDs are registered per language, and a registered
+The remaining nine diagnostic IDs are registered per language, and a registered
 diagnostic can only report for the analyzer that registered it:
 
 | Analyzer | Additional diagnostic IDs |
 |---|---|
-| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard` |
+| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard`, `flow.swallow` |
 | Go | `type.broad` |
-| Java | `type.assertion`, `type.broad` |
-| JavaScript and JSX | `type.broad` |
-| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union` |
+| Java | `type.assertion`, `type.broad`, `flow.swallow` |
+| JavaScript and JSX | `type.broad`, `flow.swallow`, `flow.fallback` |
+| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union`, `flow.swallow`, `flow.fallback` |
 
 Key differences:
 
@@ -212,6 +214,8 @@ Key differences:
 - `type.assertion` covers Python, Java, TypeScript and TSX, but not Go or
   JavaScript.
 - `type.nullable` and `type.union` appear in TypeScript and TSX files only.
+- `flow.swallow` covers Python, Java and the JavaScript family; `flow.fallback`
+  appears in JavaScript, JSX, TypeScript and TSX files only.
 - `unused.return` is always a warning, and snapshot-only `test.vacuous`
   findings are warnings; every other diagnostic reports errors. Warnings never
   change the exit code.
@@ -339,7 +343,7 @@ first read `.agents/skills/pluvy/SKILL.md` and follow it.
 
 - [Agent integration notes](references/agent-integration.md) — integration
   paths for any agent and the limits that apply.
-- [Checker index](references/checkers.md) — the 20 checkers and the 26
+- [Checker index](references/checkers.md) — the 21 checkers and the 28
   diagnostic IDs, with coverage tables and one page per checker for its role,
   language differences, options, defaults, types and configuration examples.
 - [Approved next-line diagnostic exceptions](references/comment-suppressions.md)

@@ -2,7 +2,7 @@
 
 from tree_sitter import Node
 
-from pluvy.parsing.treesitter import field, walk
+from pluvy.parsing.treesitter import field, node_text, walk
 from pluvy.semantics.testing.contracts import TestAssertion, TestDeclaration
 
 _DECLARATIONS = frozenset({"it", "test"})
@@ -28,11 +28,6 @@ _CONTROL_STATEMENTS = frozenset(
 )
 
 
-def _spelling(node: Node) -> str:
-    """Return the exact parsed spelling without decoding escapes."""
-    return (node.text or b"").decode("utf-8")
-
-
 def _arguments(call: Node) -> tuple[Node, ...]:
     arguments = field(call, "arguments")
     if arguments is None:
@@ -53,8 +48,8 @@ def _root_name(node: Node) -> str:
         current = owner
     if current.type == "call_expression":
         callee = _callee(current)
-        return _spelling(callee) if callee is not None and callee.type == "identifier" else ""
-    return _spelling(current) if current.type == "identifier" else ""
+        return node_text(callee) if callee is not None and callee.type == "identifier" else ""
+    return node_text(current) if current.type == "identifier" else ""
 
 
 def _expect_call(node: Node) -> Node | None:
@@ -65,7 +60,7 @@ def _expect_call(node: Node) -> Node | None:
             return None
         current = owner
     callee = _callee(current) if current.type == "call_expression" else None
-    if callee is not None and callee.type == "identifier" and _spelling(callee) == "expect":
+    if callee is not None and callee.type == "identifier" and node_text(callee) == "expect":
         return current
     return None
 
@@ -74,7 +69,7 @@ def _chain_has_not(function: Node) -> bool:
     current = field(function, "object")
     while current is not None and current.type == "member_expression":
         property_name = field(current, "property")
-        if property_name is not None and _spelling(property_name) == "not":
+        if property_name is not None and node_text(property_name) == "not":
             return True
         current = field(current, "object")
     return False
@@ -82,7 +77,7 @@ def _chain_has_not(function: Node) -> bool:
 
 def _pair_mirrored(call: Node) -> bool:
     arguments = _arguments(call)
-    return len(arguments) == 2 and _spelling(arguments[0]) == _spelling(arguments[1])
+    return len(arguments) == 2 and node_text(arguments[0]) == node_text(arguments[1])
 
 
 def _negated(function: Node, name: str) -> bool:
@@ -113,16 +108,16 @@ def _equality_mirrored(call: Node, function: Node) -> bool:
     return (
         callee is not None
         and callee.type == "identifier"
-        and _spelling(callee) == "expect"
+        and node_text(callee) == "expect"
         and len(expected) == 1
         and len(actual) == 1
-        and _spelling(expected[0]) == _spelling(actual[0])
+        and node_text(expected[0]) == node_text(actual[0])
     )
 
 
 def _assertion(function: Node) -> bool:
     if function.type == "identifier":
-        return _spelling(function).startswith(_ASSERTION_PREFIXES)
+        return node_text(function).startswith(_ASSERTION_PREFIXES)
     return _root_name(function) in _ASSERT_ROOTS
 
 
@@ -143,13 +138,13 @@ def _identifier(call: Node, function: Node) -> TestAssertion | None:
     return TestAssertion(
         call,
         "assertion",
-        mirrored=_assertion_mirrored(call, function, _spelling(function)),
+        mirrored=_assertion_mirrored(call, function, node_text(function)),
     )
 
 
 def _member(call: Node, function: Node) -> TestAssertion | None:
     property_name = field(function, "property")
-    matcher = _spelling(property_name) if property_name is not None else ""
+    matcher = node_text(property_name) if property_name is not None else ""
     if _expect_call(function) is not None:
         return _expect_matcher(call, function, matcher)
     return _assert_member(call, function, matcher)
@@ -194,10 +189,10 @@ def _callback(call: Node) -> Node | None:
 def _name(argument: Node) -> str:
     if argument.type == "string":
         fragments = [
-            _spelling(child) for child in argument.named_children if child.type == "string_fragment"
+            node_text(child) for child in argument.named_children if child.type == "string_fragment"
         ]
         return "".join(fragments)
-    return " ".join(_spelling(argument).split())[:80]
+    return " ".join(node_text(argument).split())[:80]
 
 
 def _test_name(call: Node, callback: Node) -> str:
@@ -218,7 +213,7 @@ class JavaScriptTestSyntax:
             function = _callee(node)
             if function is None or function.type != "identifier":
                 continue
-            if _spelling(function) not in _DECLARATIONS:
+            if node_text(function) not in _DECLARATIONS:
                 continue
             callback = _callback(node)
             if callback is not None:
