@@ -147,6 +147,43 @@ def test_javascript_literal_true_assertions_are_tautologies(statement: str) -> N
     assert _summary(_findings(code, Language.JAVASCRIPT)) == [("test.tautology", 2, "error")]
 
 
+def test_javascript_negative_and_inequality_assertions_are_not_tautologies() -> None:
+    code = (
+        'it("x", () => {\n'
+        "  assert.notEqual(x, x);\n"
+        "  assert.notStrictEqual(x, x);\n"
+        "  assertFalse(true);\n"
+        "});\n"
+    )
+    assert _findings(code, Language.JAVASCRIPT) == ()
+
+
+def test_javascript_positive_equality_assertions_remain_tautologies() -> None:
+    code = (
+        'it("x", () => {\n'
+        "  assert.equal(x, x);\n"
+        "  assert.strictEqual(x, x);\n"
+        "  assert.deepEqual(x, x);\n"
+        "  assert.deepStrictEqual(x, x);\n"
+        "  assert(true);\n"
+        "  assert.ok(true);\n"
+        "});\n"
+    )
+    assert _summary(_findings(code, Language.JAVASCRIPT)) == [
+        ("test.tautology", 2, "error"),
+        ("test.tautology", 3, "error"),
+        ("test.tautology", 4, "error"),
+        ("test.tautology", 5, "error"),
+        ("test.tautology", 6, "error"),
+        ("test.tautology", 7, "error"),
+    ]
+
+
+def test_javascript_bare_identifier_equality_call_is_not_mirrored() -> None:
+    code = 'it("x", () => {\n  assertSame(x, x);\n});\n'
+    assert _findings(code, Language.JAVASCRIPT) == ()
+
+
 def test_python_raises_and_assert_helper_calls_count_as_assertions() -> None:
     raises = "def test_failure():\n    with pytest.raises(ValueError):\n        fail()\n"
     helper = (
@@ -215,6 +252,25 @@ def test_java_annotation_assertions_are_classified() -> None:
     ]
 
 
+def test_java_assert_statements_and_assert_true_literals_are_tautologies() -> None:
+    code = (
+        "class SampleTest {\n"
+        "  @Test\n"
+        "  void checked() {\n"
+        "    assert true;\n"
+        "    assert x == x;\n"
+        "    Assertions.assertTrue(true);\n"
+        "    Assertions.assertFalse(true);\n"
+        "  }\n"
+        "}\n"
+    )
+    assert _summary(_findings(code, Language.JAVA)) == [
+        ("test.tautology", 4, "error"),
+        ("test.tautology", 5, "error"),
+        ("test.tautology", 6, "error"),
+    ]
+
+
 def test_non_test_path_and_disabled_switch_report_nothing() -> None:
     code = "def test_x():\n    assert 1 == 1\n"
     disabled = Policy.model_validate_json('{"checkers":{"test.integrity":{"enabled":false}}}')
@@ -269,6 +325,45 @@ def test_python_unittest_class_recognizes_assertions_and_raises() -> None:
         "        self.assertEqual(x, x)\n"
     )
     assert _summary(_findings(code, Language.PYTHON)) == [("test.tautology", 10, "error")]
+
+
+def test_python_negative_and_inequality_assertions_are_not_tautologies() -> None:
+    code = (
+        "def test_x():\n"
+        "    self.assertNotEqual(x, x)\n"
+        "    self.assertIsNot(x, x)\n"
+        "    self.assertLess(x, x)\n"
+        "    self.assertFalse(True)\n"
+    )
+    assert _findings(code, Language.PYTHON) == ()
+
+
+def test_python_positive_equality_assertions_remain_tautologies() -> None:
+    code = (
+        "def test_x():\n"
+        "    self.assertEqual(x, x)\n"
+        "    self.assertEquals(x, x)\n"
+        "    self.assertIs(x, x)\n"
+        "    assert True\n"
+        "    assert 1 == 1\n"
+    )
+    assert _summary(_findings(code, Language.PYTHON)) == [
+        ("test.tautology", 2, "error"),
+        ("test.tautology", 3, "error"),
+        ("test.tautology", 4, "error"),
+        ("test.tautology", 5, "error"),
+        ("test.tautology", 6, "error"),
+    ]
+
+
+def test_python_assert_true_call_requires_a_literal_true_argument() -> None:
+    code = "def test_x():\n    self.assertTrue(True)\n    self.assertTrue(False)\n"
+    assert _summary(_findings(code, Language.PYTHON)) == [("test.tautology", 2, "error")]
+
+
+def test_python_custom_equality_helper_is_an_assertion_without_tautology() -> None:
+    code = "def test_x():\n    _assert_same(x, x)\n"
+    assert _findings(code, Language.PYTHON) == ()
 
 
 def test_python_stdout_write_suppresses_empty_body_signal() -> None:

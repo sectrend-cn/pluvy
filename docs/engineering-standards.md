@@ -230,7 +230,7 @@ Approvals granted in other projects do not transfer here.
 | `unused.function` | Non-exported functions and methods without resolved references |
 | `unused.field` | Fields without reads; initialization and writes do not count |
 | `unused.return` | Warning for a known non-void result discarded at a call site |
-| `test.tautology` | Mirrored assertion operands, literal-true assertions and literal-true matchers |
+| `test.tautology` | Mirrored positive-equality assertion operands, literal-true assertions and literal-true matchers |
 | `test.vacuous` | Always-true matchers, assertion-free test bodies and snapshot-only tests (snapshot-only warnings) |
 | `type.assertion` | Python typing casts, TS assertions except `as const`, TS non-null assertions, Java reference casts |
 | `type.suppression` | Recognized suppression comments and Python no-type-check markers |

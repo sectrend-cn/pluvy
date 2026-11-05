@@ -47,6 +47,35 @@ def _pair_mirrored(call: Node) -> bool:
     return len(arguments) == 2 and _spelling(arguments[0]) == _spelling(arguments[1])
 
 
+def _assert_statement_mirrored(statement: Node) -> bool:
+    expressions = statement.named_children
+    if not expressions:
+        return False
+    expression = expressions[0]
+    if expression.type == "true":
+        return True
+    if expression.type != "binary_expression":
+        return False
+    operator = expression.child_by_field_name("operator")
+    left = expression.child_by_field_name("left")
+    right = expression.child_by_field_name("right")
+    return (
+        operator is not None
+        and operator.type == "=="
+        and left is not None
+        and right is not None
+        and _spelling(left) == _spelling(right)
+    )
+
+
+def _call_mirrored(call: Node) -> bool:
+    name = _call_name(call)
+    arguments = _arguments(call)
+    if name == "assertTrue" and len(arguments) == 1 and arguments[0].type == "true":
+        return True
+    return name in _EQUALITY_ASSERTIONS and _pair_mirrored(call)
+
+
 def _is_assertion(call: Node) -> bool:
     return _call_name(call).startswith(_ASSERTION_PREFIX)
 
@@ -81,15 +110,11 @@ class JavaTestSyntax:
         assertions: list[TestAssertion] = []
         for node in walk(body):
             if node.type == "assert_statement":
-                assertions.append(TestAssertion(node, "assertion"))
-            elif node.type == "method_invocation" and _is_assertion(node):
                 assertions.append(
-                    TestAssertion(
-                        node,
-                        "assertion",
-                        mirrored=_call_name(node) in _EQUALITY_ASSERTIONS and _pair_mirrored(node),
-                    )
+                    TestAssertion(node, "assertion", mirrored=_assert_statement_mirrored(node))
                 )
+            elif node.type == "method_invocation" and _is_assertion(node):
+                assertions.append(TestAssertion(node, "assertion", mirrored=_call_mirrored(node)))
         return tuple(assertions)
 
     def unrecognized_calls(self, declaration: Node) -> tuple[Node, ...]:

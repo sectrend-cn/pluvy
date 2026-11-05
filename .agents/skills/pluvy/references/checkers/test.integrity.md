@@ -15,21 +15,27 @@ differ:
 
 | Language | Test declarations and recognized assertions |
 | --- | --- |
-| Python | Module-level and class-level `def test_*` functions; `assert` statements and `assert*`/`_assert*` calls, with `pytest.raises` and `assertRaises` counted as assertions. |
-| JavaScript, TypeScript, TSX | `it(...)` and `test(...)` callbacks; `expect(...).matcher(...)` chains and `assert*`/`_assert*` calls. |
+| Python | Module-level and class-level `def test_*` functions; `assert` statements and `assert*`/`_assert*` calls, with `pytest.raises` and `assertRaises` counted as assertions. Tautology detection covers `assert` statements and the positive-equality calls `assertEqual`, `assertEquals` and `assertIs`. |
+| JavaScript, TypeScript, TSX | `it(...)` and `test(...)` callbacks; `expect(...).matcher(...)` chains and `assert*`/`_assert*` calls. Tautology detection covers `expect(...).toBe`/`toEqual`/`toStrictEqual`, single-argument literal-`true` assertions, and `assert`/`_assert` members `equal`, `strictEqual`, `deepEqual` and `deepStrictEqual`. |
 | Go | `func Test*` functions; `t.Error*`, `t.Fatal*` and `t.Fail*` calls. |
-| Java | `@Test` methods; `Assertions.assert*` and inherited `assert*` calls plus `assert` statements. |
+| Java | `@Test` methods; `Assertions.assert*` and inherited `assert*` calls plus `assert` statements. Tautology detection covers literal-`true` and `==`-mirrored `assert` statements, `assertTrue(true)`, and the positive-equality calls `assertEquals` and `assertSame`. |
 
 A test is reported by default only when its path matches one of the default test
-globs. The checker classifies recognized assertions one site at a time. An
-assertion whose two operands have the same source spelling, a literal-true
-assertion or literal-true `assertTrue`, and an equality assertion such as
-`assertEquals(x, x)` are tautologies. The always-true matchers are
-`.not.toThrow()`, `toBeTruthy()` and `toBeDefined()`. `toBe`, `toEqual` and
-`toStrictEqual` are compared structurally, and `assertEquals`/`assertSame` do the
-same in Java; Go does not claim mirrored or always-true forms. Each assertion
-site produces at most one diagnostic, and a test containing both kinds reports
-each defective site separately.
+globs. The checker classifies recognized assertions one site at a time. A
+recognized assertion is a tautology only in these frozen positive forms: a
+literal-`true` `assert` statement (Python/Java); `assertTrue(true)` (Python/Java)
+or a single-argument literal-`true` JavaScript assertion whose name is not
+negated; mirrored `==`/`is` operands in a Python `assert` statement, mirrored
+`==` operands in a Java `assert` statement, and mirrored
+`expect(...).toBe`/`toEqual`/`toStrictEqual`; or a named positive-equality call
+from the per-language set (Python `assertEqual`/`assertEquals`/`assertIs`, Java
+`assertEquals`/`assertSame`, JavaScript `assert`/`_assert` members
+`equal`/`strictEqual`/`deepEqual`/`deepStrictEqual`). Negative and non-equality
+forms such as `assertNotEqual`, `assertLess`, `assertFalse` and `assert.notEqual`
+stay outside the set. The always-true matchers are `.not.toThrow()`,
+`toBeTruthy()` and `toBeDefined()`. Go does not claim mirrored or always-true
+forms. Each assertion site produces at most one diagnostic, and a test containing
+both kinds reports each defective site separately.
 
 A test with no recognized assertion is vacuous only when its body also has no
 unrecognized call. Calls to the language print family are exempt from that
@@ -79,8 +85,16 @@ Incorrect — `globs` is not an option and unknown options are rejected:
 
 Known limits are deliberate. A custom assertion helper is recognized only when
 its name starts with `assert` or `_assert`; other helpers suppress the
-missing-assertion signal but are never proven to assert. Identical spelling is
-not data flow, so `assert result == service` is not a tautology even when both
+missing-assertion signal but are never proven to assert. Negative and inequality
+assertions (`assertNotEqual`, `assertLess`, `assert.notStrictEqual`) are not
+reported as tautologies: they fail rather than pass, which is a different defect
+outside this checker. `assertFalse(false)` is not detected. A custom equality
+helper outside the per-language set is not a tautology, although an
+`assert*`/`_assert*` name still counts as an assertion for the conservative
+missing-assertion check. In JavaScript, a bare identifier call such as
+`assertSame(x, x)` is not mirrored; only members of an `assert`/`_assert` root
+use the equality set. Identical spelling is not data flow, so
+`assert result == service` is not a tautology even when both
 names refer to the same value, and a call versus a literal is not a tautology.
 Snapshot-only tests receive a warning rather than an error. The path globs can
 include non-test files with test-like names, so tighten `paths` when the default

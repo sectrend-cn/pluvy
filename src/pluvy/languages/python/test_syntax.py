@@ -8,6 +8,7 @@ from pluvy.parsing.treesitter import field, walk
 from pluvy.semantics.testing.contracts import TestAssertion, TestDeclaration
 
 _EQUALITY_OPERATORS = frozenset({"==", "is"})
+_EQUALITY_CALLS = frozenset({"assertEqual", "assertEquals", "assertIs"})
 _ASSERTION_PREFIXES = ("assert", "_assert")
 _RAISES_NAMES = frozenset({"assertRaises", "raises"})
 _PRINT_NAME = "print"
@@ -59,9 +60,9 @@ def _call_mirrored(call: Node) -> bool:
     if name == "assertTrue" and len(arguments) == 1:
         return arguments[0].type == "true"
     return (
-        len(arguments) == 2
+        name in _EQUALITY_CALLS
+        and len(arguments) == 2
         and _spelling(arguments[0]) == _spelling(arguments[1])
-        and name != "raises"
     )
 
 

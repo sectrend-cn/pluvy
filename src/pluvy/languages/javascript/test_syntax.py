@@ -8,6 +8,7 @@ from pluvy.semantics.testing.contracts import TestAssertion, TestDeclaration
 _DECLARATIONS = frozenset({"it", "test"})
 _ASSERT_ROOTS = frozenset({"assert", "_assert"})
 _EQUALITY_MATCHERS = frozenset({"toBe", "toStrictEqual", "toEqual"})
+_EQUALITY_ASSERT_MEMBERS = frozenset({"equal", "strictEqual", "deepEqual", "deepStrictEqual"})
 _ALWAYS_TRUE_MATCHERS = frozenset({"toBeDefined", "toBeTruthy"})
 _SNAPSHOT_MATCHERS = frozenset({"toMatchInlineSnapshot", "toMatchSnapshot"})
 _PRINT_ROOT = "console"
@@ -70,11 +71,22 @@ def _pair_mirrored(call: Node) -> bool:
     return len(arguments) == 2 and _spelling(arguments[0]) == _spelling(arguments[1])
 
 
-def _assertion_mirrored(call: Node) -> bool:
+def _negated(function: Node, name: str) -> bool:
+    lowered = name.lower()
+    return _chain_has_not(function) or "not" in lowered or lowered.endswith("false")
+
+
+def _assertion_mirrored(call: Node, function: Node, name: str) -> bool:
+    if _negated(function, name):
+        return False
     arguments = _arguments(call)
     if len(arguments) == 1:
         return arguments[0].type == "true"
-    return _pair_mirrored(call)
+    return (
+        function.type == "member_expression"
+        and name in _EQUALITY_ASSERT_MEMBERS
+        and _pair_mirrored(call)
+    )
 
 
 def _equality_mirrored(call: Node, function: Node) -> bool:
@@ -114,7 +126,11 @@ def _classification(call: Node) -> TestAssertion | None:
 def _identifier(call: Node, function: Node) -> TestAssertion | None:
     if not _assertion(function):
         return None
-    return TestAssertion(call, "assertion", mirrored=_assertion_mirrored(call))
+    return TestAssertion(
+        call,
+        "assertion",
+        mirrored=_assertion_mirrored(call, function, _spelling(function)),
+    )
 
 
 def _member(call: Node, function: Node) -> TestAssertion | None:
@@ -122,7 +138,7 @@ def _member(call: Node, function: Node) -> TestAssertion | None:
     matcher = _spelling(property_name) if property_name is not None else ""
     if _expect_call(function) is not None:
         return _expect_matcher(call, function, matcher)
-    return _assert_member(call, function)
+    return _assert_member(call, function, matcher)
 
 
 def _expect_matcher(call: Node, function: Node, matcher: str) -> TestAssertion:
@@ -139,10 +155,14 @@ def _expect_matcher(call: Node, function: Node, matcher: str) -> TestAssertion:
     )
 
 
-def _assert_member(call: Node, function: Node) -> TestAssertion | None:
+def _assert_member(call: Node, function: Node, name: str) -> TestAssertion | None:
     if not _assertion(function):
         return None
-    return TestAssertion(call, "assertion", mirrored=_assertion_mirrored(call))
+    return TestAssertion(
+        call,
+        "assertion",
+        mirrored=_assertion_mirrored(call, function, name),
+    )
 
 
 def _is_print(call: Node) -> bool:
