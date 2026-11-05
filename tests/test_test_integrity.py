@@ -2,10 +2,21 @@
 
 import pytest
 from pydantic import ValidationError
+from tree_sitter import Node
 
 from pluvy.diagnostics import Finding
 from pluvy.engine import check
+from pluvy.languages.go.plugin import GoLanguage
+from pluvy.languages.go.test_syntax import GoTestSyntax
+from pluvy.languages.java.plugin import JavaLanguage
+from pluvy.languages.java.test_syntax import JavaTestSyntax
+from pluvy.languages.javascript.plugin import JavaScriptLanguage
+from pluvy.languages.javascript.test_syntax import JavaScriptTestSyntax
+from pluvy.languages.python.plugin import PythonLanguage
+from pluvy.languages.python.test_syntax import PythonTestSyntax
+from pluvy.parsing.treesitter import TreeParser
 from pluvy.policy.models import Policy
+from pluvy.semantics.testing.contracts import TestSyntax as Syntax
 from pluvy.source import Language, Source
 
 _DEFAULT_PATHS = {
@@ -76,6 +87,20 @@ def _findings(
 
 def _summary(findings: tuple[Finding, ...]) -> list[tuple[str, int, str]]:
     return [(finding.rule, finding.line, finding.severity) for finding in findings]
+
+
+def _root(parser: TreeParser, language: Language, path: str, code: str) -> Node:
+    return parser.tree(Source(path, code.encode(), language)).root_node
+
+
+def _assertion_kinds(syntax: Syntax, root: Node) -> tuple[str, ...]:
+    (declaration,) = syntax.declarations(root)
+    return tuple(assertion.kind for assertion in syntax.assertions(declaration.node))
+
+
+def _control_types(syntax: Syntax, root: Node) -> tuple[str, ...]:
+    (declaration,) = syntax.declarations(root)
+    return tuple(node.type for node in syntax.control_statements(declaration.node))
 
 
 def test_winner_sample_reports_tautologies_without_data_flow() -> None:
@@ -405,3 +430,337 @@ def test_tsx_snapshot_warning_survives_unrecognized_render_call() -> None:
         "});\n"
     )
     assert _summary(_findings(code, Language.TSX)) == [("test.vacuous", 3, "warning")]
+
+
+@pytest.mark.parametrize(
+    ("language", "path"),
+    [
+        (Language.JAVASCRIPT, "sample.test.js"),
+        (Language.TYPESCRIPT, "sample.test.ts"),
+        (Language.TSX, "sample.test.tsx"),
+    ],
+)
+def test_javascript_constructor_calls_suppress_empty_body_signal(
+    language: Language, path: str
+) -> None:
+    code = 'it("checked", () => {\n  new Check(42);\n});\n'
+    assert _findings(code, language, path=path) == ()
+
+
+@pytest.mark.parametrize(
+    ("language", "path"),
+    [
+        (Language.JAVASCRIPT, "sample.test.js"),
+        (Language.TYPESCRIPT, "sample.test.ts"),
+        (Language.TSX, "sample.test.tsx"),
+    ],
+)
+def test_javascript_constructor_calls_with_print_suppress_empty_body_signal(
+    language: Language, path: str
+) -> None:
+    code = 'it("checked", () => {\n  new Check(42);\n  console.log("done");\n});\n'
+    assert _findings(code, language, path=path) == ()
+
+
+def test_java_constructor_calls_suppress_empty_body_signal() -> None:
+    code = (
+        "class SampleTest {\n"
+        "  @Test\n"
+        "  void checked() {\n"
+        "    new Check(42);\n"
+        "  }\n\n"
+        "  @Test\n"
+        "  void mixed() {\n"
+        '    System.out.println("done");\n'
+        "    new Check(42);\n"
+        "  }\n"
+        "}\n"
+    )
+    assert _findings(code, Language.JAVA) == ()
+
+
+@pytest.mark.parametrize(
+    "decorator",
+    ["@pytest.fixture", '@pytest.fixture(scope="module")', "@pytest.fixture()", "@fixture"],
+)
+def test_python_fixture_decorated_functions_are_not_tests(decorator: str) -> None:
+    code = (
+        "import pytest\n\n\n"
+        f"{decorator}\n"
+        "def test_config():\n"
+        '    return {"status": "ok"}\n\n\n'
+        "def test_uses_config(test_config):\n"
+        '    assert test_config["status"] == "ok"\n'
+    )
+    assert _findings(code, Language.PYTHON) == ()
+
+
+def test_python_fixture_decorators_are_excluded_from_declarations() -> None:
+    code = (
+        "import pytest\n\n"
+        "@pytest.fixture\n"
+        "def test_config():\n"
+        "    return {}\n\n"
+        '@pytest.fixture(scope="module")\n'
+        "def test_scope():\n"
+        "    return 1\n\n"
+        "@fixture\n"
+        "def test_imported():\n"
+        "    return 2\n\n"
+        "@pytest.mark.parametrize('value', [1])\n"
+        "def test_parametrized(value):\n"
+        "    assert value == 1\n\n"
+        "@pytest.mark.asyncio\n"
+        "async def test_asyncio():\n"
+        "    assert 1 == 1\n\n"
+        "@decorator\n"
+        "def test_plain():\n"
+        "    assert 1 == 1\n"
+    )
+    root = _root(PythonLanguage().parser, Language.PYTHON, "tests/test_sample.py", code)
+    names = tuple(declaration.name for declaration in PythonTestSyntax().declarations(root))
+    assert names == ("test_parametrized", "test_asyncio", "test_plain")
+
+
+def test_python_async_tests_are_recognized() -> None:
+    code = "import pytest\n\n@pytest.mark.asyncio\nasync def test_ready():\n    assert 1 == 1\n"
+    assert _summary(_findings(code, Language.PYTHON)) == [("test.tautology", 5, "error")]
+
+
+def test_python_async_with_fixture_body_is_not_vacuous() -> None:
+    code = "async def test_stream(fixture):\n    async with fixture:\n        pass\n"
+    assert _findings(code, Language.PYTHON) == ()
+
+
+def test_python_control_flow_body_is_not_vacuous() -> None:
+    code = (
+        "def test_flow(values):\n"
+        "    for value in values:\n"
+        "        pass\n"
+        "    if values:\n"
+        "        pass\n"
+        "    while values:\n"
+        "        break\n"
+    )
+    assert _findings(code, Language.PYTHON) == ()
+
+
+def test_javascript_control_flow_body_is_not_vacuous() -> None:
+    code = (
+        'it("flow", () => {\n'
+        "  for (const value of values) {\n"
+        "    result = value;\n"
+        "  }\n"
+        "  if (result) {\n"
+        "    result = 1;\n"
+        "  }\n"
+        "  while (result) {\n"
+        "    result = 0;\n"
+        "  }\n"
+        "});\n"
+    )
+    assert _findings(code, Language.JAVASCRIPT) == ()
+
+
+def test_javascript_parameter_comments_do_not_change_argument_counts() -> None:
+    code = 'it("x", () => {\n  assert(/* rationale */ true);\n});\n'
+    assert _summary(_findings(code, Language.JAVASCRIPT)) == [("test.tautology", 2, "error")]
+
+
+def test_java_parameter_comments_do_not_change_argument_counts() -> None:
+    code = (
+        "class SampleTest {\n"
+        "  @Test\n"
+        "  void checked() {\n"
+        "    Assertions.assertTrue(/* rationale */ true);\n"
+        "  }\n"
+        "}\n"
+    )
+    assert _summary(_findings(code, Language.JAVA)) == [("test.tautology", 4, "error")]
+
+
+def test_javascript_nested_function_bodies_count_for_the_outer_test() -> None:
+    with_assertion = (
+        'it("outer", () => {\n  const inner = () => {\n    expect(x).toBe(x);\n  };\n});\n'
+    )
+    with_call = 'it("outer", () => {\n  const inner = () => {\n    helper();\n  };\n});\n'
+    assert _summary(_findings(with_assertion, Language.JAVASCRIPT)) == [
+        ("test.tautology", 3, "error")
+    ]
+    assert _findings(with_call, Language.JAVASCRIPT) == ()
+
+
+def test_python_nested_function_bodies_count_for_the_outer_test() -> None:
+    with_assertion = "def test_outer():\n    def inner():\n        assert 1 == 1\n"
+    with_call = "def test_outer():\n    def inner():\n        helper()\n"
+    assert _summary(_findings(with_assertion, Language.PYTHON)) == [("test.tautology", 3, "error")]
+    assert _findings(with_call, Language.PYTHON) == ()
+
+
+@pytest.mark.parametrize(
+    "statement",
+    ["assertNote(x, y);", "_assert_notice(x);", "assertAllFalse(x);"],
+)
+def test_javascript_negated_names_still_count_as_assertions(statement: str) -> None:
+    code = 'it("x", () => {\n  ' + statement + "\n});\n"
+    assert _findings(code, Language.JAVASCRIPT) == ()
+
+
+def test_python_assertion_kinds_are_anchored() -> None:
+    code = (
+        "def test_sample():\n"
+        "    assert value == 1\n"
+        "    with pytest.raises(ValueError):\n"
+        "        run()\n"
+    )
+    root = _root(PythonLanguage().parser, Language.PYTHON, "tests/test_sample.py", code)
+    assert _assertion_kinds(PythonTestSyntax(), root) == ("assertion", "raises")
+
+
+def test_javascript_assertion_kinds_are_anchored() -> None:
+    code = (
+        'it("x", () => {\n'
+        "  expect(value).toBe(1);\n"
+        "  expect(value).toContain(1);\n"
+        "  assert(value);\n"
+        "});\n"
+    )
+    root = _root(JavaScriptLanguage().parser, Language.JAVASCRIPT, "sample.test.js", code)
+    assert _assertion_kinds(JavaScriptTestSyntax(), root) == ("matcher", "matcher", "assertion")
+
+
+def test_go_assertion_kinds_are_anchored() -> None:
+    code = (
+        "package sample\n\n"
+        'import "testing"\n\n'
+        "func TestChecked(t *testing.T) {\n"
+        '    t.Errorf("bad")\n'
+        "}\n"
+    )
+    root = _root(GoLanguage().parser, Language.GO, "sample_test.go", code)
+    assert _assertion_kinds(GoTestSyntax(), root) == ("fatal",)
+
+
+def test_java_assertion_kinds_are_anchored() -> None:
+    code = (
+        "class SampleTest {\n"
+        "  @Test\n"
+        "  void checked() {\n"
+        "    assert value == 1;\n"
+        "    Assertions.assertTrue(value);\n"
+        "  }\n"
+        "}\n"
+    )
+    root = _root(JavaLanguage().parser, Language.JAVA, "SampleTest.java", code)
+    assert _assertion_kinds(JavaTestSyntax(), root) == ("assertion", "assertion")
+
+
+def test_python_control_statement_kinds_are_anchored() -> None:
+    code = (
+        "def test_flow(values, handle):\n"
+        "    with handle:\n"
+        "        pass\n"
+        "    for value in values:\n"
+        "        pass\n"
+        "    while values:\n"
+        "        break\n"
+        "    if values:\n"
+        "        pass\n"
+        "    try:\n"
+        "        pass\n"
+        "    except ValueError:\n"
+        "        pass\n"
+        "    match values:\n"
+        "        case 1:\n"
+        "            pass\n"
+    )
+    root = _root(PythonLanguage().parser, Language.PYTHON, "tests/test_sample.py", code)
+    assert _control_types(PythonTestSyntax(), root) == (
+        "with_statement",
+        "for_statement",
+        "while_statement",
+        "if_statement",
+        "try_statement",
+        "match_statement",
+    )
+
+
+def test_javascript_control_statement_kinds_are_anchored() -> None:
+    code = (
+        'it("flow", () => {\n'
+        "  if (x) { y(); }\n"
+        "  for (let i = 0; i < 1; i++) { y(); }\n"
+        "  for (const key in object) { y(); }\n"
+        "  for (const value of values) { y(); }\n"
+        "  while (x) { y(); }\n"
+        "  do { y(); } while (x);\n"
+        "  try { y(); } catch (error) { y(); }\n"
+        "  switch (x) { case 1: y(); }\n"
+        "  with (object) { y(); }\n"
+        "});\n"
+    )
+    root = _root(JavaScriptLanguage().parser, Language.JAVASCRIPT, "sample.test.js", code)
+    assert _control_types(JavaScriptTestSyntax(), root) == (
+        "if_statement",
+        "for_statement",
+        "for_in_statement",
+        "for_in_statement",
+        "while_statement",
+        "do_statement",
+        "try_statement",
+        "switch_statement",
+        "with_statement",
+    )
+
+
+def test_go_control_statement_kinds_are_anchored() -> None:
+    code = (
+        "package sample\n\n"
+        'import "testing"\n\n'
+        "func TestFlow(t *testing.T) {\n"
+        '    if x { t.Error("x") }\n'
+        '    for i := 0; i < 1; i++ { t.Error("x") }\n'
+        '    switch x { case 1: t.Error("x") }\n'
+        "    switch value := x.(type) { case int: _ = value }\n"
+        "    select { case <-ch: }\n"
+        "}\n"
+    )
+    root = _root(GoLanguage().parser, Language.GO, "sample_test.go", code)
+    assert _control_types(GoTestSyntax(), root) == (
+        "if_statement",
+        "for_statement",
+        "expression_switch_statement",
+        "type_switch_statement",
+        "select_statement",
+    )
+
+
+def test_java_control_statement_kinds_are_anchored() -> None:
+    code = (
+        "class SampleTest {\n"
+        "  @Test\n"
+        "  void flow() {\n"
+        "    if (x) { y(); }\n"
+        "    for (int i = 0; i < 1; i++) { y(); }\n"
+        "    for (String value : values) { y(); }\n"
+        "    while (x) { y(); }\n"
+        "    do { y(); } while (x);\n"
+        "    try { y(); } catch (Exception error) { y(); }\n"
+        "    try (var reader = open()) { y(); }\n"
+        "    switch (x) { case 1: y(); }\n"
+        "    synchronized (lock) { y(); }\n"
+        "  }\n"
+        "}\n"
+    )
+    root = _root(JavaLanguage().parser, Language.JAVA, "SampleTest.java", code)
+    assert _control_types(JavaTestSyntax(), root) == (
+        "if_statement",
+        "for_statement",
+        "enhanced_for_statement",
+        "while_statement",
+        "do_statement",
+        "try_statement",
+        "try_with_resources_statement",
+        "switch_expression",
+        "synchronized_statement",
+    )

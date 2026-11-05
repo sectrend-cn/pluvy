@@ -12,6 +12,17 @@ _EQUALITY_CALLS = frozenset({"assertEqual", "assertEquals", "assertIs"})
 _ASSERTION_PREFIXES = ("assert", "_assert")
 _RAISES_NAMES = frozenset({"assertRaises", "raises"})
 _PRINT_NAME = "print"
+_FIXTURE_NAME = "fixture"
+_CONTROL_STATEMENTS = frozenset(
+    {
+        "with_statement",
+        "for_statement",
+        "while_statement",
+        "if_statement",
+        "try_statement",
+        "match_statement",
+    }
+)
 
 
 def _spelling(node: Node) -> str:
@@ -91,6 +102,32 @@ def _declared_at_module_or_class(node: Node) -> bool:
     )
 
 
+def _decorator_name(decorator: Node) -> str:
+    expression = decorator.named_children[0] if decorator.named_children else None
+    if expression is None:
+        return ""
+    while expression.type == "call":
+        function = field(expression, "function")
+        if function is None:
+            return ""
+        expression = function
+    if expression.type == "attribute":
+        attribute = field(expression, "attribute")
+        return _spelling(attribute) if attribute is not None else ""
+    return _spelling(expression) if expression.type == "identifier" else ""
+
+
+def _fixture_decorated(node: Node) -> bool:
+    parent = node.parent
+    if parent is None or parent.type != "decorated_definition":
+        return False
+    return any(
+        _decorator_name(child) == _FIXTURE_NAME
+        for child in parent.named_children
+        if child.type == "decorator"
+    )
+
+
 class PythonTestSyntax:
     """Interpret Python test functions, unittest methods and pytest forms."""
 
@@ -103,6 +140,7 @@ class PythonTestSyntax:
                 and name is not None
                 and _spelling(name).startswith("test_")
                 and _declared_at_module_or_class(node)
+                and not _fixture_decorated(node)
             ):
                 declarations.append(TestDeclaration(node, _spelling(name)))
         return tuple(declarations)
@@ -138,3 +176,9 @@ class PythonTestSyntax:
             and _assertion_kind(node) is None
             and _callee_name(node) != _PRINT_NAME
         )
+
+    def control_statements(self, declaration: Node) -> tuple[Node, ...]:
+        body = field(declaration, "body")
+        if body is None:
+            return ()
+        return tuple(node for node in walk(body) if node.type in _CONTROL_STATEMENTS)

@@ -10,15 +10,15 @@ the checker does not execute tests, follow data flow or compare snapshot content
 test whose only assertions are snapshot matchers reports `test.vacuous` as a
 warning.
 
-**Languages**: every analyzer; recognized test declarations and assertions
-differ:
+**Languages**: every analyzer; recognized test declarations, assertions and
+control-flow statements differ:
 
-| Language | Test declarations and recognized assertions |
-| --- | --- |
-| Python | Module-level and class-level `def test_*` functions; `assert` statements and `assert*`/`_assert*` calls, with `pytest.raises` and `assertRaises` counted as assertions. Tautology detection covers `assert` statements and the positive-equality calls `assertEqual`, `assertEquals` and `assertIs`. |
-| JavaScript, TypeScript, TSX | `it(...)` and `test(...)` callbacks; `expect(...).matcher(...)` chains and `assert*`/`_assert*` calls. Tautology detection covers `expect(...).toBe`/`toEqual`/`toStrictEqual`, single-argument literal-`true` assertions, and `assert`/`_assert` members `equal`, `strictEqual`, `deepEqual` and `deepStrictEqual`. |
-| Go | `func Test*` functions; `t.Error*`, `t.Fatal*` and `t.Fail*` calls. |
-| Java | `@Test` methods; `Assertions.assert*` and inherited `assert*` calls plus `assert` statements. Tautology detection covers literal-`true` and `==`-mirrored `assert` statements, `assertTrue(true)`, and the positive-equality calls `assertEquals` and `assertSame`. |
+| Language | Test declarations and recognized assertions | Control-flow and context-manager statements |
+| --- | --- | --- |
+| Python | Module-level and class-level `def test_*` functions, excluding a function whose decorator base name is `fixture` (`@pytest.fixture`, `@pytest.fixture(...)` or `@fixture`); `assert` statements and `assert*`/`_assert*` calls, with `pytest.raises` and `assertRaises` counted as assertions. Tautology detection covers `assert` statements and the positive-equality calls `assertEqual`, `assertEquals` and `assertIs`. | `with`/`async with`, `for`, `while`, `if`, `try` and `match`. |
+| JavaScript, TypeScript, TSX | `it(...)` and `test(...)` callbacks; `expect(...).matcher(...)` chains and `assert*`/`_assert*` calls. Tautology detection covers `expect(...).toBe`/`toEqual`/`toStrictEqual`, single-argument literal-`true` assertions, and `assert`/`_assert` members `equal`, `strictEqual`, `deepEqual` and `deepStrictEqual`. | `if`, `for`, `for...in`/`for...of`, `while`, `do`, `try`, `switch` and `with`. |
+| Go | `func Test*` functions; `t.Error*`, `t.Fatal*` and `t.Fail*` calls. | `if`, `for`, `switch` and `select`. |
+| Java | `@Test` methods; `Assertions.assert*` and inherited `assert*` calls plus `assert` statements. Tautology detection covers literal-`true` and `==`-mirrored `assert` statements, `assertTrue(true)`, and the positive-equality calls `assertEquals` and `assertSame`. | `if`, `for`, enhanced `for`, `while`, `do`, `try`, try-with-resources, `switch` and `synchronized`. |
 
 A test is reported by default only when its path matches one of the default test
 globs. The checker classifies recognized assertions one site at a time. A
@@ -38,15 +38,23 @@ forms. Each assertion site produces at most one diagnostic, and a test containin
 both kinds reports each defective site separately.
 
 A test with no recognized assertion is vacuous only when its body also has no
-unrecognized call. Calls to the language print family are exempt from that
-conservative check: Python `print`, JavaScript-family `console.*`, Go
-`fmt.Print*`/`log.Print*` and Java `System.out.print*`/`System.err.print*`. Any
-other unrecognized call can be a custom assertion helper, so the missing-assertion
-signal stays silent rather than guessing that the helper cannot fail. The
-snapshot signal is independent: a test whose recognized assertions are all
-`toMatchSnapshot()` or `toMatchInlineSnapshot()` reports one warning at the first
-snapshot assertion, because setup calls do not change the fact that the test
-verifies no behavior.
+unrecognized call and no control-flow or context-manager statement listed in the
+table. This is the conservative confirmed-no-assertion standard: only a body
+made of literals, assignments and print calls is reported. Calls to the language
+print family are exempt from that conservative check: Python `print`,
+JavaScript-family `console.*`, Go `fmt.Print*`/`log.Print*` and Java
+`System.out.print*`/`System.err.print*`. Any other unrecognized call can be a
+custom assertion helper, so the missing-assertion signal stays silent rather
+than guessing that the helper cannot fail. A constructor invocation (`new` in
+JavaScript, object creation in Java) is handled the same way: it is never an
+assertion and is never classified as mirrored or always-true, and the checker
+does not infer constructor behavior. Comments inside an argument list are
+ignored and do not change argument counts. Assertions and calls anywhere inside
+the body, including uncalled nested functions and closures, count for the outer
+test. The snapshot signal is independent: a test whose recognized assertions are
+all `toMatchSnapshot()` or `toMatchInlineSnapshot()` reports one warning at the
+first snapshot assertion, because setup calls do not change the fact that the
+test verifies no behavior.
 
 A finding can be suppressed on the next line by naming `test.tautology` or
 `test.vacuous` in an approved directive with a reason; the directive applies to

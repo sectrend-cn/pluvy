@@ -11,6 +11,20 @@ _EQUALITY_ASSERTIONS = frozenset({"assertEquals", "assertSame"})
 _PRINT_RECEIVERS = frozenset({"System.err", "System.out"})
 _PRINT_PREFIX = "print"
 _ANNOTATIONS = frozenset({"annotation", "marker_annotation"})
+_COMMENTS = frozenset({"block_comment", "line_comment"})
+_CONTROL_STATEMENTS = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "enhanced_for_statement",
+        "while_statement",
+        "do_statement",
+        "try_statement",
+        "try_with_resources_statement",
+        "switch_expression",
+        "synchronized_statement",
+    }
+)
 
 
 def _spelling(node: Node) -> str:
@@ -20,7 +34,9 @@ def _spelling(node: Node) -> str:
 
 def _arguments(call: Node) -> tuple[Node, ...]:
     arguments = field(call, "arguments")
-    return tuple(arguments.named_children) if arguments is not None else ()
+    if arguments is None:
+        return ()
+    return tuple(child for child in arguments.named_children if child.type not in _COMMENTS)
 
 
 def _call_name(call: Node) -> str:
@@ -124,5 +140,14 @@ class JavaTestSyntax:
         return tuple(
             node
             for node in walk(body)
-            if node.type == "method_invocation" and not _is_assertion(node) and not _is_print(node)
+            if node.type == "object_creation_expression"
+            or (
+                node.type == "method_invocation" and not _is_assertion(node) and not _is_print(node)
+            )
         )
+
+    def control_statements(self, declaration: Node) -> tuple[Node, ...]:
+        body = field(declaration, "body")
+        if body is None:
+            return ()
+        return tuple(node for node in walk(body) if node.type in _CONTROL_STATEMENTS)

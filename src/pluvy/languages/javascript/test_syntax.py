@@ -14,6 +14,18 @@ _SNAPSHOT_MATCHERS = frozenset({"toMatchInlineSnapshot", "toMatchSnapshot"})
 _PRINT_ROOT = "console"
 _CALLBACKS = frozenset({"arrow_function", "function", "function_expression"})
 _ASSERTION_PREFIXES = ("assert", "_assert")
+_CONTROL_STATEMENTS = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "for_in_statement",
+        "while_statement",
+        "do_statement",
+        "try_statement",
+        "switch_statement",
+        "with_statement",
+    }
+)
 
 
 def _spelling(node: Node) -> str:
@@ -23,7 +35,9 @@ def _spelling(node: Node) -> str:
 
 def _arguments(call: Node) -> tuple[Node, ...]:
     arguments = field(call, "arguments")
-    return tuple(arguments.named_children) if arguments is not None else ()
+    if arguments is None:
+        return ()
+    return tuple(child for child in arguments.named_children if child.type != "comment")
 
 
 def _callee(call: Node) -> Node | None:
@@ -232,7 +246,17 @@ class JavaScriptTestSyntax:
         return tuple(
             node
             for node in walk(body)
-            if node.type == "call_expression"
-            and _classification(node) is None
-            and not _is_print(node)
+            if node.type == "new_expression"
+            or (
+                node.type == "call_expression"
+                and _classification(node) is None
+                and not _is_print(node)
+            )
         )
+
+    def control_statements(self, declaration: Node) -> tuple[Node, ...]:
+        callback = _callback(declaration)
+        body = field(callback, "body") if callback is not None else None
+        if body is None:
+            return ()
+        return tuple(node for node in walk(body) if node.type in _CONTROL_STATEMENTS)

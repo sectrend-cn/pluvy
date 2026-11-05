@@ -10,6 +10,15 @@ _ASSERTION_PREFIX = "Fail"
 _PRINT_RECEIVERS = frozenset({"fmt", "log"})
 _PRINT_PREFIX = "Print"
 _TEST_PREFIX = "Test"
+_CONTROL_STATEMENTS = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "expression_switch_statement",
+        "type_switch_statement",
+        "select_statement",
+    }
+)
 
 
 def _spelling(node: Node) -> str:
@@ -70,3 +79,9 @@ class GoTestSyntax:
             for node in walk(body)
             if node.type == "call_expression" and not _is_assertion(node) and not _is_print(node)
         )
+
+    def control_statements(self, declaration: Node) -> tuple[Node, ...]:
+        body = field(declaration, "body")
+        if body is None:
+            return ()
+        return tuple(node for node in walk(body) if node.type in _CONTROL_STATEMENTS)

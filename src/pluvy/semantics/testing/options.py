@@ -9,7 +9,9 @@ from pluvy.policy.contracts import (
     CheckerState,
 )
 
-TEST_INTEGRITY = CheckerDefinition("test.integrity", ("test.tautology", "test.vacuous"))
+TAUTOLOGY = "test.tautology"
+VACUOUS = "test.vacuous"
+TEST_INTEGRITY = CheckerDefinition("test.integrity", (TAUTOLOGY, VACUOUS))
 
 _DEFAULT_TEST_PATHS: tuple[str, ...] = (
     "test_*.py",

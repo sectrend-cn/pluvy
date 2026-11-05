@@ -10,10 +10,7 @@ from pluvy.analysis.requirements import RuleRequirements
 from pluvy.diagnostics import Finding
 from pluvy.policy.paths import matches
 from pluvy.semantics.testing.contracts import TestAssertion, TestSyntax
-from pluvy.semantics.testing.options import TEST_INTEGRITY
-
-_TAUTOLOGY = TEST_INTEGRITY.rule_ids[0]
-_VACUOUS = TEST_INTEGRITY.rule_ids[1]
+from pluvy.semantics.testing.options import TAUTOLOGY, TEST_INTEGRITY, VACUOUS
 
 
 @dataclass(frozen=True)
@@ -49,7 +46,7 @@ class TestIntegrityRule:
             return self._finding(
                 context,
                 assertion.node,
-                _TAUTOLOGY,
+                TAUTOLOGY,
                 "error",
                 f"Assertion in {test} cannot fail because it restates the same expression "
                 "or a literal true. Assert an independently produced value or outcome "
@@ -58,7 +55,7 @@ class TestIntegrityRule:
         return self._finding(
             context,
             assertion.node,
-            _VACUOUS,
+            VACUOUS,
             "error",
             f"Assertion in {test} uses a matcher that passes without checking behavior. "
             "Assert the produced value, raised error or observable outcome instead.",
@@ -72,12 +69,14 @@ class TestIntegrityRule:
         assertions: tuple[TestAssertion, ...],
     ) -> Finding | None:
         if not assertions:
-            if self.syntax.unrecognized_calls(declaration):
+            if self.syntax.unrecognized_calls(declaration) or self.syntax.control_statements(
+                declaration
+            ):
                 return None
             return self._finding(
                 context,
                 declaration,
-                _VACUOUS,
+                VACUOUS,
                 "error",
                 f"Test {test} declares no assertion and cannot fail. Add an assertion on "
                 "observable behavior, or remove the test.",
@@ -88,7 +87,7 @@ class TestIntegrityRule:
         return self._finding(
             context,
             snapshots[0].node,
-            _VACUOUS,
+            VACUOUS,
             "warning",
             f"Test {test} only asserts a snapshot, which can be accepted mechanically "
             "without verifying behavior. Add a behavioral assertion alongside the snapshot.",
