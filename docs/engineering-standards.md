@@ -225,6 +225,8 @@ Approvals granted in other projects do not transfer here.
 | `type.annotation` | Recognized broad/bare Python annotations and forward annotations |
 | `type.signature` | Missing Python parameter/return annotations |
 | `type.broad` | Recognized Python typing markers and internal `json.dumps` erasure, JS/TS `JSON.stringify` erasure, recognized Go/Java serializer erasure, TS broad/empty types, Go empty interfaces/`any`, Java `Object`, unbounded wildcards and recognized raw collections |
+| `type.nullable` | Aggregated optional or nullable properties per TypeScript/TSX type declaration and bare nullish fallbacks per innermost function body |
+| `type.union` | Non-nullish members per TypeScript/TSX union expression after removing `null` and `undefined` |
 | `type.boundary` | Recognized third-party outputs used without typed ingress conversion |
 | `unused.parameter` | Declared parameters without resolved read usage |
 | `unused.function` | Non-exported functions and methods without resolved references |
@@ -253,9 +255,10 @@ See [Checker configuration](checker-configuration.md#third-party-boundaries-and-
 for directional examples and semantic resolution limits.
 
 The parser-backed gate is read-only. Checker options are grouped by responsibility;
-`function_size` owns all five function metrics and `test.integrity` owns
-`test.tautology` and `test.vacuous`. Every other checker key matches its
-diagnostic ID. Only `include` and `exclude` control global file selection.
+`function_size` owns all five function metrics, `test.integrity` owns
+`test.tautology` and `test.vacuous`, and `type.contract` owns `type.nullable`
+and `type.union`. Every other checker key matches its diagnostic ID. Only
+`include` and `exclude` control global file selection.
 Every checker defaults to enabled; omit default-only entries and `enabled: true`.
 Reports disclose disabled checker names while findings retain their diagnostic IDs.
 Malformed configuration and tool failures fail closed. Syntax rejection emits a

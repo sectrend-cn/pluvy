@@ -599,11 +599,17 @@ def test_python_nested_function_bodies_count_for_the_outer_test() -> None:
 
 @pytest.mark.parametrize(
     "statement",
-    ["assertNote(x, y);", "_assert_notice(x);", "assertAllFalse(x);"],
+    ["assertNote(true, y);", "_assert_notice(true, y);", "assertAllFalse(true, y);"],
 )
 def test_javascript_negated_names_still_count_as_assertions(statement: str) -> None:
     code = 'it("x", () => {\n  ' + statement + "\n});\n"
     assert _findings(code, Language.JAVASCRIPT) == ()
+    root = _root(JavaScriptLanguage().parser, Language.JAVASCRIPT, "sample.test.js", code)
+    (declaration,) = JavaScriptTestSyntax().declarations(root)
+    (assertion,) = JavaScriptTestSyntax().assertions(declaration.node)
+    assert assertion.kind == "assertion"
+    assert assertion.mirrored is False
+    assert assertion.always_true is False
 
 
 def test_python_assertion_kinds_are_anchored() -> None:

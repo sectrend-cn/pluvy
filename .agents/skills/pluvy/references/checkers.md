@@ -1,13 +1,14 @@
 # Checker reference — pluvy skill
 
-Index of the built-in checkers. The schema has 19 logical checkers, which produce
-24 built-in diagnostic IDs. Some checker keys group related diagnostics:
-`function_size` owns the five `size.*` IDs and `test.integrity` owns
-`test.tautology` and `test.vacuous`. Every other checker name matches its
-diagnostic ID. Each checker has its own page under
-`checkers/`, holding what it reports, which analyzers register it, where its
-behavior differs between languages, every option with its default and type, and
-correct versus incorrect configuration examples.
+Index of the built-in checkers. The schema has 20 logical checkers, which produce
+26 built-in diagnostic IDs. Some checker keys group related diagnostics:
+`function_size` owns the five `size.*` IDs, `test.integrity` owns
+`test.tautology` and `test.vacuous`, and `type.contract` owns `type.nullable`
+and `type.union`. Every other checker name matches its diagnostic ID. Each
+checker has its own page under `checkers/`, holding what it reports, which
+analyzers register it, where its behavior differs between languages, every
+option with its default and type, and correct versus incorrect configuration
+examples.
 
 Configuration lives in the target repository's `.pluvy/pluvy.json`,
 or in the path selected with `--config`; it stays relative to the source root in
@@ -55,7 +56,7 @@ Every analyzer registers the same base set of 19 diagnostic IDs:
 - Testing: `test.tautology` and `test.vacuous`, both configured through the
   single `test.integrity` checker.
 
-The remaining five diagnostic IDs are registered per language:
+The remaining seven diagnostic IDs are registered per language:
 
 | Analyzer | Additional diagnostic IDs |
 | --- | --- |
@@ -63,7 +64,7 @@ The remaining five diagnostic IDs are registered per language:
 | Go | `type.broad` |
 | Java | `type.assertion`, `type.broad` |
 | JavaScript and JSX | `type.broad` |
-| TypeScript and TSX | `type.assertion`, `type.broad` |
+| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union` |
 
 A registered diagnostic reports only for the analyzer that registered it. For
 example, `type.annotation`, `type.signature` and `imports.wildcard` appear in
@@ -81,6 +82,7 @@ module-level functions; its page records the per-language candidate rules.
 | [`structure.guarded_projection`](checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for `size.lines`, `size.statements`, `size.complexity`, `size.nesting` and `size.parameters` | All |
 | [`test.integrity`](checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for `test.tautology` and `test.vacuous` | All |
+| [`type.contract`](checkers/type.contract.md) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions; one switch for `type.nullable` and `type.union` | TypeScript, TSX |
 | [`type.annotation`](checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |
 | [`type.signature`](checkers/type.signature.md) | Missing Python parameter and return annotations | Python |
 | [`type.broad`](checkers/type.broad.md) | Recognized broad type markers and JSON serialization outside proven outputs and permitted library inputs | All; markers differ per language |

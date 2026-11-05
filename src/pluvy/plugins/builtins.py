@@ -52,6 +52,7 @@ from pluvy.languages.semantic_syntax import (
     PythonSemanticSyntax,
 )
 from pluvy.languages.typescript import TsxLanguage, TypeScriptLanguage
+from pluvy.languages.typescript.contract import TypeScriptContractRule
 from pluvy.languages.typescript.rules import TypeScriptTypeRule
 from pluvy.languages.typescript.semantic_syntax import TypeScriptSemanticSyntax
 from pluvy.languages.typescript.syntax import TypeScriptImports
@@ -63,7 +64,14 @@ from pluvy.plugins.bundles import BundleRegistry
 from pluvy.plugins.languages import LanguagePlugin
 from pluvy.plugins.profiles import AnalysisProfile
 from pluvy.plugins.registry import AnalyzerRegistry
-from pluvy.policy.type_options import ANNOTATION, ASSERTION, SIGNATURE, SUPPRESSION, WILDCARD
+from pluvy.policy.type_options import (
+    ANNOTATION,
+    ASSERTION,
+    SIGNATURE,
+    SUPPRESSION,
+    TYPE_CONTRACT,
+    WILDCARD,
+)
 from pluvy.semantics.boundaries import BoundaryRule
 from pluvy.semantics.encoding import EncodingRule
 from pluvy.semantics.encoding_options import BROAD_TYPE
@@ -250,9 +258,16 @@ def _typescript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
     directives = comments.DirectiveSyntax(frozenset({"comment"}), "//")
     rules = (
         TypeScriptTypeRule(EncodingRule(JavaScriptEncodingSyntax())),
+        TypeScriptContractRule(),
         SuppressionRule(comments.GrammarComments(), directives=directives),
     )
-    return _compose(plugin, syntax, rules, (ASSERTION.name, BROAD_TYPE.name), directives)
+    return _compose(
+        plugin,
+        syntax,
+        rules,
+        (ASSERTION.name, BROAD_TYPE.name, *TYPE_CONTRACT.rule_ids),
+        directives,
+    )
 
 
 def builtin_analyzers() -> tuple[TypedAnalyzer, ...]:
