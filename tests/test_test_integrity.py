@@ -255,3 +255,58 @@ def test_next_line_suppression_selects_each_diagnostic() -> None:
     )
     assert _summary(_findings(tautology, Language.PYTHON)) == [("test.tautology", 4, "error")]
     assert _summary(_findings(vacuous, Language.JAVASCRIPT)) == [("test.vacuous", 4, "error")]
+
+
+def test_python_unittest_class_recognizes_assertions_and_raises() -> None:
+    code = (
+        "class FooTest(TestCase):\n"
+        "    def test_checked(self):\n"
+        "        self.assertEqual(actual, 42)\n\n"
+        "    def test_raises(self):\n"
+        "        with self.assertRaises(ValueError):\n"
+        "            run()\n\n"
+        "    def test_mirrored(self):\n"
+        "        self.assertEqual(x, x)\n"
+    )
+    assert _summary(_findings(code, Language.PYTHON)) == [("test.tautology", 10, "error")]
+
+
+def test_python_stdout_write_suppresses_empty_body_signal() -> None:
+    code = 'import sys\n\n\ndef test_writes() -> None:\n    sys.stdout.write("ok")\n'
+    assert _findings(code, Language.PYTHON) == ()
+
+
+def test_go_error_call_suppresses_empty_body_signal() -> None:
+    code = (
+        "package sample\n\n"
+        'import "testing"\n\n'
+        "func TestStatus(t *testing.T) {\n"
+        "    var err error\n"
+        "    _ = err.Error()\n"
+        "}\n"
+    )
+    assert _findings(code, Language.GO) == ()
+
+
+def test_default_paths_select_nested_tests_and_ignore_other_sources() -> None:
+    code = "def test_x():\n    assert 1 == 1\n"
+    assert _summary(_findings(code, Language.PYTHON, path="src/test_x.py")) == [
+        ("test.tautology", 2, "error")
+    ]
+    assert _summary(_findings(code, Language.PYTHON, path="deep/nested/tests/foo.py")) == [
+        ("test.tautology", 2, "error")
+    ]
+    assert _findings(code, Language.PYTHON, path="src/engine.py") == ()
+    assert _findings(code, Language.PYTHON, path="plain.py") == ()
+    empty = Policy.model_validate_json('{"checkers":{"test.integrity":{"paths":[]}}}')
+    assert _findings(code, Language.PYTHON, policy=empty, path="tests/test_x.py") == ()
+
+
+def test_tsx_snapshot_warning_survives_unrecognized_render_call() -> None:
+    code = (
+        'it("matches snapshot", () => {\n'
+        '  const { container } = render(<Badge name="Ada" />);\n'
+        "  expect(container).toMatchSnapshot();\n"
+        "});\n"
+    )
+    assert _summary(_findings(code, Language.TSX)) == [("test.vacuous", 3, "warning")]
