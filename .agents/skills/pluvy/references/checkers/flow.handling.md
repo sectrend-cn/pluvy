@@ -23,11 +23,16 @@ A capture is reported only when its handler subtree contains no re-throw. The
 whole subtree counts, including nested functions, so a nested function that
 re-throws suppresses the finding even when that function never runs. A handler
 that only logs, prints or returns a substitute value remains a finding. A
-`.catch(...)` argument that is not an inline function, such as an identifier
-naming a handler, is not reported because the checker cannot inspect its body.
-A `.catch(() => constant)` reports `flow.swallow` and never `flow.fallback`.
+finding is anchored at the captured handler clause (`except` or `catch`) or at
+the start of the swallowing call expression; a multi-line chained call reports
+the line where the whole call begins, not the `.catch` token line.
 
 #### JavaScript, JSX, TypeScript and TSX
+
+For `.catch(...)`, an argument that is not an inline function, such as an
+identifier naming a handler, is not reported because the checker cannot inspect
+its body. A `.catch(() => constant)` reports `flow.swallow` and never
+`flow.fallback`.
 
 A coalescing chain is the maximal set of `??` expressions connected through
 parenthesized expressions, assertions, member access on the object side, and
@@ -74,7 +79,11 @@ Incorrect — the limit must be positive and `flow.fallback` is not a checker ke
 Known limits are deliberate. The checker does not prove that a captured error
 should terminate the program, that a fallback changes business meaning, or that
 a literal is the wrong default; review the owning contract and its consumers.
-Go has no exception handler and is not covered: an `err` value discarded or
-logged without propagation is a different failure shape. An approved next-line
-directive can name `flow.swallow` or `flow.fallback` independently; disabling
-`flow.handling` disables both diagnostics.
+A fully qualified catch type such as `java.lang.Exception` is not recognized
+because the spelling is compared literally, and a computed member reference such
+as `promise["catch"]` is not recognized while the optional call
+`promise.catch?.(...)` is; both are conservative misses. Go has no exception
+handler and is not covered: an `err` value discarded or logged without
+propagation is a different failure shape. An approved next-line directive can
+name `flow.swallow` or `flow.fallback` independently; disabling `flow.handling`
+disables both diagnostics.

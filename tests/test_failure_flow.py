@@ -12,6 +12,7 @@ from pluvy.engine import check
 from pluvy.languages.javascript.failure import JavaScriptFailureSyntax
 from pluvy.languages.typescript.plugin import TsxLanguage, TypeScriptLanguage
 from pluvy.parsing.treesitter import node_text
+from pluvy.plugins.builtins import builtin_analyzers
 from pluvy.policy.models import Policy
 from pluvy.semantics.failure import FallbackChain
 from pluvy.semantics.failure_options import FailureHandlingOptions
@@ -305,6 +306,34 @@ def test_javascript_capture_requires_no_rethrow(code: str, reported: bool) -> No
 def test_go_registers_no_failure_flow_rules() -> None:
     code = "package sample\n\nfunc run() {\n\tif err := work(); err != nil {\n\t\treturn\n\t}\n}\n"
     assert _flow_findings(code, Language.GO) == ()
+
+
+def test_each_analyzer_registers_only_the_flow_diagnostics_it_emits() -> None:
+    registered = {
+        analyzer.name: frozenset(rule for rule in analyzer.rule_ids if rule in _FLOW_RULES)
+        for analyzer in builtin_analyzers()
+    }
+    assert registered == {
+        "builtin.python": frozenset({"flow.swallow"}),
+        "builtin.go": frozenset(),
+        "builtin.javascript": _FLOW_RULES,
+        "builtin.typescript": _FLOW_RULES,
+        "builtin.tsx": _FLOW_RULES,
+        "builtin.java": frozenset({"flow.swallow"}),
+    }
+
+
+def test_call_arguments_connect_coalescing_operators_into_one_chain() -> None:
+    findings = _flow_findings("f(a ?? 0, b ?? 0, c ?? 0, d ?? 0);\n", Language.JAVASCRIPT)
+    assert _summary(findings) == [("flow.fallback", 1, "error")]
+    assert findings[0].message.startswith("The coalescing chain has 4 operators")
+
+
+def test_object_literal_defaults_stay_out_of_the_surrounding_chain() -> None:
+    findings = _flow_findings(
+        "f(a ?? 0, { x: b ?? 0, y: c ?? 0, z: d ?? 0 });\n", Language.JAVASCRIPT
+    )
+    assert findings == ()
 
 
 def test_tsx_reuses_the_javascript_capture_and_fallback_interpretation() -> None:

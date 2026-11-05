@@ -79,7 +79,7 @@ from pluvy.semantics.boundaries import BoundaryRule
 from pluvy.semantics.encoding import EncodingRule
 from pluvy.semantics.encoding_options import BROAD_TYPE
 from pluvy.semantics.failure import FailureFlowRule
-from pluvy.semantics.failure_options import FLOW_HANDLING
+from pluvy.semantics.failure_options import FLOW_HANDLING, SWALLOW
 from pluvy.semantics.model import SemanticSyntax
 from pluvy.semantics.options import BOUNDARY, USAGE_RULES
 from pluvy.semantics.projection.contracts import ProjectionSyntax
@@ -182,13 +182,13 @@ def _python_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         ASSERTION.name,
         BROAD_TYPE.name,
         WILDCARD.name,
-        *FLOW_HANDLING.rule_ids,
+        SWALLOW,
     )
     directives = comments.DirectiveSyntax(frozenset({"comment"}), "#")
     rules = (
         PythonTypeRule(EncodingRule(PythonEncodingSyntax())),
         SuppressionRule(PythonSuppressions(), directives=directives),
-        FailureFlowRule(PythonFailureSyntax()),
+        FailureFlowRule(PythonFailureSyntax(), rule_ids=(SWALLOW,)),
     )
     return _compose(plugin, syntax, rules, required, directives)
 
@@ -230,13 +230,13 @@ def _java_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
     rules = (
         JavaTypeRule(EncodingRule(JavaEncodingSyntax())),
         SuppressionRule(JavaSuppressions(), directives=directives),
-        FailureFlowRule(JavaFailureSyntax()),
+        FailureFlowRule(JavaFailureSyntax(), rule_ids=(SWALLOW,)),
     )
     return _compose(
         plugin,
         syntax,
         rules,
-        (BROAD_TYPE.name, ASSERTION.name, *FLOW_HANDLING.rule_ids),
+        (BROAD_TYPE.name, ASSERTION.name, SWALLOW),
         directives,
     )
 
