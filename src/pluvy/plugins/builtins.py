@@ -23,12 +23,14 @@ from pluvy.languages.go.encoding import GoEncodingSyntax
 from pluvy.languages.go.projection import GoProjection
 from pluvy.languages.go.rules import GoTypeRule
 from pluvy.languages.go.syntax import GoImports, GoMetrics
+from pluvy.languages.go.test_syntax import GoTestSyntax
 from pluvy.languages.java import JavaLanguage
 from pluvy.languages.java.encoding import JavaEncodingSyntax
 from pluvy.languages.java.projection import JavaProjection
 from pluvy.languages.java.rules import JavaSuppressions, JavaTypeRule
 from pluvy.languages.java.semantic_syntax import JavaSemanticSyntax
 from pluvy.languages.java.syntax import JavaDesignSyntax, JavaImports, JavaMetrics
+from pluvy.languages.java.test_syntax import JavaTestSyntax
 from pluvy.languages.javascript import JavaScriptLanguage
 from pluvy.languages.javascript.encoding import JavaScriptEncodingSyntax
 from pluvy.languages.javascript.projection import JavaScriptProjection
@@ -37,11 +39,13 @@ from pluvy.languages.javascript.syntax import (
     JavaScriptMetrics,
     RelativeImportResolver,
 )
+from pluvy.languages.javascript.test_syntax import JavaScriptTestSyntax
 from pluvy.languages.python import PythonLanguage
 from pluvy.languages.python.encoding import PythonEncodingSyntax
 from pluvy.languages.python.projection import PythonProjection
 from pluvy.languages.python.rules import PythonTypeRule
 from pluvy.languages.python.syntax import PythonImports, PythonMetrics, PythonSuppressions
+from pluvy.languages.python.test_syntax import PythonTestSyntax
 from pluvy.languages.semantic_syntax import (
     GoSemanticSyntax,
     JavaScriptSemanticSyntax,
@@ -68,6 +72,9 @@ from pluvy.semantics.options import BOUNDARY, USAGE_RULES
 from pluvy.semantics.projection.contracts import ProjectionSyntax
 from pluvy.semantics.projection.options import GUARDED_PROJECTION
 from pluvy.semantics.projection.rules import GuardedProjectionRule
+from pluvy.semantics.testing.contracts import TestSyntax
+from pluvy.semantics.testing.options import TEST_INTEGRITY
+from pluvy.semantics.testing.rules import TestIntegrityRule
 from pluvy.semantics.usage import UsageRule
 from pluvy.source import Language
 from pluvy.suppressions import DirectiveSyntax, SuppressionRule
@@ -77,6 +84,7 @@ _BASE_RULES = (
     *BOUNDARY.rule_ids,
     *SUPPRESSION.rule_ids,
     *FUNCTION_SIZE.rule_ids,
+    *TEST_INTEGRITY.rule_ids,
     OWNERSHIP.name,
     STRUCTURE.name,
     IMPORTS.name,
@@ -96,6 +104,7 @@ class _Capabilities:
     semantics: SemanticSyntax
     design: DesignSyntax
     projection: ProjectionSyntax
+    testing: TestSyntax
 
 
 @lru_cache(maxsize=1)
@@ -128,6 +137,7 @@ def _compose(
         ArchitectureRule(syntax.imports, syntax.resolver),
         ObjectDesignRule(syntax.design),
         GuardedProjectionRule(syntax.projection),
+        TestIntegrityRule(syntax.testing),
     )
     for shared in shared_rules:
         bundles.register(shared)
@@ -151,6 +161,7 @@ def _python_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         PythonSemanticSyntax(),
         GrammarDesignSyntax(),
         PythonProjection(),
+        PythonTestSyntax(),
     )
     required = (
         ANNOTATION.name,
@@ -175,6 +186,7 @@ def _go_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         GoSemanticSyntax(),
         GrammarDesignSyntax(),
         GoProjection(),
+        GoTestSyntax(),
     )
     directives = comments.DirectiveSyntax(frozenset({"comment"}), "//")
     return _compose(
@@ -197,6 +209,7 @@ def _java_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         JavaSemanticSyntax(),
         JavaDesignSyntax(),
         JavaProjection(),
+        JavaTestSyntax(),
     )
     directives = comments.DirectiveSyntax(frozenset({"line_comment", "block_comment"}), "//")
     rules = (
@@ -214,6 +227,7 @@ def _javascript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         JavaScriptSemanticSyntax(),
         GrammarDesignSyntax(),
         JavaScriptProjection(),
+        JavaScriptTestSyntax(),
     )
     directives = comments.DirectiveSyntax(frozenset({"comment"}), "//")
     rules = (
@@ -231,6 +245,7 @@ def _typescript_analyzer(plugin: LanguagePlugin) -> TypedAnalyzer:
         TypeScriptSemanticSyntax(),
         GrammarDesignSyntax(),
         JavaScriptProjection(),
+        JavaScriptTestSyntax(),
     )
     directives = comments.DirectiveSyntax(frozenset({"comment"}), "//")
     rules = (

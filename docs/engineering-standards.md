@@ -230,6 +230,8 @@ Approvals granted in other projects do not transfer here.
 | `unused.function` | Non-exported functions and methods without resolved references |
 | `unused.field` | Fields without reads; initialization and writes do not count |
 | `unused.return` | Warning for a known non-void result discarded at a call site |
+| `test.tautology` | Mirrored assertion operands, literal-true assertions and literal-true matchers |
+| `test.vacuous` | Always-true matchers, assertion-free test bodies and snapshot-only tests (snapshot-only warnings) |
 | `type.assertion` | Python typing casts, TS assertions except `as const`, TS non-null assertions, Java reference casts |
 | `type.suppression` | Recognized suppression comments and Python no-type-check markers |
 | `imports.wildcard` | Python wildcard imports |
@@ -251,8 +253,9 @@ See [Checker configuration](checker-configuration.md#third-party-boundaries-and-
 for directional examples and semantic resolution limits.
 
 The parser-backed gate is read-only. Checker options are grouped by responsibility;
-`function_size` owns all five function metrics. Other checker keys match their
-diagnostic IDs. Only `include` and `exclude` control global file selection.
+`function_size` owns all five function metrics and `test.integrity` owns
+`test.tautology` and `test.vacuous`. Every other checker key matches its
+diagnostic ID. Only `include` and `exclude` control global file selection.
 Every checker defaults to enabled; omit default-only entries and `enabled: true`.
 Reports disclose disabled checker names while findings retain their diagnostic IDs.
 Malformed configuration and tool failures fail closed. Syntax rejection emits a

@@ -1,8 +1,10 @@
 # Checker reference — pluvy skill
 
-Index of the built-in checkers. The schema has 18 logical checkers, which produce
-22 built-in diagnostic IDs; function metrics share one checker and every other
-checker name matches its diagnostic ID. Each checker has its own page under
+Index of the built-in checkers. The schema has 19 logical checkers, which produce
+24 built-in diagnostic IDs. Some checker keys group related diagnostics:
+`function_size` owns the five `size.*` IDs and `test.integrity` owns
+`test.tautology` and `test.vacuous`. Every other checker name matches its
+diagnostic ID. Each checker has its own page under
 `checkers/`, holding what it reports, which analyzers register it, where its
 behavior differs between languages, every option with its default and type, and
 correct versus incorrect configuration examples.
@@ -15,8 +17,9 @@ and unknown options are rejected, including when that checker is disabled, and
 unknown options inside nested option objects are rejected the same way. Omitted
 entries and omitted options keep their defaults, so `enabled: true` and
 default-only entries are unnecessary. `include` and `exclude` are the only global
-file selectors. Except for `unused.return`, which is always a warning, findings
-are errors and fail the gate with exit code 1; warnings alone leave exit code 0.
+file selectors. Except for `unused.return`, which is always a warning, and the
+snapshot-only case of `test.vacuous`, which is also a warning, findings are
+errors and fail the gate with exit code 1; warnings alone leave exit code 0.
 
 Disabling a checker removes its diagnostics from every selected file. Text
 reports list disabled checker names and JSON reports include a
@@ -39,7 +42,7 @@ Six analyzers cover seven languages: Python (`.py`, `.pyi`), Go (`.go`), Java
 (`.java`), JavaScript and JSX (`.js`, `.jsx`, `.mjs`, `.cjs`), TypeScript
 (`.ts`, `.mts`, `.cts`) and TSX (`.tsx`).
 
-Every analyzer registers the same base set of 17 diagnostic IDs:
+Every analyzer registers the same base set of 19 diagnostic IDs:
 
 - Usage: `unused.parameter`, `unused.function`, `unused.field`, `unused.return`.
 - Boundaries and directives: `type.boundary`, `type.suppression`.
@@ -49,6 +52,8 @@ Every analyzer registers the same base set of 17 diagnostic IDs:
 - Architecture: `architecture.owner`, `architecture.structure`,
   `architecture.import`, `architecture.dispatch`, `architecture.object_model`.
 - Structure: `structure.guarded_projection`.
+- Testing: `test.tautology` and `test.vacuous`, both configured through the
+  single `test.integrity` checker.
 
 The remaining five diagnostic IDs are registered per language:
 
@@ -75,6 +80,7 @@ module-level functions; its page records the per-language candidate rules.
 | --- | --- | --- |
 | [`structure.guarded_projection`](checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for `size.lines`, `size.statements`, `size.complexity`, `size.nesting` and `size.parameters` | All |
+| [`test.integrity`](checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for `test.tautology` and `test.vacuous` | All |
 | [`type.annotation`](checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |
 | [`type.signature`](checkers/type.signature.md) | Missing Python parameter and return annotations | Python |
 | [`type.broad`](checkers/type.broad.md) | Recognized broad type markers and JSON serialization outside proven outputs and permitted library inputs | All; markers differ per language |

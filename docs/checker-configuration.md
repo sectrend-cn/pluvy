@@ -46,14 +46,17 @@ checkers retain their defaults, including language/rule dispatch checking.
 Every checker supports a strict boolean `enabled`, defaulting to `true`. Omission
 of a checker or an option preserves its default. Flags such as `"false"` or `0`
 are errors. Unknown checker IDs and options are errors, including when a checker
-is disabled. Each entry configures one logical checker. Function-size diagnostics
-share one checker; other checker names match their diagnostic IDs. There is no
-need to write `enabled: true` or entries that contain only default options.
+is disabled. Each entry configures one logical checker. Some checker keys group
+related diagnostics: `function_size` owns the five `size.*` IDs and
+`test.integrity` owns `test.tautology` and `test.vacuous`. Every other checker
+name matches its diagnostic ID. There is no need to write `enabled: true` or
+entries that contain only default options.
 
 | Checker ID | Additional options and defaults | What it checks |
 | --- | --- | --- |
 | `structure.guarded_projection` | `min_fields: 3` (integer, at least 2) | Repeated guarded field copies in every supported language |
 | `function_size` | `lines: 50`, `statements: 50`, `complexity: 10`, `nesting: 3`, `parameters: 5` | All five function metrics |
+| `test.integrity` | `paths: 20 test-path globs` | Tautological assertions and tests without a meaningful assertion |
 | `type.annotation` | None | Broad or bare Python annotations |
 | `type.signature` | None | Missing Python parameter/return annotations |
 | `type.broad` | `encoding: {encoders: [], decoders: [], outputs: [], instance_outputs: []}` | Recognized broad type markers and JSON encoding outside proven output or permitted third-party inputs |
@@ -82,7 +85,15 @@ case-sensitive shell matching of root-relative paths, with `*` spanning `/`.
 Architecture-specific paths select where that one architecture check applies;
 they do not remove files from other checkers.
 
-The schema covers 18 logical checkers, which produce 22 built-in diagnostic IDs.
+`test.integrity.paths` selects which files the test-integrity checker analyzes.
+Its default is `("test_*.py", "*/test_*.py", "*_test.py", "tests/*", "*/tests/*",
+"*.test.js", "*.test.jsx", "*.test.ts", "*.test.tsx", "*.test.mjs", "*.test.cjs",
+"*.test.mts", "*.test.cts", "*.spec.js", "*.spec.jsx", "*.spec.ts", "*.spec.tsx",
+"*_test.go", "*Test.java", "*Tests.java")`. The same `fnmatchcase` semantics
+apply: matching is case-sensitive, `*` spans `/`, and `**` or brace alternation
+have no special meaning. An empty tuple selects no files.
+
+The schema covers 19 logical checkers, which produce 24 built-in diagnostic IDs.
 Language syntax, region boundaries and a configuration example are documented in
 [the guarded projection checker reference](../.agents/skills/pluvy/references/checkers/structure.guarded_projection.md).
 Custom plugin settings continue
@@ -106,7 +117,7 @@ Coverage differences therefore come only from the diagnostics an analyzer regist
 Java analysis uses the locked `tree-sitter-java` grammar and needs no JDK or build
 step.
 
-Every analyzer registers the same base set of 17 diagnostic IDs:
+Every analyzer registers the same base set of 19 diagnostic IDs:
 
 - Usage: `unused.parameter`, `unused.function`, `unused.field` and
   `unused.return`, which is always a warning and never fails the gate.
@@ -118,6 +129,8 @@ Every analyzer registers the same base set of 17 diagnostic IDs:
   `architecture.import`, `architecture.dispatch` and
   `architecture.object_model`.
 - Structure: `structure.guarded_projection`.
+- Testing: `test.tautology` and `test.vacuous`, both configured through the
+  single `test.integrity` checker.
 
 The remaining five diagnostic IDs are registered per language:
 
@@ -267,7 +280,9 @@ with the built-in registry to obtain the same cross-file resolution; `engine.che
 checks one snapshot. Custom registries can register a `SemanticParser` explicitly.
 
 Every finding now includes `severity`, defaulting to `error`. `unused.return` is
-always a `warning`; text labels it and JSON retains it in `findings`. A known
+always a `warning`, and `test.vacuous` is a `warning` when a test's only
+assertions are snapshot matchers; text labels them and JSON retains them in
+`findings`. A known
 non-void local or resolved imported function result discarded as a standalone
 call, Python/Go `_` assignment, or JS `void` expression produces a warning.
 Unknown external return types are not guessed. Warnings alone leave exit status 0.

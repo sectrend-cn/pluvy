@@ -158,14 +158,16 @@ What the gate does not do:
 
 ## Checkers and per-language coverage
 
-The schema has 18 logical checkers, which produce 22 built-in diagnostic IDs.
-Function metrics share one checker; the other checker names match their
-diagnostic IDs.
+The schema has 19 logical checkers, which produce 24 built-in diagnostic IDs.
+`function_size` owns the five `size.*` IDs and `test.integrity` owns
+`test.tautology` and `test.vacuous`; every other checker name matches its
+diagnostic ID.
 
 | Checker | Reports | Languages |
 |---|---|---|
 | [`structure.guarded_projection`](references/checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](references/checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for five diagnostics | All |
+| [`test.integrity`](references/checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for two diagnostics | All |
 | [`type.annotation`](references/checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |
 | [`type.signature`](references/checkers/type.signature.md) | Missing Python parameter and return annotations | Python |
 | [`type.broad`](references/checkers/type.broad.md) | Recognized broad type markers and JSON serialization outside proven outputs and permitted library inputs | All; markers differ per language |
@@ -183,12 +185,13 @@ diagnostic IDs.
 | [`architecture.dispatch`](references/checkers/architecture.dispatch.md) | Language and rule identity comparison or match/switch dispatch | All |
 | [`architecture.object_model`](references/checkers/architecture.object_model.md) | Non-underscore module-level functions in configured extension paths; Go reports unexported lowercase package-level functions too, receiver methods and Java are not reported | Python, Go, JavaScript, TypeScript, TSX |
 
-Every analyzer registers the same base set of 17 diagnostic IDs:
+Every analyzer registers the same base set of 19 diagnostic IDs:
 `unused.parameter`, `unused.function`, `unused.field`, `unused.return`,
 `type.boundary`, `type.suppression`, `size.lines`, `size.statements`,
 `size.complexity`, `size.nesting`, `size.parameters`, `architecture.owner`,
 `architecture.structure`, `architecture.import`, `architecture.dispatch`,
-`architecture.object_model` and `structure.guarded_projection`.
+`architecture.object_model`, `structure.guarded_projection`, `test.tautology`
+and `test.vacuous`.
 
 The remaining five diagnostic IDs are registered per language, and a registered
 diagnostic can only report for the analyzer that registered it:
@@ -207,8 +210,9 @@ Key differences:
   files only.
 - `type.assertion` covers Python, Java, TypeScript and TSX, but not Go or
   JavaScript.
-- `unused.return` is always a warning and never changes the exit code; every
-  other checker reports errors.
+- `unused.return` is always a warning, and snapshot-only `test.vacuous`
+  findings are warnings; every other diagnostic reports errors. Warnings never
+  change the exit code.
 - `architecture.object_model` is registered by every analyzer, but only
   grammars with module-level functions can report. Go is included: a
   package-level function whose name does not start with `_` is reported, so an
@@ -333,7 +337,7 @@ first read `.agents/skills/pluvy/SKILL.md` and follow it.
 
 - [Agent integration notes](references/agent-integration.md) — integration
   paths for any agent and the limits that apply.
-- [Checker index](references/checkers.md) — the 18 checkers and the 22
+- [Checker index](references/checkers.md) — the 19 checkers and the 24
   diagnostic IDs, with coverage tables and one page per checker for its role,
   language differences, options, defaults, types and configuration examples.
 - [Approved next-line diagnostic exceptions](references/comment-suppressions.md)
