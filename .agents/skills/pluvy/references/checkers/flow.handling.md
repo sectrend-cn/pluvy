@@ -29,10 +29,11 @@ the line where the whole call begins, not the `.catch` token line.
 
 #### JavaScript, JSX, TypeScript and TSX
 
-For `.catch(...)`, an argument that is not an inline function, such as an
-identifier naming a handler, is not reported because the checker cannot inspect
-its body. A `.catch(() => constant)` reports `flow.swallow` and never
-`flow.fallback`.
+For `.catch(...)`, only the first argument is the rejection handler. When that
+argument is not an inline function, such as an identifier naming a handler or
+`null`, the call is not reported because the checker cannot inspect its body;
+later arguments are ignored. A `.catch(() => constant)` reports `flow.swallow`
+and never `flow.fallback`.
 
 A coalescing chain is the maximal set of `??` expressions connected through
 parenthesized expressions, assertions, member access on the object side, and
@@ -79,8 +80,9 @@ Incorrect — the limit must be positive and `flow.fallback` is not a checker ke
 Known limits are deliberate. The checker does not prove that a captured error
 should terminate the program, that a fallback changes business meaning, or that
 a literal is the wrong default; review the owning contract and its consumers.
-A fully qualified catch type such as `java.lang.Exception` is not recognized
-because the spelling is compared literally, and a computed member reference such
+A fully qualified catch type such as `java.lang.Exception` or a Python dotted
+capture type such as `module.Exception` is not recognized because the spelling
+is compared literally, and a computed member reference such
 as `promise["catch"]` is not recognized while the optional call
 `promise.catch?.(...)` is; both are conservative misses. Go has no exception
 handler and is not covered: an `err` value discarded or logged without

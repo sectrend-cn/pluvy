@@ -27,6 +27,13 @@ def _contains(node: Node, node_type: str) -> bool:
     return any(child.type == node_type for child in walk(node))
 
 
+def _first_argument(arguments: Node) -> Node | None:
+    return next(
+        (child for child in arguments.named_children if child.type != _COMMENT),
+        None,
+    )
+
+
 def _catch_callback(call: Node) -> Node | None:
     function = field(call, "function")
     if function is None or function.type != "member_expression":
@@ -37,10 +44,10 @@ def _catch_callback(call: Node) -> Node | None:
     arguments = field(call, "arguments")
     if arguments is None:
         return None
-    return next(
-        (child for child in arguments.named_children if child.type in _INLINE_CALLBACKS),
-        None,
-    )
+    handler = _first_argument(arguments)
+    if handler is None or handler.type not in _INLINE_CALLBACKS:
+        return None
+    return handler
 
 
 def _callback_swallows(call: Node) -> bool:

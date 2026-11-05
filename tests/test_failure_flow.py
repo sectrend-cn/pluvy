@@ -252,6 +252,26 @@ def test_python_wide_capture_requires_no_rethrow(code: str, reported: bool) -> N
 
 
 @pytest.mark.parametrize(
+    "capture",
+    [
+        "decimal.InvalidOperation",
+        "decimal.InvalidOperation as error",
+        "(ValueError)",
+        "errors[0]",
+        "module.Exception as error",
+    ],
+)
+def test_python_unrecognized_capture_types_are_not_bare_handlers(capture: str) -> None:
+    code = f"try:\n    work()\nexcept {capture}:\n    pass\n"
+    assert _flow_findings(code, Language.PYTHON) == ()
+
+
+def test_python_wide_tuple_alternative_still_reports_beside_unrecognized_members() -> None:
+    code = "try:\n    work()\nexcept (Exception, module.X):\n    pass\n"
+    assert _summary(_flow_findings(code, Language.PYTHON)) == [("flow.swallow", 3, "error")]
+
+
+@pytest.mark.parametrize(
     ("code", "reported"),
     [
         (
@@ -301,6 +321,31 @@ def test_java_wide_capture_requires_no_rethrow(code: str, reported: bool) -> Non
 )
 def test_javascript_capture_requires_no_rethrow(code: str, reported: bool) -> None:
     assert bool(_flow_findings(code, Language.JAVASCRIPT)) is reported
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "promise.catch(rethrow, () => null);",
+        "promise.catch(null, () => null);",
+        "promise.catch(e => { throw e; }, () => null);",
+    ],
+)
+def test_javascript_catch_ignores_arguments_after_the_first(code: str) -> None:
+    assert _flow_findings(code, Language.JAVASCRIPT) == ()
+
+
+def test_javascript_catch_reports_first_inline_handler_with_extra_arguments() -> None:
+    findings = _flow_findings("promise.catch(() => null, extra);", Language.JAVASCRIPT)
+    assert _summary(findings) == [("flow.swallow", 1, "error")]
+
+
+def test_javascript_catch_skips_a_comment_before_the_first_argument() -> None:
+    findings = _flow_findings(
+        "promise.catch(/* rejection handler */ () => null, extra);",
+        Language.JAVASCRIPT,
+    )
+    assert _summary(findings) == [("flow.swallow", 1, "error")]
 
 
 def test_go_registers_no_failure_flow_rules() -> None:

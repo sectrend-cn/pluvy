@@ -6,24 +6,35 @@ from pluvy.parsing.treesitter import node_text, walk
 from pluvy.semantics.failure import FallbackChain, SwallowedHandler
 
 _WIDE_TYPES = frozenset({"BaseException", "Exception"})
-_TYPE_NODES = frozenset({"identifier", "tuple"})
+_CLAUSE_AUXILIARIES = frozenset({"block", "comment"})
 
 
-def _declared_type(clause: Node) -> Node | None:
-    for child in clause.named_children:
-        if child.type == "as_pattern":
-            return child.named_children[0] if child.named_children else None
-        if child.type in _TYPE_NODES:
-            return child
-    return None
+def _capture_type(clause: Node) -> Node | None:
+    return next(
+        (child for child in clause.named_children if child.type not in _CLAUSE_AUXILIARIES),
+        None,
+    )
 
 
-def _alternatives(declared: Node | None) -> tuple[Node, ...]:
-    if declared is None:
-        return ()
+def _declared_type(capture: Node) -> Node:
+    if capture.type == "as_pattern" and capture.named_children:
+        return capture.named_children[0]
+    return capture
+
+
+def _wide_type(declared: Node) -> Node | None:
     if declared.type == "identifier":
-        return (declared,)
-    return tuple(child for child in declared.named_children if child.type == "identifier")
+        return declared if node_text(declared) in _WIDE_TYPES else None
+    if declared.type == "tuple":
+        return next(
+            (
+                child
+                for child in declared.named_children
+                if child.type == "identifier" and node_text(child) in _WIDE_TYPES
+            ),
+            None,
+        )
+    return None
 
 
 def _handler_block(clause: Node) -> Node | None:
@@ -45,12 +56,14 @@ class PythonFailureSyntax:
             block = _handler_block(clause)
             if block is None or _has_raise(block):
                 continue
-            declared = _declared_type(clause)
-            if declared is not None and not any(
-                node_text(alternative) in _WIDE_TYPES for alternative in _alternatives(declared)
-            ):
-                continue
-            handler = "except" if declared is None else f"except {node_text(declared)}"
+            capture = _capture_type(clause)
+            if capture is None:
+                handler = "except"
+            else:
+                declared = _declared_type(capture)
+                if _wide_type(declared) is None:
+                    continue
+                handler = f"except {node_text(declared)}"
             handlers.append(SwallowedHandler(clause, handler))
         return tuple(handlers)
 
