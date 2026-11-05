@@ -22,6 +22,7 @@ _FUNCTION_TYPES = frozenset(
 )
 _DECLARATION_TYPES = frozenset({"interface_declaration", "object_type"})
 _NULLISH_TYPES = frozenset({"null", "undefined"})
+_COMMENT = "comment"
 
 
 @dataclass(frozen=True)
@@ -83,9 +84,12 @@ class TypeScriptContractRule:
         return self._is_nullish(target)
 
     def _annotation_type(self, node: Node) -> Node:
-        if node.type == "type_annotation" and node.named_children:
-            return node.named_children[0]
-        return node
+        if node.type != "type_annotation":
+            return node
+        return next(
+            (child for child in node.named_children if child.type != _COMMENT),
+            node,
+        )
 
     def _default_findings(self, context: TreeContext, maximum: int) -> tuple[Finding, ...]:
         findings: list[Finding] = []
@@ -158,7 +162,7 @@ class TypeScriptContractRule:
         members: list[Node] = []
         current = node
         while current.type == "union_type":
-            children = current.named_children
+            children = tuple(child for child in current.named_children if child.type != _COMMENT)
             if len(children) == 1:
                 members.append(self._unwrap_parenthesized(children[0]))
                 break
@@ -175,9 +179,12 @@ class TypeScriptContractRule:
         return tuple(members)
 
     def _unwrap_parenthesized(self, node: Node) -> Node:
-        if node.type == "parenthesized_type" and node.named_children:
-            return node.named_children[0]
-        return node
+        if node.type != "parenthesized_type":
+            return node
+        return next(
+            (child for child in node.named_children if child.type != _COMMENT),
+            node,
+        )
 
     def _is_nullish(self, node: Node) -> bool:
         return node.type in _NULLISH_TYPES or (

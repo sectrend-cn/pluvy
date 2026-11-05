@@ -633,3 +633,78 @@ def test_function_body_fields_cover_generator_and_arrow_forms() -> None:
         "identifier",
         "statement_block",
     }
+
+
+def test_comment_between_union_members_does_not_hide_an_over_limit_union() -> None:
+    findings = _contract_findings("type Payload = A | B | C | D /* note */ | E;\n")
+    assert _summary(findings) == [("type.union", 1, 16, "error")]
+    assert findings[0].message.startswith("Union has 5 non-nullish")
+
+
+def test_comments_between_union_members_do_not_inflate_the_count() -> None:
+    findings = _contract_findings("type Payload = A /* one */ | /* two */ B | C;\n")
+    assert findings == ()
+
+
+@pytest.mark.parametrize("index", range(5))
+def test_union_member_count_is_independent_of_comment_position(index: int) -> None:
+    members = ["A", "B", "C", "D", "E"]
+    members.insert(index, "/* note */")
+    code = "type Payload = " + " | ".join(members) + ";\n"
+    findings = _contract_findings(code)
+    assert len(findings) == 1
+    assert findings[0].rule == "type.union"
+    assert findings[0].message.startswith("Union has 5 non-nullish")
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        "/* note */ null",
+        "null | string /* note */ | number",
+        "(/* note */ null)",
+    ],
+)
+def test_comments_do_not_hide_nullable_property_annotations(annotation: str) -> None:
+    members = "".join(f"  field{index}: {annotation};\n" for index in range(4))
+    findings = _contract_findings("type Payload = {\n" + members + "};\n")
+    assert _summary(findings) == [("type.nullable", 2, 3, "error")]
+    assert findings[0].message.startswith("4 optional")
+
+
+def test_comment_inside_nested_parentheses_does_not_recursively_unwrap() -> None:
+    members = "".join(f"  field{index}: (/* note */ (null));\n" for index in range(4))
+    findings = _contract_findings("type Payload = {\n" + members + "};\n")
+    assert findings == ()
+
+
+def test_comment_inside_nullish_fallback_still_counts() -> None:
+    code = (
+        "function run(value) {\n"
+        "  value ?? /* note */ null;\n"
+        "  value ?? undefined;\n"
+        "  value ?? null;\n"
+        "  value ?? undefined;\n"
+        "}\n"
+    )
+    findings = _contract_findings(code)
+    assert _summary(findings) == [("type.nullable", 2, 3, "error")]
+    assert findings[0].message.startswith("4 bare")
+
+
+@pytest.mark.parametrize("language", [Language.TYPESCRIPT, Language.TSX])
+def test_comment_handling_is_shared_by_typescript_and_tsx(language: Language) -> None:
+    code = (
+        "type Payload = A | B | C | D /* note */ | E;\n"
+        "type Fields = {\n"
+        "  a: /* note */ null;\n"
+        "  b: /* note */ null;\n"
+        "  c: /* note */ null;\n"
+        "  d: /* note */ null;\n"
+        "};\n"
+    )
+    findings = _contract_findings(code, language)
+    assert _summary(findings) == [
+        ("type.union", 1, 16, "error"),
+        ("type.nullable", 3, 3, "error"),
+    ]

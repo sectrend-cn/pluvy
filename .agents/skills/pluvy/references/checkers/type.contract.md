@@ -25,10 +25,12 @@ member or `??` expression when the count exceeds `optional_fields` or
 `type.union` evaluates each union expression, peeling one `parenthesized_type`
 layer from its members and removing `null` and `undefined` members before
 counting. A parenthesized union is a separate expression and is judged on its
-own. `unknown` and `any` members remain in the union count and continue to be
-reported by `type.broad` at the member node, so both diagnostics can report the
-same type. A member such as `Record<string, unknown>` likewise reports
-`type.broad` at the `unknown` type argument.
+own. The declaration signal likewise peels at most one layer, so a doubly
+parenthesized nullable annotation is not recognized. `unknown` and `any` members
+remain in the union count and continue to be reported by `type.broad` at the
+member node, so both diagnostics can report the same type. A member such as
+`Record<string, unknown>` likewise reports `type.broad` at the `unknown` type
+argument.
 
 A `??` whose right operand is wrapped in parentheses, an assertion, or a call is
 not counted by `type.nullable`; such an expression remains a candidate for
