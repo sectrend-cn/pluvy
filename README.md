@@ -1,18 +1,177 @@
 # Pluvy
 
-A read-only engineering policy gate for Python, Go, Java, JavaScript/JSX and
-TypeScript/TSX. No run mode modifies, stashes, stages, restores, deletes or
-rewrites source files, and no run mode changes Git configuration. The shared
-policy is in [Engineering standards](docs/engineering-standards.md).
+[![PyPI](https://img.shields.io/pypi/v/pluvy)](https://pypi.org/project/pluvy/)
+[![Python](https://img.shields.io/pypi/pyversions/pluvy)](https://pypi.org/project/pluvy/)
+[![License](https://img.shields.io/pypi/l/pluvy)](LICENSE)
 
-## Install
+**An engineering policy gate for code written by people and coding agents.**
+Pluvy parses Python, Go, Java, JavaScript/JSX and TypeScript/TSX with
+tree-sitter and fails the build when a change erases type contracts, swallows
+errors, weakens or deletes tests, or crosses the architecture boundaries your
+repository declares.
 
-Python 3.12 or newer is required. Install the published command line with
-`uv tool install pluvy` or `python -m pip install pluvy`, then run `pluvy --help`.
+Website: [sectrend-cn.github.io/pluvy](https://sectrend-cn.github.io/pluvy/)
 
-## Run
+```text
+$ pluvy --all
+src/orders.py:4:25: type.broad: Do not erase contracts with typing.Any
+tests/test_orders.py:5:5: test.tautology: Assertion in test_load cannot fail because it restates the same expression or a literal true. Assert an independently produced value or outcome instead.
+tests/test_orders.py:6:5: warning: unused.return: Return value from 'load' is discarded
+Diagnostic scope: full_files.
+Usage reference scope: 2 files.
+Architecture all: 2 files; 3 findings.
+```
 
-Develop from this checkout, then activate the created environment:
+## Why Pluvy
+
+- **One policy, five languages.** A single committed `.pluvy/pluvy.json`
+  drives the same checkers across every supported language.
+- **Architecture as data.** Declare owners, placements and forbidden import
+  directions; the gate enforces them on every change.
+- **Built for agent-written code.** It catches shortcuts that keep CI green
+  without doing the work: tautological or assertion-free tests, deleted tests
+  and eroded assertions, swallowed exceptions, literal fallback chains, casts
+  and `Any`.
+- **Change-aware.** `--base` and `--staged` report only the definitions and
+  statements a change touches, so existing debt does not block new work.
+- **Read-only.** No mode modifies, stages, stashes, restores or deletes source
+  files, and none changes Git configuration. It is safe to run in CI, in hooks
+  and inside agent sessions.
+
+## What it checks
+
+22 checkers, all enabled by default:
+
+| Area | Checkers |
+| --- | --- |
+| Type contracts | `type.broad`, `type.annotation`, `type.signature`, `type.boundary`, `type.assertion`, `type.contract` |
+| Test integrity | `test.integrity` (tautological and vacuous tests), `test.deletion` (removed tests, assertion erosion, changed snapshots) |
+| Error handling | `flow.handling` (swallowed handlers, long `??` literal fallbacks) |
+| Architecture | `architecture.owner`, `architecture.structure`, `architecture.import`, `architecture.dispatch`, `architecture.object_model` |
+| Dead code | `unused.parameter`, `unused.function`, `unused.field`, `unused.return` |
+| Structure and size | `function_size`, `structure.guarded_projection`, `imports.wildcard` |
+| Suppression hygiene | `type.suppression` (foreign and malformed suppression directives) |
+
+Options, defaults, per-language coverage and known limits are listed in
+[Checker configuration](docs/checker-configuration.md).
+
+## Quick start
+
+Python 3.12 or newer is required. Install the published command line from
+[PyPI](https://pypi.org/project/pluvy/):
+
+```sh
+uv tool install pluvy
+```
+
+Without uv, use `python -m pip install pluvy`. To try it once without
+installing, run `uvx pluvy --all`.
+
+Add a policy to the repository you want to check and commit it:
+
+```sh
+mkdir -p .pluvy
+echo '{"version": 2, "include": ["src/*", "tests/*"], "checkers": {}}' > .pluvy/pluvy.json
+```
+
+Then run one of the three modes:
+
+```sh
+pluvy --all                 # audit every selected file, including existing debt
+pluvy --base origin/main    # audit only what changed since a commit
+pluvy --staged              # audit the Git index before committing
+```
+
+Add `--root /path/to/project` to run from another directory and
+`--format json` for machine-readable output.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | No error findings; warnings may be present |
+| `1` | At least one error finding |
+| `2` | Configuration, encoding, filesystem or Git failure |
+
+[Getting started](docs/getting-started.md) covers installation options, building
+up a policy, triaging the first audit of an existing repository and per-task
+gating. A [Chinese translation](docs/zh/getting-started.md) is available.
+
+## Adopting on an existing repository
+
+The first `--all` on an existing codebase usually exits `1`. That is the
+baseline reading, not a failure of the tool. A practical path:
+
+1. Gate pull requests with `--base` so new changes are held to the policy.
+2. Work through the `--all` findings over time: fix the code first.
+3. Treat threshold, exclusion and owner changes as architecture decisions, each
+   with its own full audit and review. A staged policy change is refused until
+   that audit passes.
+
+Exceptions use an approved next-line suppression that names one rule and a
+reason; see [comment suppressions](docs/comment-suppressions.md).
+
+## Policy
+
+Each target repository owns `.pluvy/pluvy.json`; paths inside it are relative to
+the repository root. Start from [the example policy](examples/.pluvy/pluvy.json),
+which declares owners, an import boundary and size limits:
+
+```json
+{
+  "version": 2,
+  "include": ["src/*", "tests/*"],
+  "exclude": [],
+  "checkers": {
+    "function_size": {"lines": 50, "complexity": 10},
+    "architecture.import": {
+      "boundaries": [
+        {
+          "name": "domain does not depend on adapters",
+          "sources": ["src/domain/*"],
+          "forbidden_imports": ["adapters", "adapters.*"]
+        }
+      ]
+    }
+  }
+}
+```
+
+Specify `"enabled": false` only to turn a checker off; omitted checkers and
+options keep their defaults.
+
+## Integration
+
+### Coding agents
+
+The bundled skill in `.agents/skills/pluvy/` tells an agent when the gate
+applies, which mode to run after a task and how to report the result. The PyPI
+package contains the tool only, so copy the skill from this repository into the
+consuming project's skills directory, or point to it from `AGENTS.md`. See
+[Agent integration](docs/getting-started.md#agent-integration).
+
+### CI
+
+Any CI system that can install a Python package can run the same commands.
+This repository gates itself in
+[GitHub Actions](.github/workflows/engineering.yml).
+
+### Pre-commit
+
+Once the policy is committed, a pre-commit hook can run `pluvy --staged`.
+Install hooks yourself; Pluvy never changes Git configuration.
+
+## Extending
+
+Language plugins own suffixes and grammar interpretation; rules implement
+`RuleBundle` over a shared `TreeContext`. See
+[Plugin architecture](docs/plugin-architecture.md).
+
+Agent review rules are a programmatic extension point: they are registered in
+Python, not enabled from the JSON policy, and invoke an ACP agent that submits
+findings through MCP tools. See [Agent review](docs/agent-review.md).
+
+## Development
+
+Set up a development environment from this checkout:
 
 ```sh
 python -m pip install --no-cache-dir uv==0.8.22
@@ -20,85 +179,10 @@ uv sync --locked --group dev
 . .venv/bin/activate
 ```
 
-The repository development checks are listed in `AGENTS.md` and run in
-[the engineering workflow](.github/workflows/engineering.yml).
+The required checks are listed in `AGENTS.md` and run in
+[the engineering workflow](.github/workflows/engineering.yml). Shared code
+policy lives in [Engineering standards](docs/engineering-standards.md).
 
-Run from any directory:
+## License
 
-```sh
-pluvy --root /path/to/project --all
-pluvy --root /path/to/project --base BASE_COMMIT --format json
-pluvy --root /path/to/project --staged
-```
-
-`--all` reads all selected working files including Git-ignored ones. `--base`
-compares a commit to the working tree including untracked sources. `--staged`
-reads changed index blobs and the index policy, never unstaged contents. Git
-modes require the repository root.
-
-Build the image from this checkout:
-
-```sh
-docker build -t pluvy:0.1.0 .
-```
-
-Run a one-line full audit from a target repository containing
-`.pluvy/pluvy.json`:
-
-```sh
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace:ro" pluvy:0.1.0 pluvy --all
-```
-
-The image installs the locked runtime dependencies and Git. It does not contain a
-target policy or development tools. The mount is read-only, and the calling
-user's UID/GID preserve Git ownership checks. `--base` and `--staged` need the
-complete Git metadata mounted too.
-
-## Policy
-
-Every target repository owns and commits its `.pluvy/pluvy.json`
-policy. Copy [the example policy](examples/.pluvy/pluvy.json) to that
-path and adapt it; paths inside the policy are relative to the repository root.
-
-`include` and `exclude` control global file selection. All checkers are enabled by
-default, so specify `enabled` only when disabling one.
-
-Exit codes: **0** pass or warnings only for the reported scope, **1** error
-findings, **2** configuration, encoding, filesystem or Git failure.
-
-Repeated conditional field copies are checked in every supported language through
-[`structure.guarded_projection`](.agents/skills/pluvy/references/checkers/structure.guarded_projection.md);
-it defaults to three distinct destination fields in one local cluster.
-
-See [Checker configuration](docs/checker-configuration.md) for all options,
-defaults, language coverage and third-party usage boundaries.
-
-## Language and rule plugins
-
-All languages share one tree-sitter context. Language plugins own identity,
-suffixes and grammar interpretation; application composition owns required
-coverage and rule selection. Rules implement `RuleBundle`, consume
-`TreeContext` and declare `RuleRequirements`. See
-[Plugin architecture](docs/plugin-architecture.md), with per-checker Java scope
-and limits covered by [checker configuration](docs/checker-configuration.md).
-
-## Integration
-
-Agent review rules can own review guidelines and invoke a configured ACP agent.
-Findings are submitted incrementally through registered MCP tools, with explicit
-completion and small acknowledgements. See [Agent review](docs/agent-review.md).
-
-Any CI system that can run this image integrates with the same commands, and this
-repository runs the same engineering checks in GitHub Actions; see
-[the engineering workflow](.github/workflows/engineering.yml).
-
-To run the gate image in a container, see the [Run section](#run) above.
-
-A pre-commit hook may run `uv run --no-sync pluvy --staged` after the policy
-is committed. Install hooks explicitly; this tool never changes Git configuration.
-
-## Documentation
-
-[Engineering standards](docs/engineering-standards.md) is the shared policy.
-For installation, configuration, daily runs, finding triage and per-task gating,
-start with [Getting started](docs/getting-started.md).
+[MIT](LICENSE)
