@@ -167,6 +167,12 @@ edit selects that statement; a pure deletion keeps a nearby line anchor; untrack
 in full. Ownership and placement constraints still apply to every changed file. Reports use `scope`
 to distinguish `full_files` from `affected_definitions_and_statements`.
 
+Known limitation: an edit inside an existing multi-line class field declaration that does not touch
+the diagnostic anchor line (the member's first line) loses member-anchored aggregate or multi-line
+diagnostics in the change modes; `type.broad`, `type.annotation` and `structure.guarded_projection`
+are lost the same way. This is existing engine behaviour (change scopes do not expand class
+members), not a defect introduced by this task; use `--all` to audit such edits.
+
 Other semantics: an empty full audit counts as a configuration error (exit 2); an empty change audit
 reports 0 files; syntax errors only produce a warning on stderr without changing the exit code, and
 the remaining checks continue on the recovered syntax tree, so their results may be inaccurate;

@@ -23,6 +23,7 @@ _CONTROL_STATEMENTS = frozenset(
         "try_with_resources_statement",
         "switch_expression",
         "synchronized_statement",
+        "throw_statement",
     }
 )
 

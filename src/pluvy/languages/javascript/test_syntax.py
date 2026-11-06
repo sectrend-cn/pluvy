@@ -24,6 +24,7 @@ _CONTROL_STATEMENTS = frozenset(
         "try_statement",
         "switch_statement",
         "with_statement",
+        "throw_statement",
     }
 )
 

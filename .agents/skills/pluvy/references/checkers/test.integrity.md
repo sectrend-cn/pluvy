@@ -13,24 +13,20 @@ warning.
 **Languages**: every analyzer; recognized test declarations, assertions and
 control-flow statements differ:
 
-| Language | Test declarations and recognized assertions | Control-flow and context-manager statements |
+| Language | Test declarations and recognized assertions | Control-flow, context-manager and abort statements |
 | --- | --- | --- |
-| Python | Module-level and class-level `def test_*` functions, excluding a function whose decorator base name is `fixture` (`@pytest.fixture`, `@pytest.fixture(...)` or `@fixture`); `assert` statements and `assert*`/`_assert*` calls, with `pytest.raises` and `assertRaises` counted as assertions. Tautology detection covers `assert` statements and the positive-equality calls `assertEqual`, `assertEquals` and `assertIs`. | `with`/`async with`, `for`, `while`, `if`, `try` and `match`. |
-| JavaScript, TypeScript, TSX | `it(...)` and `test(...)` callbacks; `expect(...).matcher(...)` chains and `assert*`/`_assert*` calls. Tautology detection covers `expect(...).toBe`/`toEqual`/`toStrictEqual`, single-argument literal-`true` assertions, and `assert`/`_assert` members `equal`, `strictEqual`, `deepEqual` and `deepStrictEqual`. | `if`, `for`, `for...in`/`for...of`, `while`, `do`, `try`, `switch` and `with`. |
+| Python | Module-level and class-level `def test_*` functions, excluding a function whose decorator base name is `fixture` (`@pytest.fixture`, `@pytest.fixture(...)` or `@fixture`); `assert` statements and `assert*`/`_assert*` calls, with `pytest.raises` and `assertRaises` counted as assertions. Tautology detection covers `assert` statements and the positive-equality calls `assertEqual`, `assertEquals` and `assertIs`. | `with`/`async with`, `for`, `while`, `if`, `try`, `match` and `raise`. |
+| JavaScript, TypeScript, TSX | `it(...)` and `test(...)` callbacks; `expect(...).matcher(...)` chains and `assert*`/`_assert*` calls. Tautology detection covers `expect(...).toBe`/`toEqual`/`toStrictEqual`, single-argument literal-`true` assertions, and `assert`/`_assert` members `equal`, `strictEqual`, `deepEqual` and `deepStrictEqual`. | `if`, `for`, `for...in`/`for...of`, `while`, `do`, `try`, `switch`, `with` and `throw`. |
 | Go | `func Test*` functions; `t.Error*`, `t.Fatal*` and `t.Fail*` calls. | `if`, `for`, `switch` and `select`. |
-| Java | `@Test` methods; `Assertions.assert*` and inherited `assert*` calls plus `assert` statements. Tautology detection covers literal-`true` and `==`-mirrored `assert` statements, `assertTrue(true)`, and the positive-equality calls `assertEquals` and `assertSame`. | `if`, `for`, enhanced `for`, `while`, `do`, `try`, try-with-resources, `switch` and `synchronized`. |
+| Java | `@Test` methods; `Assertions.assert*` and inherited `assert*` calls plus `assert` statements. Tautology detection covers literal-`true` and `==`-mirrored `assert` statements, `assertTrue(true)`, and the positive-equality calls `assertEquals` and `assertSame`. | `if`, `for`, enhanced `for`, `while`, `do`, `try`, try-with-resources, `switch`, `synchronized` and `throw`. |
 
 A test is reported by default only when its path matches one of the default test
 globs. The checker classifies recognized assertions one site at a time. A
 recognized assertion is a tautology only in these frozen positive forms: a
-literal-`true` `assert` statement (Python/Java); `assertTrue(true)` (Python/Java)
-or a single-argument literal-`true` JavaScript assertion whose name is not
-negated; mirrored `==`/`is` operands in a Python `assert` statement, mirrored
-`==` operands in a Java `assert` statement, and mirrored
-`expect(...).toBe`/`toEqual`/`toStrictEqual`; or a named positive-equality call
-from the per-language set (Python `assertEqual`/`assertEquals`/`assertIs`, Java
-`assertEquals`/`assertSame`, JavaScript `assert`/`_assert` members
-`equal`/`strictEqual`/`deepEqual`/`deepStrictEqual`). Negative and non-equality
+literal-`true` assertion; a single-argument literal-`true` call whose name is not
+negated; an `assert` statement whose operands mirror on `==`/`is`, or an equality
+matcher whose expected and actual operands mirror; or a named positive-equality
+call from the per-language set in the table above. Negative and non-equality
 forms such as `assertNotEqual`, `assertLess`, `assertFalse` and `assert.notEqual`
 stay outside the set. The always-true matchers are `.not.toThrow()`,
 `toBeTruthy()` and `toBeDefined()`. Go does not claim mirrored or always-true
@@ -38,9 +34,9 @@ forms. Each assertion site produces at most one diagnostic, and a test containin
 both kinds reports each defective site separately.
 
 A test with no recognized assertion is vacuous only when its body also has no
-unrecognized call and no control-flow or context-manager statement listed in the
-table. This is the conservative confirmed-no-assertion standard: only a body
-made of literals, assignments and print calls is reported. Calls to the language
+unrecognized call and no control-flow, context-manager or abort statement listed
+in the table. This is the conservative confirmed-no-assertion standard: only a
+body made of literals, assignments and print calls is reported. Calls to the language
 print family are exempt from that conservative check: Python `print`,
 JavaScript-family `console.*`, Go `fmt.Print*`/`log.Print*` and Java
 `System.out.print*`/`System.err.print*`. Any other unrecognized call can be a
@@ -104,6 +100,12 @@ missing-assertion check. In JavaScript, a bare identifier call such as
 use the equality set. Identical spelling is not data flow, so
 `assert result == service` is not a tautology even when both
 names refer to the same value, and a call versus a literal is not a tautology.
+JavaScript declaration recognition covers only `it(...)` and `test(...)`, so
+`xit`, `xtest`, `it.only`, `test.skip` and `it.each` variants are not test
+declarations and their assertions are missed. Go recognizes assertion calls by
+member name without validating the receiver, so `err.Error()` counts as an
+assertion. These recognition limits also affect the baseline declaration names
+and assertion counts used by [`test.deletion`](test.deletion.md).
 Snapshot-only tests receive a warning rather than an error. The path globs can
 include non-test files with test-like names, so tighten `paths` when the default
 set does not describe a repository.

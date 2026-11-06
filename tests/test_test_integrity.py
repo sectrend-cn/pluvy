@@ -562,6 +562,82 @@ def test_javascript_control_flow_body_is_not_vacuous() -> None:
     assert _findings(code, Language.JAVASCRIPT) == ()
 
 
+@pytest.mark.parametrize(
+    ("language", "path", "code"),
+    [
+        (
+            Language.PYTHON,
+            "tests/test_sample.py",
+            "def test_raised():\n    raise AssertionError\n",
+        ),
+        (
+            Language.JAVASCRIPT,
+            "sample.test.js",
+            'it("raised", () => {\n  throw error;\n});\n',
+        ),
+        (
+            Language.JAVA,
+            "SampleTest.java",
+            "class SampleTest {\n  @Test\n  void raised() {\n    throw stale;\n  }\n}\n",
+        ),
+    ],
+)
+def test_bare_raise_and_throw_bodies_are_not_vacuous(
+    language: Language, path: str, code: str
+) -> None:
+    assert _findings(code, language, path=path) == ()
+
+
+@pytest.mark.parametrize(
+    ("language", "path", "code"),
+    [
+        (
+            Language.PYTHON,
+            "tests/test_sample.py",
+            'def test_raised():\n    raise ValueError("x")\n',
+        ),
+        (
+            Language.JAVASCRIPT,
+            "sample.test.js",
+            'it("raised", () => {\n  throw new Error("x");\n});\n',
+        ),
+        (
+            Language.JAVA,
+            "SampleTest.java",
+            (
+                "class SampleTest {\n"
+                "  @Test\n"
+                "  void raised() {\n"
+                '    throw new IllegalStateException("x");\n'
+                "  }\n"
+                "}\n"
+            ),
+        ),
+    ],
+)
+def test_raise_and_throw_calls_keep_the_body_signal_conservative(
+    language: Language, path: str, code: str
+) -> None:
+    assert _findings(code, language, path=path) == ()
+
+
+def test_raise_and_throw_bodies_still_report_tautologies() -> None:
+    python = "def test_raised():\n    raise AssertionError\n    assert 1 == 1\n"
+    javascript = 'it("raised", () => {\n  throw error;\n  expect(x).toBe(x);\n});\n'
+    java = (
+        "class SampleTest {\n"
+        "  @Test\n"
+        "  void raised() {\n"
+        "    throw stale;\n"
+        "    Assertions.assertTrue(true);\n"
+        "  }\n"
+        "}\n"
+    )
+    assert _summary(_findings(python, Language.PYTHON)) == [("test.tautology", 3, "error")]
+    assert _summary(_findings(javascript, Language.JAVASCRIPT)) == [("test.tautology", 3, "error")]
+    assert _summary(_findings(java, Language.JAVA)) == [("test.tautology", 5, "error")]
+
+
 def test_javascript_parameter_comments_do_not_change_argument_counts() -> None:
     code = 'it("x", () => {\n  assert(/* rationale */ true);\n});\n'
     assert _summary(_findings(code, Language.JAVASCRIPT)) == [("test.tautology", 2, "error")]
@@ -679,6 +755,7 @@ def test_python_control_statement_kinds_are_anchored() -> None:
         "    match values:\n"
         "        case 1:\n"
         "            pass\n"
+        "    raise AssertionError\n"
     )
     root = _root(PythonLanguage().parser, Language.PYTHON, "tests/test_sample.py", code)
     assert _control_types(PythonTestSyntax(), root) == (
@@ -688,6 +765,7 @@ def test_python_control_statement_kinds_are_anchored() -> None:
         "if_statement",
         "try_statement",
         "match_statement",
+        "raise_statement",
     )
 
 
@@ -703,6 +781,7 @@ def test_javascript_control_statement_kinds_are_anchored() -> None:
         "  try { y(); } catch (error) { y(); }\n"
         "  switch (x) { case 1: y(); }\n"
         "  with (object) { y(); }\n"
+        "  throw error;\n"
         "});\n"
     )
     root = _root(JavaScriptLanguage().parser, Language.JAVASCRIPT, "sample.test.js", code)
@@ -716,6 +795,7 @@ def test_javascript_control_statement_kinds_are_anchored() -> None:
         "try_statement",
         "switch_statement",
         "with_statement",
+        "throw_statement",
     )
 
 
@@ -755,6 +835,7 @@ def test_java_control_statement_kinds_are_anchored() -> None:
         "    try (var reader = open()) { y(); }\n"
         "    switch (x) { case 1: y(); }\n"
         "    synchronized (lock) { y(); }\n"
+        "    throw stale;\n"
         "  }\n"
         "}\n"
     )
@@ -769,4 +850,5 @@ def test_java_control_statement_kinds_are_anchored() -> None:
         "try_with_resources_statement",
         "switch_expression",
         "synchronized_statement",
+        "throw_statement",
     )

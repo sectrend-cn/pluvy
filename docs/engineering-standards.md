@@ -275,7 +275,15 @@ Changed modes analyze complete snapshots but report affected definitions and
 module statements. Function edits include signatures, decorators and bodies;
 class-header edits select the class. Deletion anchors participate in expansion.
 Ownership and placement still apply to every changed file. Reports disclose this
-scope; full audits expose historical debt. Configuration changes require architecture review;
+scope; full audits expose historical debt.
+
+Known limitation: an edit inside an existing multi-line class field declaration that does not touch
+the diagnostic anchor line (the member's first line) loses member-anchored aggregate or multi-line
+diagnostics in the change modes; `type.broad`, `type.annotation` and `structure.guarded_projection`
+are lost the same way. This is existing engine behaviour (change scopes do not expand class
+members), not a defect introduced by this task; use `--all` to audit such edits.
+
+Configuration changes require architecture review;
 neither excluding debt nor increasing limits is remediation.
 
 ## Semantic review and delivery evidence

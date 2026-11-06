@@ -21,6 +21,7 @@ _CONTROL_STATEMENTS = frozenset(
         "if_statement",
         "try_statement",
         "match_statement",
+        "raise_statement",
     }
 )
 
