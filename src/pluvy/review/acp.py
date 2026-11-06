@@ -77,7 +77,8 @@ class AcpReviewAgent:
             raise AnalysisError(f"ACP agent review failed: {error}") from error
 
     async def _invoke(self, request: ReviewRequest, prompt: str) -> ReviewResult:
-        with TemporaryDirectory(prefix="pluvy-review-") as directory:
+        with TemporaryDirectory(prefix="pluvy-review-") as temporary:
+            directory = str(Path(temporary).resolve())
             SubmissionStore.create(Path(directory), ReviewScope.from_request(request))
             process = await asyncio.create_subprocess_exec(
                 self.command.executable,

@@ -3,6 +3,7 @@
 import asyncio
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,20 @@ def test_acp_review_negotiates_streams_and_cleans_up(tmp_path: Path) -> None:
     assert not Path((tmp_path / "record.cwd").read_text()).exists()
     with pytest.raises(ProcessLookupError):
         os.kill(int((tmp_path / "record.pid").read_text()), 0)
+
+
+def test_session_cwd_is_the_agent_working_directory_behind_a_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(real, target_is_directory=True)
+    monkeypatch.setattr(tempfile, "tempdir", str(linked))
+    result = _agent(tmp_path, "finding").review(_REQUEST)
+    assert result.status == "complete"
+    advertised = Path((tmp_path / "record.cwd").read_text())
+    assert advertised.parent == real.resolve()
 
 
 @pytest.mark.parametrize(

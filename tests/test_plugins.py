@@ -147,7 +147,17 @@ def test_invalid_analyzer_metadata_fails_closed(analyzer: _FailingAnalyzer) -> N
 
 
 @pytest.mark.parametrize(
-    "suffixes", [(), (".py", ".py"), ("py",), (".",), (".bad/path",), (".foo.bar",)]
+    "suffixes",
+    [
+        (),
+        (".py", ".py"),
+        ("py",),
+        (".",),
+        ("..",),
+        (".py.",),
+        (".bad/path",),
+        (".foo.bar",),
+    ],
 )
 def test_invalid_suffixes_cannot_hide_selected_files(suffixes: tuple[str, ...]) -> None:
     definition = LanguageDefinition(Language.PYTHON, suffixes)
