@@ -145,7 +145,11 @@ composition.
 `builtin_registry()`. It iterates `builtin_languages()`, attaches each plugin's
 parser, and selects the matching `TestSyntax`; TypeScript and TSX reuse
 `JavaScriptTestSyntax`. The private bindings container implements
-`BaselineParsing`. The gate is not registered by any analyzer, so
+`BaselineParsing`. Gate bindings are fixed to the built-in language set: a custom
+`AnalyzerRegistry` passed to `main(..., analyzers=...)` does not participate in
+gate composition, so a deleted file in a language outside that set is selected
+from the diff but has no binding and is skipped silently. The gate is not
+registered by any analyzer, so
 `AnalysisProfile.required_rules` does not apply to it; this is a deliberate,
 documented exception for run-level checks. Its single diagnostic remains part of
 the policy switch, and `enabled: false` skips the gate.

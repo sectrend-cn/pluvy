@@ -131,9 +131,12 @@ Six analyzers cover seven languages:
 Every checker is enabled by default for every selected file. `enabled: false`
 turns one checker off for all selected files; there is no `enabled` flag scoped
 to one language or one file. The global `include` and `exclude` lists drop files
-from every checker at once. Architecture `placements`, `boundaries` and `paths`
-only select where that one architecture check applies. `owners` is not a file
-selector: once owners are configured and the checker is enabled, every selected
+from every checker at once, except that changed snapshot paths reported by the
+run-level `test.deletion` gate follow the changed set instead (see [its checker
+page](references/checkers/test.deletion.md)). Architecture `placements`,
+`boundaries` and `paths` only select where that one architecture check applies.
+`owners` is not a file selector: once owners are configured and the checker is
+enabled, every selected
 file must match exactly one owner, so an unmatched or doubly matched file is a
 finding. Coverage differences therefore come from the diagnostics each analyzer
 registers.

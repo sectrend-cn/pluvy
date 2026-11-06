@@ -2,7 +2,7 @@
 
 from collections import Counter
 from dataclasses import dataclass
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pluvy.analysis.context import TreeContext
 from pluvy.diagnostics import Finding, SyntaxFailure
@@ -13,6 +13,11 @@ from pluvy.semantics.testing.options import DELETION, TEST_DELETION
 from pluvy.source import Source
 
 _MAX_NAMES = 5
+_UNAVAILABLE_COUNTS = (
+    "Deleted test file; baseline test counts are unavailable because the baseline "
+    "syntax could not be parsed cleanly. Restore the tests or narrow "
+    "test.deletion.paths if the deletion is intentional."
+)
 
 
 @dataclass(frozen=True)
@@ -20,7 +25,7 @@ class TestDeletionGate:
     """Report deleted tests, assertion erosion and changed snapshot paths."""
 
     bindings: BaselineParsing
-    rule_ids: tuple[str, ...] = TEST_DELETION.rule_ids
+    rule_ids: ClassVar[tuple[str, ...]] = TEST_DELETION.rule_ids
 
     def candidates(
         self, current: tuple[Source, ...], changed: tuple[str, ...], policy: Policy
@@ -73,11 +78,9 @@ class TestDeletionGate:
         try:
             context = binding.parser.parse(source, policy)
         except SyntaxFailure:
-            return (
-                "Deleted test file; baseline test counts are unavailable because the "
-                "baseline syntax was rejected. Restore the tests or narrow "
-                "test.deletion.paths if the deletion is intentional."
-            )
+            return _UNAVAILABLE_COUNTS
+        if context.root.has_error:
+            return _UNAVAILABLE_COUNTS
         declarations, assertions = _counts(binding.syntax, context)
         return (
             f"Deleted test file whose baseline contained {declarations} test declaration(s) "
@@ -147,6 +150,10 @@ class TestDeletionGate:
             parts.append(f"Removed test declarations: {_names(removed)}")
         if removed_assertions > 0:
             parts.append(f"Assertion count fell by {removed_assertions}")
+        elif removed_assertions == 0:
+            parts.append("Assertion count was unchanged")
+        else:
+            parts.append(f"Assertion count rose by {-removed_assertions}")
         detail = "; ".join(parts)
         return (
             f"{detail}. Restore the removed tests or narrow test.deletion.paths if the "

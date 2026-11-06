@@ -21,10 +21,12 @@ and unknown options are rejected, including when that checker is disabled, and
 unknown options inside nested option objects are rejected the same way. Omitted
 entries and omitted options keep their defaults, so `enabled: true` and
 default-only entries are unnecessary. `include` and `exclude` are the only global
-file selectors. Except for `unused.return`, the snapshot-only case of
-`test.vacuous`, and changed snapshot paths reported by `test.deletion`, which are
-warnings, findings are errors and fail the gate with exit code 1; warnings alone
-leave exit code 0.
+file selectors, except that changed snapshot paths reported by run-level
+`test.deletion` follow the changed set instead (see
+[its page](checkers/test.deletion.md)). Except for `unused.return`, the
+snapshot-only case of `test.vacuous`, and changed snapshot paths reported by
+`test.deletion`, which are warnings, findings are errors and fail the gate with
+exit code 1; warnings alone leave exit code 0.
 
 Disabling a checker removes its diagnostics from every selected file. Text
 reports list disabled checker names and JSON reports include a

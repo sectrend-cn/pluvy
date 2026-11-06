@@ -130,9 +130,11 @@ Six built-in analyzers cover seven languages: Python (`.py`, `.pyi`), Go
 TypeScript (`.ts`, `.mts`, `.cts`) and TSX (`.tsx`). Every checker is enabled by
 default for each selected file. `enabled: false` disables that checker for every
 selected file: there is no `enabled` option scoped to one language or one file,
-and `include` / `exclude` drop files from all checkers at once. Architecture
-`placements`, `boundaries` and `paths` select where that one architecture check
-applies rather than enabling or disabling it. `owners` is not a scope selector:
+and `include` / `exclude` drop files from all checkers at once, except that
+changed snapshot paths reported by the run-level `test.deletion` gate follow the
+changed set instead (see [Run-level deletion gate](#run-level-deletion-gate)).
+Architecture `placements`, `boundaries` and `paths` select where that one
+architecture check applies rather than enabling or disabling it. `owners` is not a scope selector:
 when it is configured and the checker is enabled, every selected file must match
 exactly one owner. Both are described in [Options by checker](#options-by-checker).
 Coverage differences therefore come only from the diagnostics an analyzer registers.

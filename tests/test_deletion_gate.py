@@ -190,7 +190,11 @@ def test_bad_syntax_baseline_still_reports_deletion(
     assert [(finding.path, finding.rule, finding.scope) for finding in report.findings] == [
         ("test_sample.py", "test.deletion", "file")
     ]
-    assert "Deleted test file" in report.findings[0].message
+    message = report.findings[0].message
+    assert "Deleted test file" in message
+    assert "baseline test counts are unavailable" in message
+    assert "declaration(s)" not in message
+    assert "assertion(s)" not in message
 
 
 def test_reorder_and_helper_rename_do_not_report(
@@ -427,6 +431,29 @@ def test_candidates_filter_changed_paths_and_test_globs() -> None:
     changed = ("test_root.py", "tests/test_nested.py", "app.py")
     candidates = gate.candidates(current, changed, Policy())
     assert [source.path for source in candidates] == ["test_root.py", "tests/test_nested.py"]
+
+
+@pytest.mark.parametrize(
+    ("kept_assertions", "expected"),
+    [(2, "Assertion count was unchanged"), (3, "Assertion count rose by 1")],
+)
+def test_erosion_message_reports_flat_or_rising_assertions(
+    kept_assertions: int, expected: str
+) -> None:
+    gate = builtin_deletion_gate()
+    baseline = Source("test_sample.py", _TEST_BODY.encode(), Language.PYTHON)
+    current_body = "def test_alpha() -> None:\n" + "".join(
+        f"    assert value({index}) == {index}\n" for index in range(1, kept_assertions + 1)
+    )
+    current = Source(
+        "test_sample.py",
+        (current_body + "\ndef value(item: int) -> int:\n    return item\n").encode(),
+        Language.PYTHON,
+    )
+    findings = gate.evaluate((), (baseline,), (current,), ("test_sample.py",), Policy())
+    assert [finding.rule for finding in findings] == ["test.deletion"]
+    assert "'test_beta'" in findings[0].message
+    assert expected in findings[0].message
 
 
 def test_duplicate_declaration_multiset_reports_removal() -> None:
