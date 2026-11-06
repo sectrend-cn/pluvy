@@ -1,0 +1,92 @@
+---
+import DocsMobileNav from './DocsMobileNav.astro';
+
+const { dir, pagination } = Astro.locals.starlightRoute;
+const { prev, next } = pagination;
+const isRtl = dir === 'rtl';
+const base = `${import.meta.env.BASE_URL}/`;
+---
+
+<aside class="docs-help" aria-labelledby="docs-help-title">
+  <h2 id="docs-help-title">Still need help?</h2>
+  <div class="docs-help__links">
+    <a href="https://github.com/sectrend-cn/pluvy/issues">Open an issue</a>
+    <a href="https://github.com/sectrend-cn/pluvy/discussions">Ask the community</a>
+  </div>
+</aside>
+
+<div class="pagination-links print:hidden" dir={dir}>
+  {!prev && <a href={base} rel="prev">
+    <span aria-hidden="true">{isRtl ? '→' : '←'}</span>
+    <span>Previous<br /><span class="link-title">Home</span></span>
+  </a>}
+  {prev && <a href={prev.href} rel="prev">
+    <span aria-hidden="true">{isRtl ? '→' : '←'}</span>
+    <span>Previous<br /><span class="link-title">{prev.label}</span></span>
+  </a>}
+  {next && <a href={next.href} rel="next">
+    <span>Next<br /><span class="link-title">{next.label}</span></span>
+    <span aria-hidden="true">{isRtl ? '←' : '→'}</span>
+  </a>}
+</div>
+
+<DocsMobileNav />
+
+<style>
+  .docs-help {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+  }
+
+  .docs-help h2 {
+    margin: 0 0 0.75rem;
+    font-size: var(--sl-text-lg);
+  }
+
+  .docs-help__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+  }
+
+  .pagination-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+    gap: 1rem;
+  }
+
+  .pagination-links a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    color: var(--sl-color-gray-2);
+    box-shadow: var(--sl-shadow-md);
+    overflow-wrap: anywhere;
+    text-decoration: none;
+  }
+
+  .pagination-links a:hover {
+    border-color: var(--sl-color-gray-2);
+  }
+
+  .pagination-links [rel='next'] {
+    justify-content: end;
+    text-align: end;
+  }
+
+  .link-title {
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-2xl);
+    line-height: var(--sl-line-height-headings);
+  }
+</style>
+
+<script>
+  import './docs-navigation.ts';
+</script>

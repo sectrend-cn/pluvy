@@ -1,0 +1,34 @@
+---
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+interface Props {
+  post: CollectionEntry<'blog'>;
+}
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'long' });
+---
+
+<BaseLayout title={`${post.data.title} — Pluvy`} description={post.data.description}>
+  <article class="shell">
+    <header class="article-header">
+      <div class="article-header__meta">
+        <time datetime={post.data.pubDate.toISOString()}>{dateFormat.format(post.data.pubDate)}</time>
+        <span>{post.data.authors.join(', ')}</span>
+        <span>{post.data.tags.join(' / ')}</span>
+      </div>
+      <h1 class="display-title">{post.data.title}</h1>
+      <p class="article-header__description">{post.data.description}</p>
+    </header>
+    <div class="article-body">
+      <Content />
+    </div>
+  </article>
+</BaseLayout>

@@ -1,0 +1,87 @@
+---
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { headerContent, type Language } from '../i18n.ts';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  overlayHeader?: boolean;
+  lang?: Language;
+}
+
+const { title, description, overlayHeader = false, lang = 'en' } = Astro.props;
+const content = headerContent[lang];
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : Astro.url;
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f8faf8" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}/favicon.svg`} />
+    <title>{title}</title>
+    <script is:inline>
+      let preference = null;
+      try { preference = localStorage.getItem('pluvy-theme'); } catch {}
+      const dark = preference ? preference === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = dark ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#111210' : '#f8faf8');
+    </script>
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">{content.skip}</a>
+    <SiteHeader overlay={overlayHeader} languagePicker={overlayHeader} lang={lang} />
+    <main id="main-content">
+      <slot />
+    </main>
+    <SiteFooter lang={lang} />
+    <script>
+      const truncatedElements = document.querySelectorAll<HTMLElement>('[data-truncate]');
+
+      if (truncatedElements.length > 0) {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'text-tooltip';
+        tooltip.setAttribute('role', 'tooltip');
+        tooltip.hidden = true;
+        document.body.append(tooltip);
+
+        function showTooltip(element: HTMLElement): void {
+          const text = element.dataset.tooltip;
+          if (!text) return;
+          const bounds = element.getBoundingClientRect();
+          const center = Math.min(window.innerWidth - 16, Math.max(16, bounds.left + bounds.width / 2));
+          tooltip.textContent = text;
+          tooltip.style.left = `${center}px`;
+          tooltip.style.top = `${bounds.bottom + 6}px`;
+          tooltip.hidden = false;
+        }
+
+        function updateTruncatedLabels(): void {
+          tooltip.hidden = true;
+          truncatedElements.forEach((element) => {
+            const text = element.textContent?.trim() ?? '';
+            if (element.scrollWidth > element.clientWidth && text) element.dataset.tooltip = text;
+            else element.removeAttribute('data-tooltip');
+          });
+        }
+
+        truncatedElements.forEach((element) => {
+          element.addEventListener('pointerenter', () => showTooltip(element));
+          element.addEventListener('pointerleave', () => { tooltip.hidden = true; });
+          element.addEventListener('focus', () => showTooltip(element));
+          element.addEventListener('blur', () => { tooltip.hidden = true; });
+        });
+        window.addEventListener('resize', updateTruncatedLabels);
+        updateTruncatedLabels();
+      }
+    </script>
+  </body>
+</html>

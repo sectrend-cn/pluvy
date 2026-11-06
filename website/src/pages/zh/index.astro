@@ -1,0 +1,40 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/landing/Hero.astro';
+import Principles from '../../components/landing/Principles.astro';
+import Workflow from '../../components/landing/Workflow.astro';
+import FinalCta from '../../components/landing/FinalCta.astro';
+import LandingBackground from '../../components/landing/LandingBackground.astro';
+import type { Language } from '../../i18n.ts';
+
+const lang: Language = 'zh-CN';
+---
+
+<BaseLayout
+  title="Pluvy — 无需修改代码，即可执行工程规范"
+  description="面向 Python、Go、Java、JavaScript 和 TypeScript 的只读工程检查。支持全量审计，也可仅检查变更代码。"
+  overlayHeader
+  lang={lang}
+>
+  <div class="landing-page">
+    <LandingBackground />
+    <div class="landing-content">
+      <Hero lang={lang} />
+      <Principles lang={lang} />
+      <Workflow lang={lang} />
+      <FinalCta lang={lang} />
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .landing-page {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .landing-content {
+    position: relative;
+    z-index: 1;
+  }
+</style>

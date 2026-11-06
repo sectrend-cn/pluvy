@@ -1,0 +1,45 @@
+---
+type TocItem = NonNullable<typeof Astro.locals.starlightRoute.toc>['items'][number];
+
+interface Props {
+  items: TocItem[];
+  depth?: number;
+}
+
+const { items, depth = 0 } = Astro.props;
+---
+
+<ul data-depth={depth}>
+  {items.map((item) => (
+    <li>
+      <a href={`#${item.slug}`} data-doc-heading={item.slug}><span>{item.text}</span></a>
+      {item.children.length > 0 && <Astro.self items={item.children} depth={depth + 1} />}
+    </li>
+  ))}
+</ul>
+
+<style>
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  ul ul {
+    margin-inline-start: 0.75rem;
+    border-inline-start: 1px solid var(--sl-color-hairline-light);
+    padding-inline-start: 0.5rem;
+  }
+
+  a {
+    display: block;
+    padding: 0.45rem 0.5rem;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+  }
+
+  a[aria-current='location'] {
+    border-inline-start: 2px solid var(--sl-color-text-accent);
+    color: var(--sl-color-text-accent);
+  }
+</style>

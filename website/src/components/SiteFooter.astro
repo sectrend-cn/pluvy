@@ -1,0 +1,83 @@
+---
+import logo from '../assets/pluvy-natural-neck.svg';
+import { headerContent, type Language } from '../i18n.ts';
+
+interface Props {
+  lang?: Language;
+}
+
+const { lang = 'en' } = Astro.props;
+const content = headerContent[lang];
+const base = `${import.meta.env.BASE_URL}/`;
+---
+
+<footer class="site-footer">
+  <div class="site-footer__inner shell">
+    <div class="site-footer__brand">
+      <img src={logo.src} width="52" height="52" alt="" />
+      <strong>PLUVY</strong>
+    </div>
+    <div class="site-footer__links">
+      <a href={`${base}docs/getting-started/`}>{content.documentation}</a>
+      <a href={`${base}blog/`}>{content.blog}</a>
+      <a href="https://github.com/sectrend-cn/pluvy">GitHub</a>
+      <a href="https://github.com/sectrend-cn/pluvy/releases">{content.releases}</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .site-footer__inner {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3rem;
+    padding-block: 3.5rem 2rem;
+  }
+
+  .site-footer__brand {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .site-footer__brand img {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .site-footer__brand strong {
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 650;
+    letter-spacing: 0.22em;
+  }
+
+  .site-footer__links {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 0.5rem 2.5rem;
+    align-content: center;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+  }
+
+  .site-footer__links a {
+    text-decoration: none;
+  }
+
+  .site-footer__links a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 650px) {
+    .site-footer__inner {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+  }
+</style>
