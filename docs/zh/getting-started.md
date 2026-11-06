@@ -22,19 +22,23 @@ pluvy 是只读的解析型工程策略门禁：任何运行模式都不修改�
 `/path/to/pluvy` 指代该检出目录。检出中同时包含工具源码、`examples/` 下的样例策略，
 以及 `.agents/skills/pluvy/` skill。
 
-### 本地安装
+### 从 PyPI 安装
 
-从该检出目录本地安装命令行：
+安装已发布的命令行：
 
 ```sh
-uv tool install /path/to/pluvy
+uv tool install pluvy
 ```
 
 不使用 uv 时，pip 等价安装：
 
 ```sh
-python -m pip install /path/to/pluvy
+python -m pip install pluvy
 ```
+
+若需要跟随尚未发布的改动，把上述命令中的 `pluvy` 换成 `/path/to/pluvy`，从该检出目录安装。
+PyPI 包只包含工具本身，`examples/` 下的样例策略与 `.agents/skills/pluvy/` skill
+需要从源码检出或仓库中获取。
 
 安装把 `pluvy` 放到用户级可执行目录（例如 `~/.local/bin`），请确认该目录在 `PATH`
 中。若已存在同名的 uv 工具安装，需要替换时给 `uv tool install` 加 `--force`。

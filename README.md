@@ -5,9 +5,14 @@ TypeScript/TSX. No run mode modifies, stashes, stages, restores, deletes or
 rewrites source files, and no run mode changes Git configuration. The shared
 policy is in [Engineering standards](docs/engineering-standards.md).
 
+## Install
+
+Python 3.12 or newer is required. Install the published command line with
+`uv tool install pluvy` or `python -m pip install pluvy`, then run `pluvy --help`.
+
 ## Run
 
-Python 3.12 or newer is required. Run from this checkout, then activate the created environment:
+Develop from this checkout, then activate the created environment:
 
 ```sh
 python -m pip install --no-cache-dir uv==0.8.22
