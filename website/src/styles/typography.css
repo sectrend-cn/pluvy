@@ -1,0 +1,85 @@
+h1,
+h2,
+h3,
+.card-title,
+.hero__line,
+.post-list__title {
+  text-wrap: balance;
+}
+
+p,
+li,
+[class*='description'] {
+  text-wrap: pretty;
+}
+
+button,
+[role='button'],
+.button,
+.site-nav a,
+.text-link {
+  white-space: nowrap;
+}
+
+.exit-codes strong,
+.principles__list > li > span,
+.post-list__date,
+td,
+th,
+[data-counter],
+[data-stat],
+[data-timer] {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-truncate] {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.text-tooltip {
+  position: fixed;
+  z-index: 100;
+  max-width: 80vw;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  background: var(--night);
+  color: var(--on-night);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: normal;
+}
+
+:lang(zh) body {
+  text-autospace: normal;
+  text-spacing-trim: trim-start;
+}
+
+:lang(zh) :where(code, pre, input, textarea, .mono) {
+  text-autospace: no-autospace;
+}
+
+:lang(zh) h1,
+:lang(zh) h2,
+:lang(zh) h3,
+:lang(zh) .display-title,
+:lang(zh) .post-list__title {
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+:lang(zh) .hero__intro > p,
+:lang(zh) .article-body > p {
+  max-width: 26em;
+  text-align: justify;
+  text-wrap: pretty;
+}
+
+:lang(zh) .article-body {
+  text-spacing-trim: space-first;
+}

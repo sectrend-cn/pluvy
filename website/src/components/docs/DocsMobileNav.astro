@@ -1,0 +1,32 @@
+---
+import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
+import DocsTocList from './DocsTocList.astro';
+
+const { sidebar, toc } = Astro.locals.starlightRoute;
+const currentSection = toc?.items[0]?.text ?? 'Overview';
+---
+
+<nav class="docs-mobile-nav" aria-label="Documentation navigation">
+  <button type="button" data-docs-open="pages" aria-controls="docs-sheet-pages">Pages</button>
+  <button type="button" data-docs-open="outline" aria-controls="docs-sheet-outline">
+    <span data-current-section>{currentSection}</span>
+  </button>
+</nav>
+
+<dialog id="docs-sheet-pages" class="docs-sheet" data-docs-sheet aria-label="Documentation pages">
+  <div class="docs-sheet__header">
+    <strong>Pages</strong>
+    <button type="button" data-docs-close aria-label="Close">×</button>
+  </div>
+  <div class="docs-sheet__body"><SidebarSublist sublist={sidebar} /></div>
+</dialog>
+
+{toc && (
+  <dialog id="docs-sheet-outline" class="docs-sheet" data-docs-sheet aria-label="On this page">
+    <div class="docs-sheet__header">
+      <strong>On this page</strong>
+      <button type="button" data-docs-close aria-label="Close">×</button>
+    </div>
+    <div class="docs-sheet__body"><DocsTocList items={toc.items} /></div>
+  </dialog>
+)}

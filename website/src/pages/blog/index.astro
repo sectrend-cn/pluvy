@@ -1,0 +1,44 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const base = `${import.meta.env.BASE_URL}/`;
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((left, right) => right.data.pubDate.getTime() - left.data.pubDate.getTime());
+const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
+---
+
+<BaseLayout
+  title="Journal — Pluvy"
+  description="Engineering notes, practical guides and release context from the Pluvy project."
+>
+  <div class="blog-index shell">
+    <div class="blog-index__heading">
+      <div>
+        <h1 class="display-title">Engineering notes</h1>
+      </div>
+      <p>Pluvy design decisions, practical guides and release updates.</p>
+    </div>
+    <ul class="post-list">
+      {posts.map((post) => (
+        <li class="post-list__item">
+          <time class="post-list__date" datetime={post.data.pubDate.toISOString()}>
+            {dateFormat.format(post.data.pubDate)}
+          </time>
+          <div>
+            <h2 class="post-list__title"><a href={`${base}blog/${post.id}/`}>{post.data.title}</a></h2>
+            <p class="post-list__description">{post.data.description}</p>
+          </div>
+          <span class="post-list__tags">{post.data.tags.join(' / ')}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</BaseLayout>
+
+<style>
+  h1 em {
+    font-family: var(--serif);
+    font-weight: 400;
+  }
+</style>

@@ -1,0 +1,48 @@
+:root {
+  --sl-color-accent-low: #eef6d6;
+  --sl-color-accent: #5c7c2f;
+  --sl-color-accent-high: #37401c;
+  --sl-color-white: #1d211c;
+  --sl-color-gray-1: #1d211c;
+  --sl-color-gray-2: #60655f;
+  --sl-color-gray-3: #898e87;
+  --sl-color-gray-4: #b9bcb8;
+  --sl-color-gray-5: #d7dad7;
+  --sl-color-gray-6: #eff1ef;
+  --sl-color-gray-7: #f8faf8;
+  --sl-color-black: #fcfdfc;
+  --sl-font: 'Helvetica Neue', 'Arial Nova', Helvetica, Arial, sans-serif;
+  --sl-font-system-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #29371d;
+  --sl-color-accent: #bdee63;
+  --sl-color-accent-high: #e3f7ba;
+  --sl-color-white: #eceeec;
+  --sl-color-gray-1: #eceeec;
+  --sl-color-gray-2: #afb5ad;
+  --sl-color-gray-3: #767d74;
+  --sl-color-gray-4: #5c625b;
+  --sl-color-gray-5: #454843;
+  --sl-color-gray-6: #212220;
+  --sl-color-gray-7: #181917;
+  --sl-color-black: #111210;
+}
+
+.site-title img {
+  width: 2rem;
+  height: 2rem;
+}
+
+:root[data-theme='dark'] .site-title img {
+  filter: invert(1);
+}
+
+header.header {
+  background: var(--sl-color-bg);
+}
+
+.sl-markdown-content {
+  line-height: 1.7;
+}

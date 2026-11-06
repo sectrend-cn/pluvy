@@ -1,0 +1,141 @@
+.blog-index {
+  min-height: 70vh;
+  padding-block: clamp(4rem, 8vw, 8rem);
+}
+
+.blog-index__heading {
+  display: grid;
+  grid-template-columns: 1fr minmax(16rem, 0.55fr);
+  gap: 3rem;
+  align-items: end;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid var(--ink);
+}
+
+.blog-index__heading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.post-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.post-list__item {
+  display: grid;
+  grid-template-columns: 10rem 1fr auto;
+  gap: 2rem;
+  align-items: start;
+  padding-block: 2.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.post-list__date,
+.post-list__tags {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.post-list__title {
+  margin: 0 0 0.7rem;
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.post-list__title a {
+  text-decoration: none;
+}
+
+.post-list__title a:hover {
+  text-decoration: underline;
+}
+
+.post-list__description {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--muted);
+}
+
+.article-header {
+  padding-block: clamp(4rem, 8vw, 7rem) 3rem;
+  border-bottom: 1px solid var(--ink);
+}
+
+.article-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.article-header__description {
+  max-width: 46rem;
+  margin: 1.8rem 0 0;
+  color: var(--muted);
+  font-size: 1.2rem;
+}
+
+.article-body {
+  max-width: 46rem;
+  padding-block: 3rem 7rem;
+  font-family: var(--serif);
+  font-size: 1.16rem;
+  line-height: 1.75;
+}
+
+.article-body h2 {
+  margin: 3.5rem 0 1rem;
+  font-family: var(--sans);
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+
+.article-body h3 {
+  margin-top: 2.5rem;
+  font-family: var(--sans);
+}
+
+.article-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1.4rem;
+  background: var(--night);
+  color: var(--on-night);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+.article-body code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+.article-body blockquote {
+  margin-inline: 0;
+  padding-left: 1.5rem;
+  border-left: 3px solid var(--ink);
+}
+
+@media (max-width: 700px) {
+  .blog-index__heading,
+  .post-list__item {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .post-list__tags {
+    display: none;
+  }
+}

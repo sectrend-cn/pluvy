@@ -1,0 +1,40 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/landing/Hero.astro';
+import Principles from '../components/landing/Principles.astro';
+import Workflow from '../components/landing/Workflow.astro';
+import FinalCta from '../components/landing/FinalCta.astro';
+import LandingBackground from '../components/landing/LandingBackground.astro';
+import type { Language } from '../i18n.ts';
+
+const lang: Language = 'en';
+---
+
+<BaseLayout
+  title="Pluvy — Engineering standards, enforced without rewriting your code"
+  description="A read-only, parser-backed engineering policy gate for Python, Go, Java, JavaScript and TypeScript."
+  overlayHeader
+  lang={lang}
+>
+  <div class="landing-page">
+    <LandingBackground />
+    <div class="landing-content">
+      <Hero lang={lang} />
+      <Principles lang={lang} />
+      <Workflow lang={lang} />
+      <FinalCta lang={lang} />
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .landing-page {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .landing-content {
+    position: relative;
+    z-index: 1;
+  }
+</style>

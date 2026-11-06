@@ -1,0 +1,66 @@
+---
+import { landingContent, type Language } from '../../i18n.ts';
+import TextSegments from '../TextSegments.astro';
+
+interface Props {
+  lang?: Language;
+}
+
+const { lang = 'en' } = Astro.props;
+const content = landingContent[lang].final;
+const base = `${import.meta.env.BASE_URL}/`;
+---
+
+<section class="final-cta" data-reveal>
+  <div class="final-cta__inner shell">
+    <h2><TextSegments text={content.titleA} lang={lang} /><br /><em><TextSegments text={content.titleB} lang={lang} /></em></h2>
+    <div class="final-cta__actions">
+      <a class="button button--acid" href={`${base}docs/getting-started/`}>
+        {content.readGuide} <span aria-hidden="true">→</span>
+      </a>
+      <a class="text-link" href="https://github.com/sectrend-cn/pluvy/blob/main/examples/.pluvy/pluvy.json">
+        {content.explore}
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .final-cta {
+    border-top: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .final-cta__inner {
+    padding-block: clamp(4.5rem, 7vw, 7rem);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: clamp(3rem, 7vw, 7rem);
+    font-weight: 500;
+    letter-spacing: -0.07em;
+    line-height: 0.95;
+  }
+
+  h2 em {
+    color: var(--accent);
+    font-family: var(--serif);
+    font-weight: 400;
+  }
+
+  .final-cta__actions {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-top: 3.5rem;
+  }
+
+  @media (max-width: 560px) {
+    .final-cta__actions {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+</style>

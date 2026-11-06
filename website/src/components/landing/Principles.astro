@@ -1,0 +1,90 @@
+---
+import { landingContent, type Language } from '../../i18n.ts';
+import TextSegments from '../TextSegments.astro';
+
+interface Props {
+  lang?: Language;
+}
+
+const { lang = 'en' } = Astro.props;
+const content = landingContent[lang].principles;
+---
+
+<section class="principles shell" aria-labelledby="principles-title" data-reveal>
+  <div class="principles__heading">
+    <h2 id="principles-title" class="display-title"><TextSegments text={content.titleA} lang={lang} /><br /><em><TextSegments text={content.titleB} lang={lang} /></em></h2>
+  </div>
+  <ol class="principles__list">
+    {content.items.map((item) => (
+      <li>
+        <span>{item.number}</span>
+        <h3><TextSegments text={item.title} lang={lang} /></h3>
+        <p>{item.description}{item.code && <code>{item.code}</code>}{lang === 'en' && item.code ? '.' : ''}</p>
+      </li>
+    ))}
+  </ol>
+</section>
+
+<style>
+  .principles {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: clamp(3rem, 8vw, 9rem);
+    padding-block: clamp(4.5rem, 8vw, 8rem);
+  }
+
+  h2 em {
+    font-family: var(--serif);
+    font-weight: 400;
+  }
+
+  .principles__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .principles__list li {
+    position: relative;
+    padding: 2rem 0 2rem 3.5rem;
+    border-top: 1px solid var(--line);
+    text-shadow: 0 0 10px var(--paper), 0 0 3px var(--paper);
+  }
+
+  .principles__list li:last-child {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .principles__list span {
+    position: absolute;
+    top: 2.25rem;
+    left: 0;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+  }
+
+  h3 {
+    margin: 0 0 0.65rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+  .principles__list p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.94rem;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+  }
+
+  @media (max-width: 800px) {
+    .principles {
+      grid-template-columns: 1fr;
+      gap: 4rem;
+    }
+  }
+</style>

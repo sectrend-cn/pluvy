@@ -1,0 +1,20 @@
+---
+import { loadDefaultSimplifiedChineseParser } from 'budoux';
+import type { Language } from '../i18n.ts';
+
+interface Props {
+  text: string;
+  lang?: Language;
+}
+
+const { text, lang = 'en' } = Astro.props;
+const parser = loadDefaultSimplifiedChineseParser();
+const phrases = lang === 'zh-CN' ? parser.parse(text) : [text];
+---
+
+{phrases.map((phrase, index) => (
+  <Fragment>
+    {index > 0 && <wbr />}
+    {phrase}
+  </Fragment>
+))}
