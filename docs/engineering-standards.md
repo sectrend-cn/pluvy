@@ -234,6 +234,7 @@ Approvals granted in other projects do not transfer here.
 | `unused.return` | Warning for a known non-void result discarded at a call site |
 | `test.tautology` | Mirrored positive-equality assertion operands and literal-true assertions |
 | `test.vacuous` | Always-true matchers, assertion-free test bodies and snapshot-only tests (snapshot-only warnings) |
+| `test.deletion` | Changed-audit baseline comparison: deleted test-file baseline parsing, test declaration multisets, assertion counts against `removed_assertions`, and snapshot path globs |
 | `flow.swallow` | Wide catch/except handler or `.catch` callback whose subtree contains no re-throw |
 | `flow.fallback` | `??` chain whose operator count exceeds `max_chain` while every direct default is a bare non-nullish literal |
 | `type.assertion` | Python typing casts, TS assertions except `as const`, TS non-null assertions, Java reference casts |
@@ -260,7 +261,8 @@ The parser-backed gate is read-only. Checker options are grouped by responsibili
 `function_size` owns all five function metrics, `test.integrity` owns
 `test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
 `flow.fallback`, and `type.contract` owns `type.nullable`
-and `type.union`. Every other checker key matches its diagnostic ID. Only
+and `type.union`. The run-level `test.deletion` owns its single diagnostic
+outside analyzer registration. Every other checker key matches its diagnostic ID. Only
 `include` and `exclude` control global file selection.
 Every checker defaults to enabled; omit default-only entries and `enabled: true`.
 Reports disclose disabled checker names while findings retain their diagnostic IDs.

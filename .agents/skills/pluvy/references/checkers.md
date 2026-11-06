@@ -1,11 +1,13 @@
 # Checker reference — pluvy skill
 
-Index of the built-in checkers. The schema has 21 logical checkers, which produce
-28 built-in diagnostic IDs. Some checker keys group related diagnostics:
+Index of the built-in checkers. The schema has 22 logical checkers, which produce
+29 built-in diagnostic IDs. Some checker keys group related diagnostics:
 `function_size` owns the five `size.*` IDs, `test.integrity` owns
 `test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
 `flow.fallback`, and `type.contract` owns `type.nullable`
-and `type.union`. Every other checker name matches its diagnostic ID. Each
+and `type.union`. The run-level `test.deletion` owns its single diagnostic
+outside analyzer registration. Every other checker name matches its diagnostic
+ID. Each
 checker has its own page under `checkers/`, holding what it reports, which
 analyzers register it, where its behavior differs between languages, every
 option with its default and type, and correct versus incorrect configuration
@@ -19,9 +21,10 @@ and unknown options are rejected, including when that checker is disabled, and
 unknown options inside nested option objects are rejected the same way. Omitted
 entries and omitted options keep their defaults, so `enabled: true` and
 default-only entries are unnecessary. `include` and `exclude` are the only global
-file selectors. Except for `unused.return`, which is always a warning, and the
-snapshot-only case of `test.vacuous`, which is also a warning, findings are
-errors and fail the gate with exit code 1; warnings alone leave exit code 0.
+file selectors. Except for `unused.return`, the snapshot-only case of
+`test.vacuous`, and changed snapshot paths reported by `test.deletion`, which are
+warnings, findings are errors and fail the gate with exit code 1; warnings alone
+leave exit code 0.
 
 Disabling a checker removes its diagnostics from every selected file. Text
 reports list disabled checker names and JSON reports include a
@@ -67,6 +70,10 @@ The remaining nine diagnostic IDs are registered per language:
 | JavaScript and JSX | `type.broad`, `flow.swallow`, `flow.fallback` |
 | TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union`, `flow.swallow`, `flow.fallback` |
 
+`test.deletion` is the exception: it is a run-level gate rather than an analyzer
+registration, and it runs only for `--base` and `--staged`; `--all` does not
+activate it.
+
 A registered diagnostic reports only for the analyzer that registered it. For
 example, `type.annotation`, `type.signature` and `imports.wildcard` appear in
 Python files only, and `type.assertion` covers Python, Java, TypeScript and TSX
@@ -83,6 +90,7 @@ module-level functions; its page records the per-language candidate rules.
 | [`structure.guarded_projection`](checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for `size.lines`, `size.statements`, `size.complexity`, `size.nesting` and `size.parameters` | All |
 | [`test.integrity`](checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for `test.tautology` and `test.vacuous` | All |
+| [`test.deletion`](checkers/test.deletion.md) | Removed test files, assertion erosion and changed snapshot paths in changed audits; one run-level diagnostic with error and warning forms | All; run-level |
 | [`flow.handling`](checkers/flow.handling.md) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals; one switch for `flow.swallow` and `flow.fallback` | Python, Java, JavaScript, JSX, TypeScript, TSX |
 | [`type.contract`](checkers/type.contract.md) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions; one switch for `type.nullable` and `type.union` | TypeScript, TSX |
 | [`type.annotation`](checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |

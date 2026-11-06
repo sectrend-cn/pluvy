@@ -50,8 +50,9 @@ is disabled. Each entry configures one logical checker. Some checker keys group
 related diagnostics: `function_size` owns the five `size.*` IDs,
 `test.integrity` owns `test.tautology` and `test.vacuous`, `flow.handling` owns
 `flow.swallow` and `flow.fallback`, and `type.contract`
-owns `type.nullable` and `type.union`. Every other checker name matches its
-diagnostic ID. There is no need to write `enabled: true` or entries that contain
+owns `type.nullable` and `type.union`. The run-level `test.deletion` owns its
+single diagnostic outside analyzer registration. Every other checker name matches
+its diagnostic ID. There is no need to write `enabled: true` or entries that contain
 only default options.
 
 | Checker ID | Additional options and defaults | What it checks |
@@ -59,6 +60,7 @@ only default options.
 | `structure.guarded_projection` | `min_fields: 3` (integer, at least 2) | Repeated guarded field copies in every supported language |
 | `function_size` | `lines: 50`, `statements: 50`, `complexity: 10`, `nesting: 3`, `parameters: 5` | All five function metrics |
 | `test.integrity` | `paths: 20 test-path globs` | Tautological assertions and tests without a meaningful assertion |
+| `test.deletion` | `paths: 20 test-path globs`, `snapshot_paths: ("*.snap", "__snapshots__/*", "*/__snapshots__/*")`, `removed_assertions: 3` (integer, at least 0) | Removed test files, assertion erosion and changed snapshot paths in changed audits |
 | `flow.handling` | `max_chain: 3` (positive integer) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals |
 | `type.contract` | `max_members: 4`, `optional_fields: 3`, `null_defaults: 3` (positive integers) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions in TypeScript and TSX |
 | `type.annotation` | None | Broad or bare Python annotations |
@@ -96,20 +98,25 @@ chain is reported. A chain is reported only when every direct default is a bare
 non-nullish literal; parenthesized, asserted and called defaults are not
 literals, and a mixed chain stays silent.
 
+`test.deletion.removed_assertions` is a non-negative integer using the same strict
+`>`: an assertion count fall equal to the limit passes, and only a larger fall is
+reported. Whole-file deletion is not subject to this threshold.
+
 `include` and `exclude` are global and cannot be placed inside a checker. They use
 case-sensitive shell matching of root-relative paths, with `*` spanning `/`.
 Architecture-specific paths select where that one architecture check applies;
 they do not remove files from other checkers.
 
 `test.integrity.paths` selects which files the test-integrity checker analyzes.
-Its default is `("test_*.py", "*/test_*.py", "*_test.py", "tests/*", "*/tests/*",
+`test.deletion.paths` shares the same default and dialect for changed test files.
+The default is `("test_*.py", "*/test_*.py", "*_test.py", "tests/*", "*/tests/*",
 "*.test.js", "*.test.jsx", "*.test.ts", "*.test.tsx", "*.test.mjs", "*.test.cjs",
 "*.test.mts", "*.test.cts", "*.spec.js", "*.spec.jsx", "*.spec.ts", "*.spec.tsx",
 "*_test.go", "*Test.java", "*Tests.java")`. The same `fnmatchcase` semantics
 apply: matching is case-sensitive, `*` spans `/`, and `**` or brace alternation
 have no special meaning. An empty tuple selects no files.
 
-The schema covers 21 logical checkers, which produce 28 built-in diagnostic IDs.
+The schema covers 22 logical checkers, which produce 29 built-in diagnostic IDs.
 Language syntax, region boundaries and a configuration example are documented in
 [the guarded projection checker reference](../.agents/skills/pluvy/references/checkers/structure.guarded_projection.md).
 Custom plugin settings continue
@@ -148,6 +155,9 @@ Every analyzer registers the same base set of 19 diagnostic IDs:
 - Testing: `test.tautology` and `test.vacuous`, both configured through the
   single `test.integrity` checker.
 
+`test.deletion` is not part of that per-language set: no analyzer registers it,
+and it is produced by the run-level deletion gate in `--base` and `--staged` mode.
+
 The remaining nine diagnostic IDs are registered per language:
 
 | Analyzer | Additional diagnostic IDs |
@@ -182,6 +192,29 @@ Coverage of a diagnostic does not promise complete evidence for every construct:
 resolution limits are described in
 [Third-party boundaries and usage](#third-party-boundaries-and-usage) and
 [Configuring encoding APIs](#configuring-encoding-apis).
+
+## Run-level deletion gate
+
+`test.deletion` is a run-level gate, not an analyzer registration. It activates
+only for `--base` and `--staged`; `--all` does not run it. A deleted test file
+reports one error with its baseline declaration and assertion counts. A surviving
+changed test file is compared with its baseline: a missing declaration name in
+the multiset or an assertion count fall greater than `removed_assertions` reports
+one error per file. A changed path matching `snapshot_paths` reports one warning
+per path. Exact 100% renames are excluded from both the deletion and changed-path
+sets, so a partial rename still appears as a deletion.
+
+Next-line suppression is unavailable. A deleted file has no current snapshot, and
+an erosion finding has no corresponding current defect node, so
+`pluvy: ignore-next-line test.deletion` in a surviving file is an invalid
+directive and produces `type.suppression`. Disable the checker with
+`enabled: false` or tighten its globs when a reduction is intentional.
+
+Deleted files are not analyzed inputs: `files` in a text or JSON report counts
+only the current selected sources, while deletion findings are added from
+baseline evidence. Every `test.deletion` finding is anchored at line 1, column 1
+with `scope: "file"`. An unmerged `--staged` index and a baseline blob that is not
+valid UTF-8 fail closed with exit code 2.
 
 ## Disabling and shared execution
 
@@ -296,9 +329,9 @@ with the built-in registry to obtain the same cross-file resolution; `engine.che
 checks one snapshot. Custom registries can register a `SemanticParser` explicitly.
 
 Every finding now includes `severity`, defaulting to `error`. `unused.return` is
-always a `warning`, and `test.vacuous` is a `warning` when a test's only
-assertions are snapshot matchers; text labels them and JSON retains them in
-`findings`. A known
+always a `warning`, `test.vacuous` is a `warning` when a test's only assertions
+are snapshot matchers, and `test.deletion` reports a changed snapshot path as a
+`warning`; text labels them and JSON retains them in `findings`. A known
 non-void local or resolved imported function result discarded as a standalone
 call, Python/Go `_` assignment, or JS `void` expression produces a warning.
 Unknown external return types are not guessed. Warnings alone leave exit status 0.

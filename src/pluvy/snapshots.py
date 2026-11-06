@@ -159,6 +159,125 @@ def usage_sources(
     return _read_sources(selection, paths, policy, analyzers)
 
 
+def deleted_sources(
+    selection: Selection, policy: Policy, analyzers: AnalyzerRegistry
+) -> tuple[Source, ...]:
+    """Read baseline blobs for files removed by the selected comparison."""
+    revision = _baseline_revision(selection)
+    comparison = ("--cached",)
+    if selection.mode == "staged":
+        if git(selection.root, ("ls-files", "--unmerged", "-z")):
+            raise GateError("Resolve unmerged index entries before checking staged files")
+    else:
+        comparison = (revision,)
+    entries = _name_status(
+        git(
+            selection.root,
+            (
+                "diff",
+                "--diff-filter=D",
+                "--name-status",
+                "--find-renames=100%",
+                "-z",
+                *comparison,
+                "--",
+            ),
+        )
+    )
+    result: list[Source] = []
+    for status, paths in entries:
+        if status[:1] != "D" or len(paths) != 1:
+            continue
+        path = paths[0]
+        if not selected(path, policy, analyzers):
+            continue
+        language = analyzers.language_for(path)
+        if language is None:
+            raise GateError(f"Selected source has no registered language: {path}")
+        content = git(selection.root, ("show", f"{revision}:{path}"))
+        content.decode("utf-8")
+        result.append(Source(path, content, language))
+    return tuple(result)
+
+
+def changed_paths(selection: Selection) -> tuple[str, ...]:
+    """List every changed path while ignoring exact renames and including untracked files."""
+    revision = _baseline_revision(selection)
+    comparison = ("--cached",) if selection.mode == "staged" else (revision,)
+    entries = _name_status(
+        git(
+            selection.root,
+            (
+                "diff",
+                "--name-status",
+                "--find-renames=100%",
+                "-z",
+                *comparison,
+                "--",
+            ),
+        )
+    )
+    paths = [path for status, names in entries if status != "R100" for path in names]
+    if selection.mode != "staged":
+        untracked = _paths(
+            git(selection.root, ("ls-files", "--others", "--exclude-standard", "-z"))
+        )
+        paths.extend(untracked)
+    return tuple(sorted(set(paths)))
+
+
+def baseline_sources(
+    selection: Selection, paths: tuple[str, ...], analyzers: AnalyzerRegistry
+) -> tuple[Source, ...]:
+    """Read baseline blobs that still exist for given current paths."""
+    revision = _baseline_revision(selection)
+    present = frozenset(
+        _paths(git(selection.root, ("ls-tree", "-r", "--name-only", "-z", revision)))
+    )
+    result: list[Source] = []
+    for path in paths:
+        language = analyzers.language_for(path)
+        if language is None or path not in present:
+            continue
+        content = git(selection.root, ("show", f"{revision}:{path}"))
+        content.decode("utf-8")
+        result.append(Source(path, content, language))
+    return tuple(result)
+
+
+def _baseline_revision(selection: Selection) -> str:
+    if selection.mode == "staged":
+        return "HEAD"
+    if selection.base is None:
+        raise GateError("Base mode requires a commit reference")
+    return (
+        git(
+            selection.root,
+            ("rev-parse", "--verify", "--end-of-options", f"{selection.base}^{{commit}}"),
+        )
+        .decode()
+        .strip()
+    )
+
+
+def _name_status(output: bytes) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    if output and not output.endswith(b"\0"):
+        raise GateError("Git returned a malformed filename list")
+    tokens = output.split(b"\0")[:-1] if output else []
+    entries: list[tuple[str, tuple[str, ...]]] = []
+    index = 0
+    while index < len(tokens):
+        status = tokens[index].decode("utf-8")
+        index += 1
+        width = 2 if status[:1] in {"R", "C"} else 1
+        names = tokens[index : index + width]
+        if len(names) != width:
+            raise GateError("Git returned a malformed name-status list")
+        entries.append((status, tuple(name.decode("utf-8") for name in names)))
+        index += width
+    return tuple(entries)
+
+
 def _read_sources(
     selection: Selection, paths: tuple[str, ...], policy: Policy, analyzers: AnalyzerRegistry
 ) -> tuple[Source, ...]:

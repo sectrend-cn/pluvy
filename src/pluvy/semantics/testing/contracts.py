@@ -5,6 +5,9 @@ from typing import Literal, Protocol
 
 from tree_sitter import Node
 
+from pluvy.analysis.contracts import ContextParser
+from pluvy.source import Language
+
 
 @dataclass(frozen=True)
 class TestDeclaration:
@@ -35,3 +38,17 @@ class TestSyntax(Protocol):
     def unrecognized_calls(self, declaration: Node) -> tuple[Node, ...]: ...
 
     def control_statements(self, declaration: Node) -> tuple[Node, ...]: ...
+
+
+@dataclass(frozen=True)
+class TestBinding:
+    """Bind one parser and test syntax capability at composition."""
+
+    parser: ContextParser
+    syntax: TestSyntax
+
+
+class BaselineParsing(Protocol):
+    """Resolve the test capability that parses baseline and current snapshots."""
+
+    def binding_for(self, language: Language) -> TestBinding | None: ...

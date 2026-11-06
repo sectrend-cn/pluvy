@@ -3,7 +3,7 @@
 import pytest
 from pydantic import Field, ValidationError
 
-from pluvy.plugins.builtins import builtin_analyzers
+from pluvy.plugins.builtins import builtin_analyzers, builtin_deletion_gate
 from pluvy.policy.contracts import (
     CheckerConfiguration,
     CheckerDefinition,
@@ -100,8 +100,8 @@ def test_registered_diagnostics_match_all_builtin_analyzer_coverage() -> None:
         rule for state in Checkers().checker_states() for rule in state.definition.rule_ids
     }
     executed = {rule for analyzer in builtin_analyzers() for rule in analyzer.rule_ids}
-    assert configured == executed
-    assert len(Checkers().checker_states()) == 21
+    assert configured == executed | set(builtin_deletion_gate().rule_ids)
+    assert len(Checkers().checker_states()) == 22
     assert {state.definition.name for state in Checkers().checker_states()} == {
         field.serialization_alias or name for name, field in Checkers.model_fields.items()
     }

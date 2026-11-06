@@ -131,6 +131,34 @@ Custom `TypedAnalyzer` compositions must supply this capability for changed-scop
 runs; missing capability fails visibly instead of silently claiming scoped checks.
 Full-source library calls remain compatible with the default `Source` constructor.
 
+## Run-level deletion gate
+
+`TestDeletionGate` in `semantics/testing/gate.py` is a run-level execution shape,
+not a `RuleBundle`. It consumes the baseline evidence ports supplied by the CLI
+and the narrow `BaselineParsing` protocol, whose `TestBinding` pairs a
+`ContextParser` with the same `TestSyntax` used by `TestIntegrityRule`. The gate
+itself imports no snapshot, language or plugin module: reading baseline blobs
+belongs to `snapshots.py`, and parser/syntax assembly belongs to application
+composition.
+
+`plugins/builtins.py` exposes `builtin_deletion_gate()`, symmetric with
+`builtin_registry()`. It iterates `builtin_languages()`, attaches each plugin's
+parser, and selects the matching `TestSyntax`; TypeScript and TSX reuse
+`JavaScriptTestSyntax`. The private bindings container implements
+`BaselineParsing`. The gate is not registered by any analyzer, so
+`AnalysisProfile.required_rules` does not apply to it; this is a deliberate,
+documented exception for run-level checks. Its single diagnostic remains part of
+the policy switch, and `enabled: false` skips the gate.
+
+`cli.py` invokes the gate only for `--base` and `--staged`. It reads changed
+paths, asks the gate for current changed test candidates, reads their baseline
+blobs, collects deleted-file baselines, then merges the returned findings with
+analyzer findings under the same sort key. `--all` never activates the gate.
+Deleted files are not analyzed inputs, so report `files` counts current selected
+sources only; deletion findings are file-scoped and anchored at line 1, column 1.
+Infrastructure failures such as an unmerged staged index or a non-UTF-8 baseline
+blob fail closed through the existing CLI error path.
+
 ## Extending the application
 
 A shared rule consumes the same concrete context regardless of source language:

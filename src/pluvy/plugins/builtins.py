@@ -85,7 +85,8 @@ from pluvy.semantics.options import BOUNDARY, USAGE_RULES
 from pluvy.semantics.projection.contracts import ProjectionSyntax
 from pluvy.semantics.projection.options import GUARDED_PROJECTION
 from pluvy.semantics.projection.rules import GuardedProjectionRule
-from pluvy.semantics.testing.contracts import TestSyntax
+from pluvy.semantics.testing.contracts import TestBinding, TestSyntax
+from pluvy.semantics.testing.gate import TestDeletionGate
 from pluvy.semantics.testing.options import TEST_INTEGRITY
 from pluvy.semantics.testing.rules import TestIntegrityRule
 from pluvy.semantics.usage import UsageRule
@@ -131,6 +132,36 @@ def builtin_languages() -> tuple[LanguagePlugin, ...]:
         TsxLanguage(),
         JavaLanguage(),
     )
+
+
+@dataclass(frozen=True)
+class _DeletionBindings:
+    """Resolve the test capability that owns each registered language."""
+
+    bindings: dict[Language, TestBinding]
+
+    def binding_for(self, language: Language) -> TestBinding | None:
+        return self.bindings.get(language)
+
+
+def builtin_deletion_gate() -> TestDeletionGate:
+    """Compose baseline test parsing for every registered grammar."""
+    syntaxes: dict[Language, TestSyntax] = {
+        Language.PYTHON: PythonTestSyntax(),
+        Language.GO: GoTestSyntax(),
+        Language.JAVASCRIPT: JavaScriptTestSyntax(),
+        Language.TYPESCRIPT: JavaScriptTestSyntax(),
+        Language.TSX: JavaScriptTestSyntax(),
+        Language.JAVA: JavaTestSyntax(),
+    }
+    bindings: dict[Language, TestBinding] = {}
+    for plugin in builtin_languages():
+        language = plugin.definition.language
+        syntax = syntaxes.get(language)
+        if syntax is None:
+            raise AnalysisError(f"No test syntax registered for {language}")
+        bindings[language] = TestBinding(plugin.parser, syntax)
+    return TestDeletionGate(_DeletionBindings(bindings))
 
 
 def _compose(
