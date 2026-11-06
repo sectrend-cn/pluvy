@@ -141,7 +141,12 @@ def test_global_scope_and_disabled_checkers_are_reported(
 
 def test_disabling_all_analyzer_rules_skips_parsing() -> None:
     analyzer = builtin_analyzers()[0]
-    names = ("function_size", *(name for name in analyzer.rule_ids if not name.startswith("size.")))
+    names = (
+        "function_size",
+        "test.integrity",
+        "flow.handling",
+        *(name for name in analyzer.rule_ids if not name.startswith(("size.", "test.", "flow."))),
+    )
     settings = ",".join(f'"{name}":{{"enabled":false}}' for name in names)
     policy = Policy.model_validate_json('{"checkers":{' + settings + "}}")
     source = Source("app.py", b"def broken(:", Language.PYTHON)

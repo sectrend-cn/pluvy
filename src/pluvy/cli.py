@@ -8,10 +8,21 @@ from pydantic import ValidationError
 
 from pluvy.diagnostics import AnalysisError, Finding, GateError, Report
 from pluvy.engine import registry
+from pluvy.plugins.builtins import builtin_deletion_gate
 from pluvy.plugins.registry import AnalyzerRegistry
 from pluvy.policy.models import Policy
 from pluvy.semantics.usage import USAGE_RULES
-from pluvy.snapshots import Selection, git, read_disk, read_index, sources, usage_sources
+from pluvy.snapshots import (
+    Selection,
+    baseline_sources,
+    changed_paths,
+    deleted_sources,
+    git,
+    read_disk,
+    read_index,
+    sources,
+    usage_sources,
+)
 from pluvy.source import Source
 
 
@@ -99,7 +110,10 @@ def main(arguments: list[str] | None = None, analyzers: AnalyzerRegistry | None 
         evidence = _usage_evidence(selection, inputs, policy, analyzers)
         findings = tuple(
             sorted(
-                analyzers.analyze_sources(inputs, policy, evidence),
+                (
+                    *analyzers.analyze_sources(inputs, policy, evidence),
+                    *_deletion_findings(selection, inputs, policy, analyzers),
+                ),
                 key=_sort_key,
             )
         )
@@ -124,3 +138,18 @@ def _usage_evidence(
     if not inputs or all(rule in policy.checkers.disabled_rules() for rule in USAGE_RULES):
         return ()
     return inputs if selection.mode == "all" else usage_sources(selection, policy, analyzers)
+
+
+def _deletion_findings(
+    selection: Selection, inputs: tuple[Source, ...], policy: Policy, analyzers: AnalyzerRegistry
+) -> tuple[Finding, ...]:
+    if selection.mode == "all":
+        return ()
+    gate = builtin_deletion_gate()
+    if all(rule in policy.checkers.disabled_rules() for rule in gate.rule_ids):
+        return ()
+    changed = changed_paths(selection)
+    candidates = gate.candidates(inputs, changed, policy)
+    baselines = baseline_sources(selection, tuple(source.path for source in candidates), analyzers)
+    deleted = deleted_sources(selection, policy, analyzers)
+    return gate.evaluate(deleted, baselines, inputs, changed, policy)

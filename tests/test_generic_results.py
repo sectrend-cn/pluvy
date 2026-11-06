@@ -225,3 +225,9 @@ def test_go_empty_struct_is_a_value() -> None:
         "func Run() { effect(); transact(func() struct{} { return struct{}{} }) }\n"
     )
     assert len(_returns(code, Language.GO)) == 1
+
+
+def test_python_bare_print_has_no_known_discarded_result() -> None:
+    """An unresolved builtin return value is not guessed as a value result."""
+    code = 'print("done")\nprint("done", "again")\n'
+    assert _returns(code, Language.PYTHON) == ()

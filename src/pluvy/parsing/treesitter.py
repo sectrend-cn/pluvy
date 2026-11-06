@@ -64,6 +64,11 @@ def walk(root: Node) -> Iterator[Node]:
         pending.extend(reversed(children))
 
 
+def node_text(node: Node) -> str:
+    """Read exactly the UTF-8 bytes carried by a syntax node."""
+    return (node.text or b"").decode("utf-8")
+
+
 def spelling(node: Node, source: Source) -> str:
     """Read exactly the UTF-8 bytes represented by a syntax node."""
     return source.content[node.start_byte : node.end_byte].decode("utf-8")

@@ -131,9 +131,12 @@ Six analyzers cover seven languages:
 Every checker is enabled by default for every selected file. `enabled: false`
 turns one checker off for all selected files; there is no `enabled` flag scoped
 to one language or one file. The global `include` and `exclude` lists drop files
-from every checker at once. Architecture `placements`, `boundaries` and `paths`
-only select where that one architecture check applies. `owners` is not a file
-selector: once owners are configured and the checker is enabled, every selected
+from every checker at once, except that changed snapshot paths reported by the
+run-level `test.deletion` gate follow the changed set instead (see [its checker
+page](references/checkers/test.deletion.md)). Architecture `placements`,
+`boundaries` and `paths` only select where that one architecture check applies.
+`owners` is not a file selector: once owners are configured and the checker is
+enabled, every selected
 file must match exactly one owner, so an unmatched or doubly matched file is a
 finding. Coverage differences therefore come from the diagnostics each analyzer
 registers.
@@ -158,14 +161,21 @@ What the gate does not do:
 
 ## Checkers and per-language coverage
 
-The schema has 18 logical checkers, which produce 22 built-in diagnostic IDs.
-Function metrics share one checker; the other checker names match their
-diagnostic IDs.
+The schema has 22 logical checkers, which produce 29 built-in diagnostic IDs.
+`function_size` owns the five `size.*` IDs, `test.integrity` owns
+`test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
+`flow.fallback`, and `type.contract` owns `type.nullable` and `type.union`;
+the run-level `test.deletion` owns its single diagnostic outside analyzer
+registration, and every other checker name matches its diagnostic ID.
 
 | Checker | Reports | Languages |
 |---|---|---|
 | [`structure.guarded_projection`](references/checkers/structure.guarded_projection.md) | Repeated guarded field copies in one local region (three distinct destination fields by default) | All |
 | [`function_size`](references/checkers/function_size.md) | Function lines, statements, complexity, nesting and parameters; one switch for five diagnostics | All |
+| [`test.integrity`](references/checkers/test.integrity.md) | Tautological assertions and tests without a meaningful assertion; one switch for two diagnostics | All |
+| [`test.deletion`](references/checkers/test.deletion.md) | Removed test files, assertion erosion and changed snapshot paths in changed audits; one run-level diagnostic with error and warning forms | All; run-level |
+| [`flow.handling`](references/checkers/flow.handling.md) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals; one switch for two diagnostics | Python, Java, JavaScript, JSX, TypeScript, TSX |
+| [`type.contract`](references/checkers/type.contract.md) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions; one switch for two diagnostics | TypeScript, TSX |
 | [`type.annotation`](references/checkers/type.annotation.md) | Broad or bare Python annotations and invalid forward annotations | Python |
 | [`type.signature`](references/checkers/type.signature.md) | Missing Python parameter and return annotations | Python |
 | [`type.broad`](references/checkers/type.broad.md) | Recognized broad type markers and JSON serialization outside proven outputs and permitted library inputs | All; markers differ per language |
@@ -183,23 +193,28 @@ diagnostic IDs.
 | [`architecture.dispatch`](references/checkers/architecture.dispatch.md) | Language and rule identity comparison or match/switch dispatch | All |
 | [`architecture.object_model`](references/checkers/architecture.object_model.md) | Non-underscore module-level functions in configured extension paths; Go reports unexported lowercase package-level functions too, receiver methods and Java are not reported | Python, Go, JavaScript, TypeScript, TSX |
 
-Every analyzer registers the same base set of 17 diagnostic IDs:
+Every analyzer registers the same base set of 19 diagnostic IDs:
 `unused.parameter`, `unused.function`, `unused.field`, `unused.return`,
 `type.boundary`, `type.suppression`, `size.lines`, `size.statements`,
 `size.complexity`, `size.nesting`, `size.parameters`, `architecture.owner`,
 `architecture.structure`, `architecture.import`, `architecture.dispatch`,
-`architecture.object_model` and `structure.guarded_projection`.
+`architecture.object_model`, `structure.guarded_projection`, `test.tautology`
+and `test.vacuous`.
 
-The remaining five diagnostic IDs are registered per language, and a registered
+`test.deletion` is not part of that per-language set: no analyzer registers it,
+and it is produced by the run-level deletion gate only in `--base` and `--staged`
+mode.
+
+The remaining nine diagnostic IDs are registered per language, and a registered
 diagnostic can only report for the analyzer that registered it:
 
 | Analyzer | Additional diagnostic IDs |
 |---|---|
-| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard` |
+| Python | `type.annotation`, `type.signature`, `type.assertion`, `type.broad`, `imports.wildcard`, `flow.swallow` |
 | Go | `type.broad` |
-| Java | `type.assertion`, `type.broad` |
-| JavaScript and JSX | `type.broad` |
-| TypeScript and TSX | `type.assertion`, `type.broad` |
+| Java | `type.assertion`, `type.broad`, `flow.swallow` |
+| JavaScript and JSX | `type.broad`, `flow.swallow`, `flow.fallback` |
+| TypeScript and TSX | `type.assertion`, `type.broad`, `type.nullable`, `type.union`, `flow.swallow`, `flow.fallback` |
 
 Key differences:
 
@@ -207,8 +222,12 @@ Key differences:
   files only.
 - `type.assertion` covers Python, Java, TypeScript and TSX, but not Go or
   JavaScript.
-- `unused.return` is always a warning and never changes the exit code; every
-  other checker reports errors.
+- `type.nullable` and `type.union` appear in TypeScript and TSX files only.
+- `flow.swallow` covers Python, Java and the JavaScript family; `flow.fallback`
+  appears in JavaScript, JSX, TypeScript and TSX files only.
+- `unused.return` is always a warning, snapshot-only `test.vacuous` findings are
+  warnings, and `test.deletion` reports a changed snapshot path as a warning;
+  every other diagnostic reports errors. Warnings never change the exit code.
 - `architecture.object_model` is registered by every analyzer, but only
   grammars with module-level functions can report. Go is included: a
   package-level function whose name does not start with `_` is reported, so an
@@ -333,7 +352,7 @@ first read `.agents/skills/pluvy/SKILL.md` and follow it.
 
 - [Agent integration notes](references/agent-integration.md) — integration
   paths for any agent and the limits that apply.
-- [Checker index](references/checkers.md) — the 18 checkers and the 22
+- [Checker index](references/checkers.md) — the 22 checkers and the 29
   diagnostic IDs, with coverage tables and one page per checker for its role,
   language differences, options, defaults, types and configuration examples.
 - [Approved next-line diagnostic exceptions](references/comment-suppressions.md)

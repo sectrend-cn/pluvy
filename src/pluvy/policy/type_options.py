@@ -19,6 +19,20 @@ SUPPRESSION = CheckerDefinition("type.suppression")
 
 WILDCARD = CheckerDefinition("imports.wildcard")
 
+NULLABLE = "type.nullable"
+
+UNION = "type.union"
+
+TYPE_CONTRACT = CheckerDefinition("type.contract", (NULLABLE, UNION))
+
+
+class TypeContractOptions(CheckerOptions):
+    """Limit nullable declarations, nullish fallbacks and union membership."""
+
+    max_members: int = Field(default=4, ge=1)
+    optional_fields: int = Field(default=3, ge=1)
+    null_defaults: int = Field(default=3, ge=1)
+
 
 class TypeCheckers(CheckerConfiguration):
     """Register owned checker fields and project their execution switches."""
@@ -48,6 +62,11 @@ class TypeCheckers(CheckerConfiguration):
         validation_alias=WILDCARD.name,
         serialization_alias=WILDCARD.name,
     )
+    type_contract: TypeContractOptions = Field(
+        default=TypeContractOptions(),
+        validation_alias=TYPE_CONTRACT.name,
+        serialization_alias=TYPE_CONTRACT.name,
+    )
 
     def checker_states(self) -> tuple[CheckerState, ...]:
         return (
@@ -57,4 +76,5 @@ class TypeCheckers(CheckerConfiguration):
             ASSERTION.configure(self.type_assertion.enabled),
             SUPPRESSION.configure(self.type_suppression.enabled),
             WILDCARD.configure(self.imports_wildcard.enabled),
+            TYPE_CONTRACT.configure(self.type_contract.enabled),
         )

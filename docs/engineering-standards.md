@@ -225,11 +225,18 @@ Approvals granted in other projects do not transfer here.
 | `type.annotation` | Recognized broad/bare Python annotations and forward annotations |
 | `type.signature` | Missing Python parameter/return annotations |
 | `type.broad` | Recognized Python typing markers and internal `json.dumps` erasure, JS/TS `JSON.stringify` erasure, recognized Go/Java serializer erasure, TS broad/empty types, Go empty interfaces/`any`, Java `Object`, unbounded wildcards and recognized raw collections |
+| `type.nullable` | Aggregated optional or nullable properties per TypeScript/TSX type declaration and bare nullish fallbacks per innermost function body |
+| `type.union` | Non-nullish members per TypeScript/TSX union expression after removing `null` and `undefined` |
 | `type.boundary` | Recognized third-party outputs used without typed ingress conversion |
 | `unused.parameter` | Declared parameters without resolved read usage |
 | `unused.function` | Non-exported functions and methods without resolved references |
 | `unused.field` | Fields without reads; initialization and writes do not count |
 | `unused.return` | Warning for a known non-void result discarded at a call site |
+| `test.tautology` | Mirrored positive-equality assertion operands and literal-true assertions |
+| `test.vacuous` | Always-true matchers, assertion-free test bodies and snapshot-only tests (snapshot-only warnings) |
+| `test.deletion` | Changed-audit baseline comparison: deleted test-file baseline parsing, test declaration multisets, assertion counts against `removed_assertions`, and snapshot path globs |
+| `flow.swallow` | Wide catch/except handler or `.catch` callback whose subtree contains no re-throw |
+| `flow.fallback` | `??` chain whose operator count exceeds `max_chain` while every direct default is a bare non-nullish literal |
 | `type.assertion` | Python typing casts, TS assertions except `as const`, TS non-null assertions, Java reference casts |
 | `type.suppression` | Recognized suppression comments and Python no-type-check markers |
 | `imports.wildcard` | Python wildcard imports |
@@ -251,8 +258,12 @@ See [Checker configuration](checker-configuration.md#third-party-boundaries-and-
 for directional examples and semantic resolution limits.
 
 The parser-backed gate is read-only. Checker options are grouped by responsibility;
-`function_size` owns all five function metrics. Other checker keys match their
-diagnostic IDs. Only `include` and `exclude` control global file selection.
+`function_size` owns all five function metrics, `test.integrity` owns
+`test.tautology` and `test.vacuous`, `flow.handling` owns `flow.swallow` and
+`flow.fallback`, and `type.contract` owns `type.nullable`
+and `type.union`. The run-level `test.deletion` owns its single diagnostic
+outside analyzer registration. Every other checker key matches its diagnostic ID. Only
+`include` and `exclude` control global file selection.
 Every checker defaults to enabled; omit default-only entries and `enabled: true`.
 Reports disclose disabled checker names while findings retain their diagnostic IDs.
 Malformed configuration and tool failures fail closed. Syntax rejection emits a
@@ -264,7 +275,15 @@ Changed modes analyze complete snapshots but report affected definitions and
 module statements. Function edits include signatures, decorators and bodies;
 class-header edits select the class. Deletion anchors participate in expansion.
 Ownership and placement still apply to every changed file. Reports disclose this
-scope; full audits expose historical debt. Configuration changes require architecture review;
+scope; full audits expose historical debt.
+
+Known limitation: an edit inside an existing multi-line class field declaration that does not touch
+the diagnostic anchor line (the member's first line) loses member-anchored aggregate or multi-line
+diagnostics in the change modes; `type.broad`, `type.annotation` and `structure.guarded_projection`
+are lost the same way. This is existing engine behaviour (change scopes do not expand class
+members), not a defect introduced by this task; use `--all` to audit such edits.
+
+Configuration changes require architecture review;
 neither excluding debt nor increasing limits is remediation.
 
 ## Semantic review and delivery evidence

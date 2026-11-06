@@ -15,7 +15,7 @@ outside a proven output or a permitted library input.
 | Go | `any` and empty interfaces, plus imported `encoding/json` `Marshal`/`MarshalIndent` results |
 | Java | `java.lang.Object`, unbounded wildcards and recognized raw collections, plus recognized Gson/Jackson results |
 | JavaScript and JSX | `JSON.stringify` results only; JavaScript has no type annotations to check |
-| TypeScript and TSX | `any`, `unknown`, `object` and empty object types, plus `JSON.stringify` results |
+| TypeScript and TSX | `any`, `unknown`, `object` and empty object types, plus `JSON.stringify` results; a generic type argument such as the second `unknown` in `Record<string, unknown>` is matched at its own node |
 
 An encoding is permitted when it flows exclusively to a proven output or to a
 configured library input. Unshadowed `print`, standard streams, `pathlib`

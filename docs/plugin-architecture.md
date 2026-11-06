@@ -71,6 +71,11 @@ cycles, shadowing and multiple assignments do not become guessed destinations.
 traversal. Both third-party boundary evidence and serialization checks use this
 same algorithm. An internal use cannot be hidden by another permitted output use.
 
+`semantics/failure.py` owns the separate `builtin.failure` policy bundle, which
+reports swallowed wide captures and coalescing chains that hide failures behind
+literal defaults. It shares no traversal or evidence with `semantics/flow.py`,
+whose carrier forwarding serves encoding output proof.
+
 `EncodingRule` consumes `EncodingSyntax`, which identifies encoders, decoders,
 argument consumers and actual output APIs. Its `argument` capability returns the
 canonical `ParameterSlot` for a payload; this lets shared semantics enforce
@@ -125,6 +130,38 @@ dispatch in the shared filter.
 Custom `TypedAnalyzer` compositions must supply this capability for changed-scope
 runs; missing capability fails visibly instead of silently claiming scoped checks.
 Full-source library calls remain compatible with the default `Source` constructor.
+
+## Run-level deletion gate
+
+`TestDeletionGate` in `semantics/testing/gate.py` is a run-level execution shape,
+not a `RuleBundle`. It consumes the baseline evidence ports supplied by the CLI
+and the narrow `BaselineParsing` protocol, whose `TestBinding` pairs a
+`ContextParser` with the same `TestSyntax` used by `TestIntegrityRule`. The gate
+itself imports no snapshot, language or plugin module: reading baseline blobs
+belongs to `snapshots.py`, and parser/syntax assembly belongs to application
+composition.
+
+`plugins/builtins.py` exposes `builtin_deletion_gate()`, symmetric with
+`builtin_registry()`. It iterates `builtin_languages()`, attaches each plugin's
+parser, and selects the matching `TestSyntax`; TypeScript and TSX reuse
+`JavaScriptTestSyntax`. The private bindings container implements
+`BaselineParsing`. Gate bindings are fixed to the built-in language set: a custom
+`AnalyzerRegistry` passed to `main(..., analyzers=...)` does not participate in
+gate composition, so a deleted file in a language outside that set is selected
+from the diff but has no binding and is skipped silently. The gate is not
+registered by any analyzer, so
+`AnalysisProfile.required_rules` does not apply to it; this is a deliberate,
+documented exception for run-level checks. Its single diagnostic remains part of
+the policy switch, and `enabled: false` skips the gate.
+
+`cli.py` invokes the gate only for `--base` and `--staged`. It reads changed
+paths, asks the gate for current changed test candidates, reads their baseline
+blobs, collects deleted-file baselines, then merges the returned findings with
+analyzer findings under the same sort key. `--all` never activates the gate.
+Deleted files are not analyzed inputs, so report `files` counts current selected
+sources only; deletion findings are file-scoped and anchored at line 1, column 1.
+Infrastructure failures such as an unmerged staged index or a non-UTF-8 baseline
+blob fail closed through the existing CLI error path.
 
 ## Extending the application
 

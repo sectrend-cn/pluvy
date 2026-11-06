@@ -151,6 +151,11 @@
             "pluvy.semantics.usage.UsageRule",
             "pluvy.semantics.projection.rules",
             "pluvy.semantics.projection.rules.*",
+            "pluvy.semantics.testing.rules",
+            "pluvy.semantics.testing.rules.*",
+            "pluvy.semantics.testing.gate",
+            "pluvy.semantics.testing.gate.*",
+            "pluvy.semantics.failure.FailureFlowRule",
             "pluvy.semantics.boundaries.BoundaryRule",
             "pluvy.suppressions.SuppressionRule"
           ]

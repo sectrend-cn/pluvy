@@ -19,8 +19,10 @@ from pluvy.semantics.encoding_options import BroadTypeOptions as BroadTypeOption
 from pluvy.semantics.encoding_options import EncodingCheckers
 from pluvy.semantics.encoding_options import EncodingOptions as EncodingOptions
 from pluvy.semantics.encoding_options import OutputApi as OutputApi
+from pluvy.semantics.failure_options import FailureCheckers
 from pluvy.semantics.options import SemanticCheckers
 from pluvy.semantics.projection.options import ProjectionCheckers
+from pluvy.semantics.testing.options import TestingCheckers
 
 
 class Checkers(
@@ -30,6 +32,8 @@ class Checkers(
     SemanticCheckers,
     TypeCheckers,
     ProjectionCheckers,
+    TestingCheckers,
+    FailureCheckers,
 ):
     """Compose supported checker schemas without redeclaring their options or identities."""
 
