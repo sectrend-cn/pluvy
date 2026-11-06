@@ -81,7 +81,7 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--ink);
   outline-offset: 5px;
 }
 
@@ -136,15 +136,16 @@ svg {
   }
 }
 
-[data-reveal] {
-  animation: section-reveal 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-timeline: view();
-  animation-range: entry 0% entry 32%;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-reveal] {
-    animation: none;
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-reveal] {
+      animation-name: section-reveal;
+      animation-duration: auto;
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      animation-fill-mode: both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 32%;
+    }
   }
 }
 
@@ -201,6 +202,28 @@ svg {
   background: var(--accent-hover);
 }
 
+.legible {
+  position: relative;
+  isolation: isolate;
+}
+
+.legible::before {
+  position: absolute;
+  inset: -2.5rem -3rem;
+  z-index: -1;
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  content: '';
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 3rem, #000 calc(100% - 3rem), transparent),
+    linear-gradient(to bottom, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 3rem, #000 calc(100% - 3rem), transparent),
+    linear-gradient(to bottom, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+  mask-composite: intersect;
+}
+
 .text-link {
   display: inline-flex;
   align-items: center;
@@ -208,15 +231,25 @@ svg {
   font-family: var(--mono);
   font-size: 0.75rem;
   font-weight: 600;
+  padding-block: 0.8rem;
+  margin-block: -0.8rem;
   text-decoration: none;
 }
 
 .text-link::after {
-  content: '↗';
+  content: '→';
   transition: transform 160ms ease;
 }
 
 .text-link:hover::after {
+  transform: translateX(3px);
+}
+
+.text-link[href^='http']::after {
+  content: '↗';
+}
+
+.text-link[href^='http']:hover::after {
   transform: translate(2px, -2px);
 }
 
@@ -240,5 +273,17 @@ svg {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  [data-reveal] {
+    animation: none;
+  }
+
+  [data-dot-matrix],
+  .theme-toggle,
+  .skip-link {
+    display: none;
   }
 }

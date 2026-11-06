@@ -21,7 +21,7 @@ button,
   white-space: nowrap;
 }
 
-.exit-codes strong,
+.exit-codes dt,
 .principles__list > li > span,
 .post-list__date,
 td,

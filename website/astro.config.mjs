@@ -51,13 +51,20 @@ export default defineConfig({
         Pagination: './src/components/docs/DocsPagination.astro',
       },
       disable404Route: true,
+      defaultLocale: 'root',
+      locales: {
+        root: { label: 'English', lang: 'en' },
+        zh: { label: '简体中文', lang: 'zh-CN' },
+      },
       sidebar: [
         {
           label: 'Start',
-          items: [{ label: 'Getting started', slug: 'docs/getting-started' }],
+          translations: { 'zh-CN': '开始' },
+          items: [{ label: 'Getting started', translations: { 'zh-CN': '快速入门' }, slug: 'docs/getting-started' }],
         },
         {
           label: 'Configure & Run',
+          translations: { 'zh-CN': '配置与运行' },
           items: [
             { label: 'Checker configuration', slug: 'docs/checker-configuration' },
             { label: 'Diagnostic exceptions', slug: 'docs/comment-suppressions' },
@@ -65,10 +72,12 @@ export default defineConfig({
         },
         {
           label: 'Integrate',
+          translations: { 'zh-CN': '集成' },
           items: [{ label: 'Agent review', slug: 'docs/agent-review' }],
         },
         {
           label: 'Design & Reference',
+          translations: { 'zh-CN': '设计与参考' },
           items: [
             { label: 'Engineering standards', slug: 'docs/engineering-standards' },
             { label: 'Plugin architecture', slug: 'docs/plugin-architecture' },

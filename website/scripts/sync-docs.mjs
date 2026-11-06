@@ -6,27 +6,55 @@ const websiteRoot = path.dirname(fileURLToPath(new URL('../package.json', import
 const sourceRoot = path.join(websiteRoot, '..', 'docs');
 const outputRoot = path.join(websiteRoot, 'src', 'content', 'docs');
 const repository = 'https://github.com/sectrend-cn/pluvy/blob/main';
+const siteBase = '/pluvy';
 
-function frontmatter(source, filename) {
+const locales = [
+  { source: sourceRoot, output: outputRoot, slugPrefix: 'docs', repositoryPrefix: '../' },
+  { source: path.join(sourceRoot, 'zh'), output: path.join(outputRoot, 'zh'), slugPrefix: 'zh/docs', repositoryPrefix: '../../' },
+];
+
+function frontmatter(source, filename, slugPrefix) {
   const heading = source.match(/^#\s+(.+)$/m)?.[1] ?? filename;
-  const slug = `docs/${filename.replace(/\.md$/, '')}`;
+  const slug = `${slugPrefix}/${filename.replace(/\.md$/, '')}`;
   return `---\ntitle: ${JSON.stringify(heading)}\nslug: ${slug}\n---\n\n`;
 }
 
-function transformBody(source) {
-  return source.replace(/^#\s+.+(?:\r?\n)+/, '')
-    .replaceAll('../README.md', `${repository}/README.md`)
-    .replaceAll('../examples/', `${repository}/examples/`)
-    .replaceAll('../.agents/', `${repository}/.agents/`)
-    .replaceAll('zh/getting-started.md', `${repository}/docs/zh/getting-started.md`);
+function rewriteTarget(target, locale) {
+  const [file, anchor] = target.split('#');
+  const suffix = anchor ? `#${anchor}` : '';
+  if (file.startsWith(locale.repositoryPrefix)) {
+    return `${repository}/${file.slice(locale.repositoryPrefix.length)}${suffix}`;
+  }
+  if (locale.slugPrefix === 'docs' && file === 'zh/getting-started.md') {
+    return `${siteBase}/zh/docs/getting-started/${suffix}`;
+  }
+  if (locale.slugPrefix === 'zh/docs' && file === '../getting-started.md') {
+    return `${siteBase}/docs/getting-started/${suffix}`;
+  }
+  const sibling = locale.slugPrefix === 'zh/docs' ? file.replace(/^\.\.\//, '') : file;
+  if (/^[\w-]+\.md$/.test(sibling)) {
+    return `${siteBase}/${locale.slugPrefix}/${sibling.replace(/\.md$/, '')}/${suffix}`;
+  }
+  return target;
+}
+
+function transformBody(source, locale) {
+  return source
+    .replace(/^#\s+.+(?:\r?\n)+/, '')
+    .replace(/\]\(([^)\s]+)\)/g, (match, target) => {
+      if (/^(?:[a-z]+:|#|\/)/.test(target)) return match;
+      return `](${rewriteTarget(target, locale)})`;
+    });
 }
 
 await rm(outputRoot, { recursive: true, force: true });
-await mkdir(outputRoot, { recursive: true });
-const entries = await readdir(sourceRoot, { withFileTypes: true });
-for (const entry of entries) {
-  if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
-  const source = await readFile(path.join(sourceRoot, entry.name), 'utf8');
-  const transformed = frontmatter(source, entry.name) + transformBody(source);
-  await writeFile(path.join(outputRoot, entry.name), transformed);
+for (const locale of locales) {
+  await mkdir(locale.output, { recursive: true });
+  const entries = await readdir(locale.source, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+    const source = await readFile(path.join(locale.source, entry.name), 'utf8');
+    const transformed = frontmatter(source, entry.name, locale.slugPrefix) + transformBody(source, locale);
+    await writeFile(path.join(locale.output, entry.name), transformed);
+  }
 }
