@@ -17,18 +17,11 @@ A Chinese translation of this page is available at
 - Python 3.12 or later.
 - Using `uv` to manage a dedicated tool environment is recommended; for obtaining `uv` itself and
   for the repository development commands, see
-  [the Run section of the README](../README.md#run).
-
-### Obtaining the source
-
-Obtain a source checkout of pluvy (clone the repository, or unpack the source archive you
-received). Throughout this page `/path/to/pluvy` refers to that checkout directory. The
-checkout holds the tool's source, the sample policies under `examples/`, and the
-`.agents/skills/pluvy/` skill.
+  [the Development section of the README](../README.md#development).
 
 ### Installation from PyPI
 
-Install the published command line:
+Install the published command line from [PyPI](https://pypi.org/project/pluvy/):
 
 ```sh
 uv tool install pluvy
@@ -40,14 +33,18 @@ Without uv, the pip equivalent is:
 python -m pip install pluvy
 ```
 
-To follow an unreleased change, replace `pluvy` with `/path/to/pluvy` in either command and install
-from that checkout. The PyPI package contains the tool only, so take the sample policies under
-`examples/` and the `.agents/skills/pluvy/` skill from a checkout or the repository when you need
-them.
+To run once without installing, use `uvx pluvy --all`.
 
 The installation places `pluvy` in the user-level executable directory (for example
 `~/.local/bin`), so make sure that directory is on your `PATH`. If a uv tool installation of the same
 name already exists and you need to replace it, pass `--force` to `uv tool install`.
+
+### Obtaining the source
+
+The PyPI package contains the tool only. The sample policies under `examples/` and the
+`.agents/skills/pluvy/` skill live in the [repository](https://github.com/sectrend-cn/pluvy); clone
+it when you need them. Throughout this page `/path/to/pluvy` refers to that checkout directory. To
+follow an unreleased change, replace `pluvy` with `/path/to/pluvy` in either install command.
 
 ### Verification
 
@@ -63,14 +60,9 @@ the target repository; if the target repository has no policy yet as described i
 [Configuration](#configuration), that command reports that no policy file was found and exits 2,
 which is expected behaviour — finish the configuration first and then come back to verify.
 
-### Container usage
-
-To run in a container with the target repository mounted read-only, see
-[the Integration section of the README](../README.md#integration).
-
 ### Obtaining the skill
 
-The skill that agents use comes from the same source checkout: copy `.agents/skills/pluvy/`
+The skill that agents use comes from the repository: copy `.agents/skills/pluvy/`
 from the checkout to the consuming project's skill location. See
 [Agent integration](#agent-integration) for the integration paths.
 
@@ -244,7 +236,7 @@ count as a pass when the task really changed code.
 
 ## Agent integration
 
-The skill directory comes from `.agents/skills/pluvy/` in the source checkout (with
+The skill directory comes from `.agents/skills/pluvy/` in the repository checkout (with
 `SKILL.md` and `references/`). Three integration paths:
 
 1. **Native skills directory**: when the consuming project follows the skills-directory convention,

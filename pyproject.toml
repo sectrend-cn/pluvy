@@ -7,18 +7,36 @@ name = "pluvy"
 dynamic = ["version"]
 description = "Read-only, parser-backed engineering policy gate for Python, Go, Java, JavaScript and TypeScript"
 readme = "README.md"
+requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["static-analysis", "policy", "tree-sitter", "code-review", "engineering-standards"]
+authors = [{ name = "Sectrend Information Technology Co., Ltd." }]
+keywords = [
+  "static-analysis",
+  "policy",
+  "tree-sitter",
+  "code-review",
+  "engineering-standards",
+  "linter",
+  "architecture",
+  "code-quality",
+  "ai-agents",
+  "ci",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Go",
+  "Programming Language :: Java",
+  "Programming Language :: JavaScript",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
 ]
-requires-python = ">=3.12"
 dependencies = [
   "pydantic>=2.10,<3",
   "tree-sitter>=0.25,<0.26",
@@ -37,7 +55,7 @@ pluvy = "pluvy.cli:main"
 [project.urls]
 Homepage = "https://sectrend-cn.github.io/pluvy/"
 Repository = "https://github.com/sectrend-cn/pluvy"
-Documentation = "https://github.com/sectrend-cn/pluvy/blob/main/docs/getting-started.md"
+Documentation = "https://sectrend-cn.github.io/pluvy/docs/getting-started/"
 Issues = "https://github.com/sectrend-cn/pluvy/issues"
 
 [tool.hatch.version]
