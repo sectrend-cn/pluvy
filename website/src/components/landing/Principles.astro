@@ -12,14 +12,14 @@ const content = landingContent[lang].principles;
 
 <section class="principles shell" aria-labelledby="principles-title" data-reveal>
   <div class="principles__heading">
-    <h2 id="principles-title" class="display-title"><TextSegments text={content.titleA} lang={lang} /><br /><em><TextSegments text={content.titleB} lang={lang} /></em></h2>
+    <h2 id="principles-title" class="display-title"><TextSegments text={content.titleA} lang={lang} />{' '}<br /><em><TextSegments text={content.titleB} lang={lang} /></em></h2>
   </div>
-  <ol class="principles__list">
+  <ol class="principles__list legible">
     {content.items.map((item) => (
       <li>
         <span>{item.number}</span>
         <h3><TextSegments text={item.title} lang={lang} /></h3>
-        <p>{item.description}{item.code && <code>{item.code}</code>}{lang === 'en' && item.code ? '.' : ''}</p>
+        <p>{item.before}{item.code && <code>{item.code}</code>}{item.after}</p>
       </li>
     ))}
   </ol>
@@ -48,7 +48,6 @@ const content = landingContent[lang].principles;
     position: relative;
     padding: 2rem 0 2rem 3.5rem;
     border-top: 1px solid var(--line);
-    text-shadow: 0 0 10px var(--paper), 0 0 3px var(--paper);
   }
 
   .principles__list li:last-child {
@@ -60,7 +59,7 @@ const content = landingContent[lang].principles;
     top: 2.25rem;
     left: 0;
     font-family: var(--mono);
-    font-size: 0.65rem;
+    font-size: 0.7rem;
   }
 
   h3 {

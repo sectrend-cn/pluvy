@@ -1,6 +1,6 @@
 ---
 import logo from '../assets/pluvy-natural-neck.svg';
-import { headerContent, type Language } from '../i18n.ts';
+import { docsPath, headerContent, type Language } from '../i18n.ts';
 
 interface Props {
   overlay?: boolean;
@@ -23,7 +23,7 @@ const languageAria = lang === 'zh-CN' ? 'Switch to English' : '切换到简体�
       <span>PLUVY</span>
     </a>
     <nav class="site-nav" aria-label={content.navigation}>
-      <a href={`${base}docs/getting-started/`} data-truncate>{content.docs}</a>
+      <a href={`${base}${docsPath(lang)}/getting-started/`} data-truncate>{content.docs}</a>
       <a href={`${base}blog/`} data-truncate>{content.blog}</a>
       <a href="https://github.com/sectrend-cn/pluvy" rel="external" data-truncate>GitHub <span aria-hidden="true">↗</span></a>
       {languagePicker && (
@@ -180,15 +180,26 @@ const languageAria = lang === 'zh-CN' ? 'Switch to English' : '切换到简体�
 
   .site-nav a {
     position: relative;
-    padding-block: 0.5rem;
+    margin: -0.8rem -0.4rem;
+    padding: 0.8rem 0.4rem;
     text-decoration: none;
+  }
+
+  .theme-toggle {
+    position: relative;
+  }
+
+  .theme-toggle::before {
+    position: absolute;
+    inset: -0.35rem;
+    content: '';
   }
 
   .site-nav a::after {
     position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: 0.4rem;
+    bottom: 0.3rem;
+    left: 0.4rem;
     height: 1px;
     background: currentColor;
     content: '';
@@ -219,7 +230,12 @@ const languageAria = lang === 'zh-CN' ? 'Switch to English' : '切换到简体�
 
     .site-nav {
       gap: 0.9rem;
-      font-size: 0.65rem;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .brand span {
+      display: none;
     }
   }
 </style>
