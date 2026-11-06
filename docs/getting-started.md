@@ -26,19 +26,24 @@ received). Throughout this page `/path/to/pluvy` refers to that checkout directo
 checkout holds the tool's source, the sample policies under `examples/`, and the
 `.agents/skills/pluvy/` skill.
 
-### Local installation
+### Installation from PyPI
 
-Install the command line from that checkout directory:
+Install the published command line:
 
 ```sh
-uv tool install /path/to/pluvy
+uv tool install pluvy
 ```
 
 Without uv, the pip equivalent is:
 
 ```sh
-python -m pip install /path/to/pluvy
+python -m pip install pluvy
 ```
+
+To follow an unreleased change, replace `pluvy` with `/path/to/pluvy` in either command and install
+from that checkout. The PyPI package contains the tool only, so take the sample policies under
+`examples/` and the `.agents/skills/pluvy/` skill from a checkout or the repository when you need
+them.
 
 The installation places `pluvy` in the user-level executable directory (for example
 `~/.local/bin`), so make sure that directory is on your `PATH`. If a uv tool installation of the same
