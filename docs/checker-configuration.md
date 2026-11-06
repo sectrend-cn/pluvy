@@ -201,8 +201,10 @@ reports one error with its baseline declaration and assertion counts. A survivin
 changed test file is compared with its baseline: a missing declaration name in
 the multiset or an assertion count fall greater than `removed_assertions` reports
 one error per file. A changed path matching `snapshot_paths` reports one warning
-per path. Exact 100% renames are excluded from both the deletion and changed-path
-sets, so a partial rename still appears as a deletion.
+per path. Snapshot warnings are path signals over the changed set; global
+`include`/`exclude` do not filter them, so tighten `snapshot_paths` or disable the
+checker instead. Exact 100% renames are excluded from both the deletion and
+changed-path sets, so a partial rename still appears as a deletion.
 
 Next-line suppression is unavailable. A deleted file has no current snapshot, and
 an erosion finding has no corresponding current defect node, so

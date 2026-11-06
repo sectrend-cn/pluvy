@@ -8,7 +8,7 @@ import pytest
 
 from pluvy.analysis.context import TreeContext
 from pluvy.cli import main
-from pluvy.diagnostics import ParseWarning, Report, SyntaxFailure
+from pluvy.diagnostics import GateError, ParseWarning, Report, SyntaxFailure
 from pluvy.languages.javascript.test_syntax import JavaScriptTestSyntax
 from pluvy.languages.python.test_syntax import PythonTestSyntax
 from pluvy.plugins.builtins import (
@@ -19,7 +19,15 @@ from pluvy.plugins.builtins import (
 from pluvy.policy.models import Policy
 from pluvy.semantics.testing.contracts import TestBinding as _TestBinding
 from pluvy.semantics.testing.gate import TestDeletionGate as _TestDeletionGate
-from pluvy.snapshots import Selection, baseline_sources, changed_paths, deleted_sources
+from pluvy.snapshots import (
+    Selection,
+    baseline_sources,
+    changed_paths,
+    deleted_sources,
+)
+from pluvy.snapshots import (
+    git as snapshot_git,
+)
 from pluvy.source import Language, Source
 
 _TEST_BODY = (
@@ -507,3 +515,72 @@ def test_baseline_sources_skips_missing_and_unregistered_paths(repository: Path)
     )
     assert [source.path for source in baselines] == ["test_sample.py"]
     assert baselines[0].content.startswith(b"def test_alpha")
+
+
+def test_deletion_directive_is_invalid_and_does_not_suppress_gate(
+    repository: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (repository / "test_sample.py").write_text(
+        "def test_alpha() -> None:\n"
+        "    assert value(1) == 1\n"
+        "    assert value(2) == 2\n\n"
+        "def test_beta() -> None:\n"
+        "    assert value(3) == 3\n\n"
+        "def value(item: int) -> int:\n"
+        "    return item\n"
+    )
+    _commit(repository, "declaration baseline")
+    (repository / "test_sample.py").write_text(
+        "def test_alpha() -> None:\n"
+        "    # pluvy: ignore-next-line test.deletion -- approved exception\n"
+        "    assert value(1) == 1\n"
+        "    assert value(2) == 2\n\n"
+        "def value(item: int) -> int:\n"
+        "    return item\n"
+    )
+    assert main(["--root", str(repository), "--base", "HEAD", "--format", "json"]) == 1
+    findings = {
+        (finding.rule, finding.path, finding.line, finding.severity)
+        for finding in _report(capsys).findings
+    }
+    assert ("test.deletion", "test_sample.py", 1, "error") in findings
+    assert ("type.suppression", "test_sample.py", 2, "error") in findings
+
+
+def test_deleted_snapshot_path_is_a_warning(
+    repository: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (repository / "widget.snap").write_text("recorded\n")
+    _commit(repository, "snapshot baseline")
+    (repository / "widget.snap").unlink()
+    assert main(["--root", str(repository), "--base", "HEAD", "--format", "json"]) == 0
+    assert [
+        (finding.path, finding.rule, finding.severity, finding.scope)
+        for finding in _report(capsys).findings
+    ] == [("widget.snap", "test.deletion", "warning", "file")]
+
+
+def test_staged_exact_rename_is_silent(
+    repository: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _git(repository, "mv", "test_sample.py", "test_renamed.py")
+    _git(repository, "add", "-A")
+    assert main(["--root", str(repository), "--staged", "--format", "json"]) == 0
+    assert [
+        finding for finding in _report(capsys).findings if finding.rule == "test.deletion"
+    ] == []
+
+
+def test_baseline_sources_surfaces_git_failure(
+    repository: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def failing_git(root: Path, arguments: tuple[str, ...]) -> bytes:
+        if arguments[:1] == ("ls-tree",):
+            raise GateError("simulated ls-tree failure")
+        return snapshot_git(root, arguments)
+
+    monkeypatch.setattr("pluvy.snapshots.git", failing_git)
+    selection = Selection(repository, "base", "HEAD")
+    with pytest.raises(GateError, match="simulated ls-tree failure"):
+        baselines = baseline_sources(selection, ("test_sample.py",), builtin_registry())
+        pytest.fail(f"baseline_sources returned {len(baselines)} sources instead of failing")

@@ -35,7 +35,8 @@ baseline syntax is rejected.
 A changed path matching `snapshot_paths` reports one warning per path. Addition,
 modification, deletion and both sides of a non-exact rename are included, and in
 `--base` mode an untracked snapshot file is included too. Snapshot content is not
-compared.
+compared. Global `include` and `exclude` do not filter this path signal; tighten
+`snapshot_paths` or disable the checker instead.
 
 The gate does not use next-line suppression: a deleted file has no current
 snapshot, and an erosion finding has no corresponding current defect node. A
@@ -51,8 +52,10 @@ Declaration and assertion recognition belongs to
 [`test.integrity`](test.integrity.md); this page does not duplicate it. The known
 false-positive surface follows from that comparison: legitimately deleting an
 obsolete test, or renaming a test declaration, is reported because no similarity
-or intent analysis exists. Tighten the test globs or disable the checker for such
-a deliberate change.
+or intent analysis exists. A deleted helper file that matches the test globs, such
+as a `tests/` support module, is reported with zero baseline declarations and zero
+assertions for the same reason. Tighten the test globs or disable the checker for
+such a deliberate change.
 
 Correct diff — a deliberate obsolete-test removal scopes the checker away in the
 same change:
