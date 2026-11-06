@@ -1,0 +1,39 @@
+name: Recover the v0.0.1 PyPI release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-pypi:
+    name: Publish the existing v0.0.1 distributions to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pluvy/0.0.1/
+    steps:
+      - name: Download and verify the published v0.0.1 distributions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          gh release download v0.0.1 --repo sectrend-cn/pluvy \
+            --pattern pluvy-0.0.1-py3-none-any.whl --dir dist
+          gh release download v0.0.1 --repo sectrend-cn/pluvy \
+            --pattern pluvy-0.0.1.tar.gz --dir dist
+          printf '%s  %s\n' \
+            c7e6cf301c30c11d3e7f059b101b3f7ce02d7589d000a457c40d0ca6b30fb5ef \
+            dist/pluvy-0.0.1-py3-none-any.whl \
+            0f22655dfa2969b1a10abd0dad5131ab912fece5e10516b16da1bca21080f503 \
+            dist/pluvy-0.0.1.tar.gz | shasum -a 256 -c -
+      - name: Upload the verified distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/
+          attestations: false
+          print-hash: true
