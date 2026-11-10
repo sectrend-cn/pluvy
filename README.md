@@ -165,10 +165,6 @@ Language plugins own suffixes and grammar interpretation; rules implement
 `RuleBundle` over a shared `TreeContext`. See
 [Plugin architecture](docs/plugin-architecture.md).
 
-Agent review rules are a programmatic extension point: they are registered in
-Python, not enabled from the JSON policy, and invoke an ACP agent that submits
-findings through MCP tools. See [Agent review](docs/agent-review.md).
-
 ## Development
 
 Set up a development environment from this checkout:

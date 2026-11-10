@@ -8,6 +8,16 @@ from pluvy.parsing.treesitter import TreeParser
 from pluvy.source import Language, LanguageDefinition
 
 
+def _is_single_suffix(suffix: str) -> bool:
+    """Accept one dot followed by a non-empty name without separators or further dots.
+
+    The rule is spelled out instead of delegated to ``PurePosixPath.suffix``, whose
+    treatment of a trailing dot differs between Python releases.
+    """
+    name = suffix.removeprefix(".")
+    return suffix.startswith(".") and bool(name) and "." not in name and "/" not in name
+
+
 class LanguagePlugin(Protocol):
     """Own an identity, its suffixes and its tree-sitter parser."""
 
@@ -33,7 +43,7 @@ class LanguageRegistry:
         if not suffixes or len(set(suffixes)) != len(suffixes):
             raise AnalysisError(f"Invalid suffix declarations for language: {definition.language}")
         for suffix in suffixes:
-            if PurePosixPath("source" + suffix).suffix != suffix or not suffix.startswith("."):
+            if not _is_single_suffix(suffix):
                 raise AnalysisError(f"Invalid language suffix: {suffix}")
             if suffix in self._suffixes:
                 raise AnalysisError(f"Conflicting language suffix: {suffix}")

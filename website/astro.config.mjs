@@ -78,11 +78,6 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Integrate',
-          translations: { 'zh-CN': '集成' },
-          items: [{ label: 'Agent review', slug: 'docs/agent-review' }],
-        },
-        {
           label: 'Design & Reference',
           translations: { 'zh-CN': '设计与参考' },
           items: [

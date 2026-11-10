@@ -44,8 +44,6 @@ dependencies = [
   "tree-sitter-go>=0.25,<0.26",
   "tree-sitter-javascript>=0.25,<0.26",
   "tree-sitter-typescript>=0.23,<0.24",
-  "agent-client-protocol>=0.12.1,<0.13",
-  "mcp>=1.26,<2",
   "tree-sitter-java>=0.23,<0.24",
 ]
 

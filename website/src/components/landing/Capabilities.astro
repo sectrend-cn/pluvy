@@ -1,7 +1,4 @@
 ---
-import { basePath } from '../../i18n.ts';
-
-const base = basePath();
 const capabilities = [
   {
     title: 'Type boundaries',
@@ -25,7 +22,7 @@ const capabilities = [
   },
   {
     title: 'CI & agent integration',
-    body: 'PyPI CLI, JSON output, agent skill and explicitly configured ACP review.',
+    body: 'PyPI CLI, JSON output and the bundled agent skill.',
   },
 ];
 ---
@@ -47,18 +44,6 @@ const capabilities = [
       </li>
     ))}
   </ol>
-  <div class="agent-note">
-    <div>
-      <h3>Deterministic checks first.<br />Agent review only when you configure it.</h3>
-    </div>
-    <div>
-      <p>
-        Pluvy selects no agent or model provider implicitly. ACP review submits findings through
-        explicit tools and never requires an unrestricted editing agent.
-      </p>
-      <a class="text-link" href={`${base}docs/agent-review/`}>Explore agent review</a>
-    </div>
-  </div>
 </section>
 
 <style>
@@ -129,40 +114,9 @@ const capabilities = [
     font-size: 0.9rem;
   }
 
-  .agent-note {
-    display: grid;
-    grid-template-columns: 1.1fr 1fr;
-    gap: 4rem;
-    margin-top: 7rem;
-    padding: 3rem;
-    background: var(--accent-soft);
-  }
-
-  .agent-note h3 {
-    margin: 0;
-    font-size: clamp(1.8rem, 3vw, 2.8rem);
-    font-weight: 500;
-    letter-spacing: -0.045em;
-    line-height: 1.1;
-  }
-
-  .agent-note > div:last-child {
-    align-self: end;
-  }
-
-  .agent-note > div:last-child p {
-    margin: 0 0 1.5rem;
-    color: var(--muted);
-  }
-
   @media (max-width: 850px) {
     .capabilities__grid {
       grid-template-columns: repeat(2, 1fr);
-    }
-
-    .agent-note {
-      grid-template-columns: 1fr;
-      gap: 2rem;
     }
   }
 
@@ -183,11 +137,6 @@ const capabilities = [
 
     .capabilities__grid li {
       min-height: 0;
-    }
-
-    .agent-note {
-      margin-top: 4rem;
-      padding: 1.5rem;
     }
   }
 </style>
