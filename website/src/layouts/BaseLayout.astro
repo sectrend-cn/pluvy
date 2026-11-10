@@ -1,17 +1,18 @@
 ---
 import SiteFooter from '../components/SiteFooter.astro';
 import SiteHeader from '../components/SiteHeader.astro';
+import Typography from '../components/Typography.astro';
 import { headerContent, type Language } from '../i18n.ts';
 import '../styles/global.css';
 
 interface Props {
   title: string;
   description: string;
-  overlayHeader?: boolean;
+  landingHeader?: boolean;
   lang?: Language;
 }
 
-const { title, description, overlayHeader = false, lang = 'en' } = Astro.props;
+const { title, description, landingHeader = false, lang = 'en' } = Astro.props;
 const content = headerContent[lang];
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : Astro.url;
 ---
@@ -38,50 +39,11 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : Astro.u
   </head>
   <body>
     <a class="skip-link" href="#main-content">{content.skip}</a>
-    <SiteHeader overlay={overlayHeader} languagePicker={overlayHeader} lang={lang} />
+    <SiteHeader landing={landingHeader} languagePicker={landingHeader} lang={lang} />
     <main id="main-content">
       <slot />
     </main>
-    <SiteFooter lang={lang} />
-    <script>
-      const truncatedElements = document.querySelectorAll<HTMLElement>('[data-truncate]');
-
-      if (truncatedElements.length > 0) {
-        const tooltip = document.createElement('div');
-        tooltip.className = 'text-tooltip';
-        tooltip.setAttribute('role', 'tooltip');
-        tooltip.hidden = true;
-        document.body.append(tooltip);
-
-        function showTooltip(element: HTMLElement): void {
-          const text = element.dataset.tooltip;
-          if (!text) return;
-          const bounds = element.getBoundingClientRect();
-          const center = Math.min(window.innerWidth - 16, Math.max(16, bounds.left + bounds.width / 2));
-          tooltip.textContent = text;
-          tooltip.style.left = `${center}px`;
-          tooltip.style.top = `${bounds.bottom + 6}px`;
-          tooltip.hidden = false;
-        }
-
-        function updateTruncatedLabels(): void {
-          tooltip.hidden = true;
-          truncatedElements.forEach((element) => {
-            const text = element.textContent?.trim() ?? '';
-            if (element.scrollWidth > element.clientWidth && text) element.dataset.tooltip = text;
-            else element.removeAttribute('data-tooltip');
-          });
-        }
-
-        truncatedElements.forEach((element) => {
-          element.addEventListener('pointerenter', () => showTooltip(element));
-          element.addEventListener('pointerleave', () => { tooltip.hidden = true; });
-          element.addEventListener('focus', () => showTooltip(element));
-          element.addEventListener('blur', () => { tooltip.hidden = true; });
-        });
-        window.addEventListener('resize', updateTruncatedLabels);
-        updateTruncatedLabels();
-      }
-    </script>
+    <SiteFooter lang={lang} landing={landingHeader} />
+    <Typography />
   </body>
 </html>

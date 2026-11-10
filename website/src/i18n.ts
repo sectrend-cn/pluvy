@@ -3,10 +3,11 @@ export type Language = 'en' | 'zh-CN';
 const englishLanding = {
   hero: {
     lead: 'Agent-written code,',
-    emphasis: 'checked by a gate.',
+    emphasis: 'checked by Pluvy.',
     description: 'Agents can make a task look done by loosening types, suppressing diagnostics or deleting tests. Pluvy checks each change against your committed policy and reports findings with an exit code.',
     getStarted: 'Get started',
     viewGithub: 'View on GitHub',
+    install: 'Install with uv',
     copy: 'Copy',
     copied: 'Copied',
   },
@@ -30,18 +31,11 @@ const englishLanding = {
     guide: 'Read the run guide',
     policy: 'POLICY',
     run: 'RUN',
-    exitCodes: 'Exit codes',
-    items: [
-      { code: '0', description: 'Pass, or warnings only' },
-      { code: '1', description: 'Error findings' },
-      { code: '2', description: 'Configuration, encoding, filesystem or Git failure' },
-    ],
   },
   final: {
     titleA: 'Put a gate after',
     titleB: 'every agent task.',
     connectAgent: 'Connect your agent',
-    explore: 'Explore the example policy',
   },
 };
 
@@ -52,10 +46,11 @@ export const landingContent: Record<Language, LandingContent> = {
   'zh-CN': {
     hero: {
       lead: 'Agent 写的代码，',
-      emphasis: '交给门禁检查。',
+      emphasis: '交给 Pluvy 检查。',
       description: 'Agent 可能放宽类型、压掉诊断或删掉测试，让任务看起来已经完成。Pluvy 按仓库中提交的策略检查每次改动，报告检查结果和退出码。',
       getStarted: '开始使用',
       viewGithub: '查看 GitHub',
+      install: '使用 uv 安装',
       copy: '复制',
       copied: '已复制',
     },
@@ -79,18 +74,11 @@ export const landingContent: Record<Language, LandingContent> = {
       guide: '查看运行指南',
       policy: '策略',
       run: '运行',
-      exitCodes: '退出码',
-      items: [
-        { code: '0', description: '通过，或只有警告' },
-        { code: '1', description: '存在错误级检查结果' },
-        { code: '2', description: '配置、编码、文件系统或 Git 故障' },
-      ],
     },
     final: {
       titleA: '在每个 Agent 任务后',
       titleB: '设一道门禁。',
       connectAgent: '接入你的 Agent',
-      explore: '查看策略示例',
     },
   },
 };
@@ -120,4 +108,9 @@ export const headerContent: Record<Language, typeof englishHeader> = {
 
 export function docsPath(lang: Language): string {
   return lang === 'zh-CN' ? 'zh/docs' : 'docs';
+}
+
+export function basePath(): string {
+  const base = import.meta.env.BASE_URL;
+  return base.endsWith('/') ? base : `${base}/`;
 }

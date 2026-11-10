@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-const base = `${import.meta.env.BASE_URL}/`;
+import { basePath } from '../i18n.ts';
+const base = basePath();
 ---
 
 <BaseLayout title="Page not found — Pluvy" description="The requested Pluvy page does not exist.">

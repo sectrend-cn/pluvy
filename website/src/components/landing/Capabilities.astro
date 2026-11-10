@@ -1,5 +1,7 @@
 ---
-const base = `${import.meta.env.BASE_URL}/`;
+import { basePath } from '../../i18n.ts';
+
+const base = basePath();
 const capabilities = [
   {
     title: 'Type boundaries',

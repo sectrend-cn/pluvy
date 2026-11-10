@@ -1,0 +1,19 @@
+---
+import TextSegments from '../TextSegments.astro';
+
+const { entry, lang } = Astro.locals.starlightRoute;
+---
+
+<h1 id="_top"><TextSegments text={entry.data.title} lang={lang.startsWith('zh') ? 'zh-CN' : 'en'} /></h1>
+
+<style>
+  @layer starlight.core {
+    h1 {
+      margin-top: 1rem;
+      font-size: var(--sl-text-h1);
+      line-height: var(--sl-line-height-headings);
+      font-weight: 600;
+      color: var(--sl-color-white);
+    }
+  }
+</style>

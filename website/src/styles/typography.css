@@ -3,12 +3,15 @@ h2,
 h3,
 .card-title,
 .hero__line,
+.display-title,
+.sl-heading-wrapper:is(.level-h1, .level-h2, .level-h3),
 .post-list__title {
   text-wrap: balance;
 }
 
 p,
 li,
+dd,
 [class*='description'] {
   text-wrap: pretty;
 }
@@ -17,15 +20,20 @@ button,
 [role='button'],
 .button,
 .site-nav a,
-.text-link {
+.text-link,
+.evidence-block__bar > span,
+.evidence-meta__value,
+.article-header__meta > span {
   white-space: nowrap;
 }
 
 .exit-codes dt,
 .principles__list > li > span,
 .post-list__date,
+.evidence-meta__value,
 td,
 th,
+[data-price],
 [data-counter],
 [data-stat],
 [data-timer] {
@@ -40,46 +48,59 @@ th,
   text-overflow: ellipsis;
 }
 
+[data-truncate-container] {
+  min-width: 0;
+}
+
 .text-tooltip {
   position: fixed;
   z-index: 100;
   max-width: 80vw;
   padding: 0.35rem 0.5rem;
   border-radius: 4px;
-  background: var(--night);
-  color: var(--on-night);
+  background: var(--night, var(--sl-color-text));
+  color: var(--on-night, var(--sl-color-bg));
   overflow-wrap: anywhere;
   pointer-events: none;
   transform: translateX(-50%);
   white-space: normal;
 }
 
-:lang(zh) body {
+:where(html:lang(zh), [lang]:lang(zh)) {
   text-autospace: normal;
   text-spacing-trim: trim-start;
 }
 
-:lang(zh) :where(code, pre, input, textarea, .mono) {
+:where([lang]:not(:lang(zh))) {
+  text-autospace: initial;
+  text-spacing-trim: initial;
+}
+
+:where(code, pre, kbd, samp, input, textarea, .mono,
+  .button, .text-link, .site-nav, .site-footer__links, .hero__command,
+  .evidence-meta, .evidence-block__bar, .code-comparison,
+  .post-list__date, .post-list__tags, .article-header__meta, .journal__meta,
+  .principles__list > li > span, .language-note span, .capabilities__grid > li > span,
+  .exit-codes h3, .exit-codes dt) {
   text-autospace: no-autospace;
 }
 
-:lang(zh) h1,
-:lang(zh) h2,
-:lang(zh) h3,
-:lang(zh) .display-title,
-:lang(zh) .post-list__title {
+:where(h1, h2, h3, .card-title, .hero__line, .display-title, .post-list__title):lang(zh) {
   overflow-wrap: anywhere;
-  text-wrap: balance;
+}
+
+:where(h1, h2, h3, .card-title, .hero__line, .display-title, .post-list__title):lang(zh):has(wbr[data-phrase-break]) {
   word-break: keep-all;
 }
 
-:lang(zh) .hero__intro > p,
-:lang(zh) .article-body > p {
-  max-width: 26em;
-  text-align: justify;
-  text-wrap: pretty;
+:where(.hero__intro, .article-body, .sl-markdown-content):lang(zh) {
+  container: text-measure / inline-size;
 }
 
-:lang(zh) .article-body {
-  text-spacing-trim: space-first;
+@container text-measure (min-width: 17em) {
+  p[data-zh-prose]:lang(zh) {
+    max-inline-size: 26em;
+    inline-size: round(down, min(100%, 26em), 1em);
+    text-align: justify;
+  }
 }
