@@ -9,7 +9,7 @@ const currentSection = toc?.items[0]?.text ?? 'Overview';
 <nav class="docs-mobile-nav" aria-label="Documentation navigation">
   <button type="button" data-docs-open="pages" aria-controls="docs-sheet-pages">Pages</button>
   <button type="button" data-docs-open="outline" aria-controls="docs-sheet-outline">
-    <span data-current-section>{currentSection}</span>
+    <span data-current-section data-truncate>{currentSection}</span>
   </button>
 </nav>
 

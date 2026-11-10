@@ -18,8 +18,10 @@
   --primary-hover: #37401c;
   --content: 1280px;
   --gutter: clamp(1.25rem, 4vw, 4.5rem);
-  --sans: 'Helvetica Neue', 'Arial Nova', Helvetica, Arial, sans-serif;
-  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --landing-width: calc(100% - clamp(48px, 10vw, 160px));
+  --landing-max-width: 1760px;
+  --sans: 'Helvetica Neue', 'Arial Nova', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Songti SC', STSong, serif;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }
 
@@ -117,6 +119,43 @@ svg {
   padding-inline: var(--gutter);
 }
 
+.landing-shell {
+  --landing-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
+  --landing-gap: clamp(32px, 4vw, 112px);
+  width: var(--landing-width);
+  max-width: var(--landing-max-width);
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+@media (min-width: 1280px) {
+  .landing-shell {
+    --landing-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  }
+}
+
+.landing-content :is(h1, .display-title, .final-cta h2) {
+  margin-inline-start: -0.035em;
+}
+
+@media (max-width: 1099px) {
+  :root {
+    --landing-width: calc(100% - 80px);
+    --landing-max-width: 800px;
+  }
+
+  .landing-shell {
+    --landing-columns: minmax(0, 1fr);
+    --landing-gap: 48px;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --landing-width: calc(100% - 40px);
+  }
+}
+
 .display-title {
   margin: 0;
   font-size: clamp(2.8rem, 6vw, 5.8rem);
@@ -209,7 +248,7 @@ svg {
 
 .legible::before {
   position: absolute;
-  inset: -2.5rem -3rem;
+  inset: -2.5rem max(-3rem, calc(-1 * var(--gutter)));
   z-index: -1;
   background: color-mix(in srgb, var(--paper) 84%, transparent);
   -webkit-backdrop-filter: blur(6px);

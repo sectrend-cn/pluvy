@@ -1,0 +1,82 @@
+---
+import type { DemoCodeLine } from './optimization-cases.ts';
+
+interface Props {
+  lines: readonly DemoCodeLine[];
+  label: string;
+  highlightFindings?: boolean;
+}
+
+type TokenKind = 'keyword' | 'type' | 'string' | 'literal' | 'comment' | 'optional' | 'plain';
+interface CodeToken {
+  text: string;
+  kind: TokenKind;
+}
+
+const tokenPattern = /(\/\/.*$)|(\/\*.*?\*\/)|("(?:[^"\\]|\\.)*")|\?(?=:)|\b(?:const|function|return|if|typeof|export|interface|as|new|in)\b|\b(?:unknown|string|void|Promise|Array|ModelRouteInput|ModelRuntime|CliDependencies|NullableJsonParser|ZodJsonParser)\b|\b(?:null|undefined|\d+)\b/g;
+const keywordPattern = /^(?:const|function|return|if|typeof|export|interface|as|new|in)$/;
+const literalPattern = /^(?:null|undefined|\d+)$/;
+
+function tokenKind(text: string): TokenKind {
+  if (text.startsWith('//') || text.startsWith('/*')) return 'comment';
+  if (text.startsWith('"')) return 'string';
+  if (text === '?') return 'optional';
+  if (keywordPattern.test(text)) return 'keyword';
+  if (literalPattern.test(text)) return 'literal';
+  return 'type';
+}
+
+function highlightTypeScript(line: string): CodeToken[] {
+  const tokens: CodeToken[] = [];
+  let lastIndex = 0;
+  for (const match of line.matchAll(tokenPattern)) {
+    if (match.index > lastIndex) tokens.push({ text: line.slice(lastIndex, match.index), kind: 'plain' });
+    tokens.push({ text: match[0], kind: tokenKind(match[0]) });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < line.length) tokens.push({ text: line.slice(lastIndex), kind: 'plain' });
+  return tokens.length > 0 ? tokens : [{ text: line || ' ', kind: 'plain' }];
+}
+
+const { lines, label, highlightFindings = false } = Astro.props;
+---
+
+<pre tabindex="0" aria-label={label} class:list={{ 'is-annotated': highlightFindings }}><code>{lines.map((line) => <span class:list={['code-line', { 'code-line--finding': highlightFindings && line.signal === 'finding' }]}>{highlightTypeScript(line.text).map((token) => <span class={`token-${token.kind}`}>{token.text}</span>)}</span>)}</code></pre>
+
+<style>
+  pre {
+    flex: 1;
+    min-height: 0;
+    max-width: 100%;
+    margin: 0;
+    padding-block: 8px;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
+  .code-line {
+    display: block;
+    position: relative;
+    width: max-content;
+    min-width: 100%;
+    padding-inline: 16px;
+    white-space: pre;
+  }
+
+  .code-line--finding {
+    text-decoration: underline;
+    text-decoration-color: #f2c16c80;
+    text-underline-offset: 4px;
+  }
+
+  .token-keyword { color: #c9a5ff; font-weight: 600; }
+  .token-type { color: #7dd8e8; }
+  .token-string { color: #c3df9b; }
+  .token-literal { color: #ffbc8b; }
+  .token-comment { color: #a1adb9; font-style: italic; }
+  .is-annotated .token-optional { color: #ffe3a3; background: #6a4726; border-radius: 2px; }
+
+  @media (max-width: 767px) {
+    .code-line { padding-inline: 12px; }
+  }
+</style>

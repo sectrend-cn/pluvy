@@ -1,10 +1,11 @@
 ---
 import DocsMobileNav from './DocsMobileNav.astro';
+import { basePath } from '../../i18n.ts';
 
 const { dir, pagination } = Astro.locals.starlightRoute;
 const { prev, next } = pagination;
 const isRtl = dir === 'rtl';
-const base = `${import.meta.env.BASE_URL}/`;
+const base = basePath();
 ---
 
 <aside class="docs-help" aria-labelledby="docs-help-title">

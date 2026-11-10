@@ -1,0 +1,98 @@
+---
+import type { Language } from '../../i18n.ts';
+import { formatText } from '../../typography/chinese-text.ts';
+import type { OptimizationCase } from './optimization-cases.ts';
+
+interface Props {
+  item: Exclude<OptimizationCase, { kind: 'resolved' }>;
+  lang: Language;
+}
+
+const { item, lang } = Astro.props;
+const zh = lang === 'zh-CN';
+const finding = item.kind === 'optional-fields'
+  ? (zh ? `${item.count} 个可选字段 · 上限 ${item.limit}` : `${item.count} fields · limit ${item.limit}`)
+  : (zh ? `${item.count} 次守卫拷贝` : `${item.count} guarded copies`);
+---
+
+<aside class="agent-advice" aria-label={zh ? '给 Agent 的建议示意' : 'Suggested handoff to Agent'}>
+  <div class="agent-advice__pending" aria-hidden="true"><span class="pending-dot"></span>{zh ? '扫描代码，生成建议' : 'Scanning code for suggested next steps'}</div>
+  <div class="agent-advice__result">
+    <div class="agent-advice__route">
+      <strong>PLUVY <span aria-hidden="true">↗</span> AGENT</strong>
+      <span class="agent-advice__finding">{formatText(finding, lang)}</span>
+    </div>
+    <ol>{item.copy[lang].advice.map((advice, index) => <li><span class="step-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><span>{formatText(advice, lang)}</span></li>)}</ol>
+  </div>
+</aside>
+
+<style>
+  .agent-advice {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 1;
+    display: grid;
+    align-items: center;
+    height: var(--advice-height);
+    padding: 10px 16px;
+    border-top: 2px solid #a8bf7b;
+    background: #edf1e5;
+    color: #27331e;
+    font: 12px/1.4 var(--sans);
+    pointer-events: none;
+  }
+  .agent-advice__pending,
+  .agent-advice__result { grid-area: 1 / 1; min-width: 0; }
+  .agent-advice__pending { display: none; align-items: center; gap: 9px; color: #61704f; }
+  .pending-dot { width: 6px; height: 6px; border-radius: 50%; background: #789743; }
+  .agent-advice__route {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+    font-size: 10px;
+    color: #60704c;
+  }
+  .agent-advice__route strong { color: #3d5720; font: 650 10px var(--mono); letter-spacing: .045em; }
+  .agent-advice__route strong span { margin-inline: 7px; color: #789743; }
+  .agent-advice__finding { font-variant-numeric: tabular-nums; }
+  ol {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  li { display: flex; align-items: flex-start; gap: 7px; }
+  .step-number {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 17px;
+    height: 17px;
+    color: #5a713d;
+    font: 10px var(--mono);
+  }
+  :global([data-scan-state='scanning']) .agent-advice__result,
+  :global([data-scan-state='manual']) .agent-advice__result { opacity: 0; visibility: hidden; }
+  :global([data-scan-state='scanning']) .agent-advice__pending,
+  :global([data-scan-state='manual']) .agent-advice__pending { display: flex; }
+  :global([data-scan-state='complete']) .agent-advice__result { animation: advice-enter 450ms ease-out both; }
+  :global([data-scan-state='complete']) li { animation: advice-enter 400ms 160ms ease-out both; }
+  :global([data-scan-state='complete']) li:nth-child(2) { animation-delay: 300ms; }
+  @keyframes advice-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global([data-scan-state]) .agent-advice__result,
+    :global([data-scan-state]) li { animation: none; }
+  }
+  @media (max-width: 767px) {
+    .agent-advice { padding: 10px 12px; font-size: 11px; }
+    ol { grid-template-columns: 1fr; gap: 5px; }
+    .agent-advice__route { gap: 5px 8px; }
+  }
+</style>

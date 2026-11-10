@@ -1,10 +1,11 @@
 import rss from '@astrojs/rss';
 import { getCollection } from 'astro:content';
 import type { APIRoute } from 'astro';
+import { basePath } from '../i18n.ts';
 
 export const GET: APIRoute = async ({ site }) => {
   const posts = await getCollection('blog', ({ data }) => !data.draft);
-  const base = `${import.meta.env.BASE_URL}/`;
+  const base = basePath();
   return rss({
     title: 'Pluvy Journal',
     description: 'Engineering notes, practical guides and release context from Pluvy.',

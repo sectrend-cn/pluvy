@@ -1,11 +1,16 @@
 import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import { satteri } from '@astrojs/markdown-satteri';
+import { typographyMarkdown } from './src/typography/markdown.ts';
 
 export default defineConfig({
   site: 'https://sectrend-cn.github.io',
-  base: '/pluvy',
+  base: process.env.ASTRO_BASE ?? '/pluvy',
   output: 'static',
+  markdown: {
+    processor: satteri({ hastPlugins: [typographyMarkdown] }),
+  },
   integrations: [
     starlight({
       title: 'Pluvy',
@@ -48,6 +53,8 @@ export default defineConfig({
       ],
       customCss: ['./src/styles/starlight.css', './src/styles/typography.css', './src/styles/docs-layout.css'],
       components: {
+        Head: './src/components/docs/TypographyHead.astro',
+        PageTitle: './src/components/docs/TypographyPageTitle.astro',
         Pagination: './src/components/docs/DocsPagination.astro',
       },
       disable404Route: true,

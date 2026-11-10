@@ -1,0 +1,357 @@
+---
+import type { Language } from '../../i18n.ts';
+import { formatText } from '../../typography/chinese-text.ts';
+import { optimizationCases } from './optimization-cases.ts';
+import AgentAdvice from './AgentAdvice.astro';
+import DemoCode from './DemoCode.astro';
+import ScanHandle from './ScanHandle.astro';
+
+interface Props {
+  lang?: Language;
+}
+
+const { lang = 'en' } = Astro.props;
+const zh = lang === 'zh-CN';
+const copy = {
+  tabsLabel: zh ? '选择扫描案例' : 'Choose a scan case',
+  beforeLabel: zh ? '修复前 · 节选' : 'Before · excerpt',
+  afterLabel: zh ? '修复后 · 节选' : 'After · excerpt',
+  sourceLabel: zh ? '代码节选' : 'Source excerpt',
+  diagnosticLabel: zh ? '诊断标注 · 同一代码' : 'Diagnostics · same source',
+  compareLabel: zh ? '拖动扫描线，对比真实修复' : 'Drag to compare the recorded refactor',
+  inspectLabel: zh ? '拖动扫描线，定位问题' : 'Drag to reveal the findings',
+  resolved: zh ? '已修复' : 'Resolved',
+  snapshot: zh ? '扫描演示' : 'Scan demo',
+};
+---
+
+<section class="optimization" aria-label={copy.tabsLabel} data-optimization-demo data-reveal>
+  <div class="optimization__inner shell">
+    <div class="demo-stage">
+      <div class="scan-workbench">
+        {optimizationCases.map((item, caseIndex) => (
+          <article
+            id={`case-panel-${caseIndex}`}
+            class="demo-panel"
+            data-case-kind={item.kind}
+            role="tabpanel"
+            aria-labelledby={`case-tab-${caseIndex}`}
+            data-demo-panel={caseIndex}
+            hidden={caseIndex !== 0}
+          >
+            <div class="evidence-meta">
+              <strong class="evidence-meta__finding" title={item.kind === 'resolved' ? `${item.file} · ${item.commit} · ${item.fixedOn}` : `${item.file} · ${item.snapshot.date} · pluvy ${item.snapshot.version}`}>{item.finding}</strong>
+              <span class:list={["evidence-meta__value", { "is-finding": item.kind !== "resolved" }]}>{item.kind === 'resolved' ? copy.resolved : copy.snapshot}</span>
+            </div>
+            <p class="case-description">{formatText(item.copy[lang].description, lang)}</p>
+            <div class:list={['code-comparison', { 'has-advice': item.kind !== 'resolved' }]} data-code-comparison>
+              <div class="code-group code-group--issue">
+                <span class="code-group__label">{item.kind === 'resolved' ? copy.beforeLabel : copy.sourceLabel}</span>
+                <DemoCode lines={item.source} label={item.kind === 'resolved' ? copy.beforeLabel : copy.sourceLabel} />
+              </div>
+              <div class:list={['code-group', 'code-group--fix', { 'code-group--diagnostic': item.kind !== 'resolved' }]}>
+                <span class="code-group__label">{item.kind === 'resolved' ? copy.afterLabel : copy.diagnosticLabel}</span>
+                <DemoCode
+                  lines={item.kind === 'resolved' ? item.after : item.source}
+                  label={item.kind === 'resolved' ? copy.afterLabel : copy.diagnosticLabel}
+                  highlightFindings={item.kind !== 'resolved'}
+                />
+              </div>
+              {item.kind !== 'resolved' && <AgentAdvice item={item} lang={lang} />}
+              <ScanHandle label={item.kind === 'resolved' ? copy.compareLabel : copy.inspectLabel} />
+            </div>
+          </article>
+        ))}
+      </div>
+      <div class="case-tabs" role="tablist" aria-label={copy.tabsLabel}>
+        {optimizationCases.map((item, index) => (
+          <button
+            id={`case-tab-${index}`}
+            class="case-tab"
+            type="button"
+            role="tab"
+            aria-selected={index === 0 ? 'true' : 'false'}
+            aria-controls={`case-panel-${index}`}
+            tabindex={index === 0 ? 0 : -1}
+            data-demo-tab={index}
+          >
+            {item.copy[lang].tab}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { ScanPlayback } from './scan-playback.ts';
+
+  for (const demo of document.querySelectorAll<HTMLElement>('[data-optimization-demo]')) {
+    const tabs = Array.from(demo.querySelectorAll<HTMLButtonElement>('[data-demo-tab]'));
+    const panels = Array.from(demo.querySelectorAll<HTMLElement>('[data-demo-panel]'));
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const playback = new Map<HTMLElement, ScanPlayback>();
+    for (const panel of panels) {
+      const range = panel.querySelector<HTMLInputElement>('[data-code-range]');
+      const comparison = panel.querySelector<HTMLElement>('[data-code-comparison]');
+      if (!range || !comparison) continue;
+      playback.set(panel, new ScanPlayback(panel, comparison, range, reducedMotion));
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      for (const panel of panels) {
+        if (!panel.hidden) playback.get(panel)?.play();
+      }
+      observer.disconnect();
+    }, { threshold: 0.3 });
+    observer.observe(demo);
+
+    function selectPanel(index: number): void {
+      observer.disconnect();
+      tabs.forEach((tab, tabIndex) => {
+        const selected = tabIndex === index;
+        tab.setAttribute('aria-selected', String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+      });
+      panels.forEach((panel, panelIndex) => {
+        playback.get(panel)?.stop();
+        panel.hidden = panelIndex !== index;
+        if (!panel.hidden) playback.get(panel)?.play();
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectPanel(index));
+      tab.addEventListener('keydown', (event) => {
+        let next: number;
+        switch (event.key) {
+          case 'ArrowLeft': next = (index - 1 + tabs.length) % tabs.length; break;
+          case 'ArrowRight': next = (index + 1) % tabs.length; break;
+          case 'Home': next = 0; break;
+          case 'End': next = tabs.length - 1; break;
+          default: return;
+        }
+        event.preventDefault();
+        selectPanel(next);
+        tabs[next]?.focus();
+      });
+    });
+  }
+</script>
+
+<style>
+  @property --code-position {
+    syntax: '<percentage>';
+    inherits: true;
+    initial-value: 50%;
+  }
+
+  .optimization {
+    min-width: 0;
+  }
+
+  .optimization__inner {
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  .demo-stage {
+    padding: 16px;
+    border: 1px solid var(--line);
+    background: var(--paper-bright);
+  }
+
+  .scan-workbench {
+    display: grid;
+  }
+
+  .demo-panel {
+    grid-area: 1 / 1;
+    min-width: 0;
+    display: grid;
+    grid-template-rows: minmax(36px, auto) minmax(44px, auto) auto;
+    align-content: start;
+  }
+
+  .demo-panel[hidden] {
+    display: grid;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .evidence-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 8px;
+    font: clamp(10px, 0.7vw, 13px)/1.5 var(--mono);
+  }
+
+  .evidence-meta__finding {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font: 650 clamp(14px, 1.2vw, 18px)/1.3 var(--mono);
+    letter-spacing: -0.035em;
+  }
+
+  .evidence-meta__value {
+    padding: 4px 8px;
+    border-radius: 2px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .evidence-meta__value.is-finding {
+    background: color-mix(in srgb, #c68a38 12%, var(--paper));
+    color: var(--ink);
+  }
+
+  .case-description {
+    max-width: 65ch;
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: clamp(12px, 0.85vw, 14px);
+    line-height: 1.55;
+  }
+
+  .code-comparison {
+    --code-position: 50%;
+    --scan-position: clamp(0%, var(--code-position), 100%);
+    --advice-height: 84px;
+    position: relative;
+    height: 276px;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #384034;
+    background: #1c2429;
+    color: #e1e8ef;
+    font-family: var(--mono);
+    font-size: clamp(11px, 0.8vw, 12px);
+    line-height: 1.65;
+    tab-size: 2;
+  }
+
+  .code-group {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100%;
+    background: #1c2429;
+  }
+
+  .code-group--issue {
+    clip-path: inset(0 calc(100% - var(--scan-position)) 0 0);
+  }
+
+  .code-group--fix {
+    clip-path: inset(0 0 0 var(--scan-position));
+  }
+
+  .code-group--fix::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #b7dc7924;
+    pointer-events: none;
+  }
+
+  .code-comparison.has-advice .code-group {
+    bottom: var(--advice-height);
+    height: auto;
+  }
+
+  .code-comparison.has-advice :global(.scan-handle) {
+    bottom: var(--advice-height);
+  }
+
+  .code-group__label {
+    display: block;
+    padding: 8px 16px;
+    background: #302823;
+    color: #f0c4ba;
+    font: 500 11px/1.6 var(--sans);
+  }
+
+  .code-group--fix .code-group__label {
+    background: #293123;
+    color: #d9eac3;
+    text-align: right;
+  }
+
+  .code-group--diagnostic .code-group__label {
+    background: #383024;
+    color: #f2d394;
+  }
+
+  .code-comparison:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .case-tabs {
+    --tab-inset: 4px;
+    --tab-radius: 1px;
+    display: flex;
+    gap: 4px;
+    min-width: 0;
+    margin-top: 12px;
+    padding: var(--tab-inset);
+    border: 1px solid var(--line);
+    border-radius: calc(var(--tab-radius) + var(--tab-inset) + 1px);
+    background: var(--paper);
+  }
+
+  .case-tab {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 4px;
+    border: 0;
+    border-radius: var(--tab-radius);
+    background: transparent;
+    color: var(--muted);
+    font: 500 clamp(11px, 0.75vw, 15px)/1.6 var(--sans);
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .case-tab:hover,
+  .case-tab[aria-selected='true'] {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  .case-tab:focus-visible {
+    outline-offset: 1px;
+  }
+
+  @media (max-width: 767px) {
+    .code-comparison { height: 322px; --advice-height: 132px; }
+
+    .demo-stage {
+      padding: 16px;
+    }
+
+    .evidence-meta {
+      align-items: flex-start;
+    }
+
+    .code-group__label {
+      padding: 8px 12px;
+    }
+
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .case-tab,
+    .code-comparison {
+      transition: none;
+    }
+  }
+</style>

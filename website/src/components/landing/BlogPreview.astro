@@ -1,12 +1,13 @@
 ---
 import type { CollectionEntry } from 'astro:content';
+import { basePath } from '../../i18n.ts';
 
 interface Props {
   posts: CollectionEntry<'blog'>[];
 }
 
 const { posts } = Astro.props;
-const base = `${import.meta.env.BASE_URL}/`;
+const base = basePath();
 const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 ---
 
