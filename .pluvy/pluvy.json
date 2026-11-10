@@ -44,12 +44,6 @@
           ]
         },
         {
-          "name": "agent review",
-          "paths": [
-            "src/pluvy/review/*"
-          ]
-        },
-        {
           "name": "language plugins",
           "paths": [
             "src/pluvy/languages/*"
@@ -161,26 +155,6 @@
           ]
         },
         {
-          "name": "review rules do not depend on ACP transport",
-          "sources": [
-            "src/pluvy/review/contracts.py",
-            "src/pluvy/review/rules.py",
-            "src/pluvy/review/prompt.py",
-            "src/pluvy/review/submission_models.py",
-            "src/pluvy/review/submissions.py"
-          ],
-          "forbidden_imports": [
-            "acp",
-            "acp.*",
-            "mcp",
-            "mcp.*",
-            "pluvy.review.mcp_server",
-            "pluvy.review.acp",
-            "pluvy.review.channel",
-            "pluvy.review.wire"
-          ]
-        },
-        {
           "name": "shared analysis and rules do not select concrete languages",
           "sources": [
             "src/pluvy/analysis/*",
@@ -237,7 +211,6 @@
             "src/pluvy/engine.py",
             "src/pluvy/plugins/*",
             "src/pluvy/languages/*",
-            "src/pluvy/review/*",
             "src/pluvy/suppressions.py",
             "src/pluvy/semantics/*",
             "src/pluvy/metrics/*",
@@ -264,8 +237,7 @@
         "src/pluvy/architecture/rules.py",
         "src/pluvy/architecture/design.py",
         "src/pluvy/analysis/analyzer.py",
-        "src/pluvy/languages/*",
-        "src/pluvy/review/*"
+        "src/pluvy/languages/*"
       ]
     }
   }
