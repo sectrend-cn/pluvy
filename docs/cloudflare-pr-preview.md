@@ -4,7 +4,9 @@
 `false` guard. This is intentional: the requested `pull_request` event cannot
 provide an immutable, trusted workflow when the PR can change its own YAML.
 No Cloudflare upload is enabled by this change. Do not remove that guard simply
-because credentials become available.
+because credentials become available or Plan A has been selected. The deploy
+job alone is prepared to reference the fixed Environment `cloudflare-pr-preview`;
+the build job references neither that Environment nor Cloudflare secrets.
 
 ## Verified repository inputs and production effects
 
@@ -37,17 +39,93 @@ filters, pinned actions and a workflow-diff check in that same mutable YAML do
 not solve this. Repository or organization secrets exposed to PR workflows
 cannot safely hold the preview token under this threat model.
 
-Ops can choose a separately configured
-[protected GitHub Environment](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
-with required reviewers, prevention of self-review and bypass, and credentials
-stored only in that environment. A subsequent reviewed change would bind only
-the deploy job to that environment and replace the unconditional guard. Reviewers
-must inspect the exact run's workflow, every credential-bearing step, pinned
-tooling and artifact validation before approving each revision. Removing the
-environment declaration must leave credentials unavailable. This is a human
-trust boundary; it does not make automatic execution of arbitrary PR YAML safe.
-Do not provision repository-level copies of those credentials. No environments,
-secrets, approval rules or other repository settings were changed for this work.
+Plan A selects a manually approved protected Environment. Its YAML binding is
+prepared, but the unconditional guard stays in place until Ops confirms the
+configuration and a later, separately reviewed commit is approved to lift it.
+An absent or unprotected Environment, early repository-level credentials, or
+the Plan A decision alone cannot enable this reviewed workflow's deploy job.
+Removing the Environment declaration in a future workflow must leave credentials
+unavailable. This is a human trust boundary; it does not make arbitrary PR YAML
+trusted. No Environments, secrets, approval rules or other repository settings
+were created or edited by the coding agent.
+
+## Plan A Ops checklist (洛托姆)
+
+1. Configure the exact Environment **`cloudflare-pr-preview`**. Read-only
+   inspection found only `github-pages` and `pypi` in the repository; the chosen
+   name collides with neither existing Environment nor a production workflow
+   binding. Do not reuse either existing Environment. Keep the upload guard
+   unchanged throughout setup; the skipped job does not exercise Environment
+   protections. Do not run a credential-bearing job to test configuration.
+2. Configure **at least two distinct qualified people** in the required-reviewer
+   pool, individually or through a team with at least two qualified members.
+   Each must have at least read access and be able to review Actions security.
+   GitHub permits up to six user/team entries and requires **one eligible
+   approval per deployment job**, not approval from everyone listed or a
+   two-person approval quorum. A configured reviewer who did not initiate the
+   run must manually approve each deploy run. If two independent approvals are
+   desired, the built-in reviewer list does not enforce that extra requirement.
+3. Set **Prevent self-review: ON**. GitHub excludes the deployment/run initiator
+   from approving. For this preview policy, the approver must also be independent
+   of the PR author. PR #23's author is **`sunny0826`**. If `sunny0826` is the only
+   available reviewer, setup is **blocked**: 洛托姆 must ask the user to designate
+   another qualified reviewer. That person's identity and access remain
+   unconfirmed. Do not disable self-review prevention or change the rerun actor
+   as a workaround for author self-approval.
+4. Set **Prevent administrators from bypassing protection rules: ON**. In
+   GitHub's UI this means **Allow administrators to bypass configured protection
+   rules: OFF**. Do not use an admin bypass to release a waiting job.
+5. Set **Deployment branches and tags: Selected branches and tags**. Add exactly
+   one **Branch** rule with pattern **`refs/pull/*/merge`** and no Tag rules.
+   Do not add `main`, `cloudflare-pr-preview`, additional rules or a
+   no-restriction policy. GitHub's
+   [deployment-branch documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags)
+   matches rules against `GITHUB_REF` and explicitly documents this PR pattern.
+   For `pull_request`, that ref is `refs/pull/N/merge`, not the head branch name
+   or `main`. A main-only or protected-branches-only policy would not correctly
+   admit these PR merge refs. This selected Branch rule excludes production
+   `main` refs and tags. It is separate from the explicit Cloudflare Pages branch
+   `pr-N`; it does not enable fork uploads or any additional workflow events.
+6. Store **only** `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in this
+   Environment. Never provision copies as repository secrets or broadly
+   inherited organization secrets. Keep the build job outside the Environment.
+   Credential values are not needed in this document, PR review or agent chat.
+7. For **every exact run/revision**, before approving its Environment gate,
+   inspect the workflow YAML actually used by that run from its PR merge/head
+   tree using GitHub's workflow-file view for that run. Record the run URL/ID
+   and attempt, immutable workflow/merge commit SHA and PR head SHA; inspect
+   `.github/workflows/preview-website.yml` at that workflow revision, not the
+   current branch tip or default branch. Do not assume an API's `head_sha` is
+   the merge commit or resolve a moving merge ref after a new PR update.
+   Check every secret reference, checkout, action pin, inline command, artifact
+   validator and upload target.
+   A general PR approval or approval of an earlier run is insufficient. New
+   commits and reruns require another review of their exact revision and gate.
+8. Confirm all controls and reviewer eligibility are available and configured,
+   and verify the Cloudflare metadata listed below. Report completion to the
+   user without exposing secret values. **Activation is a future, separately
+   reviewed commit** that lifts the unconditional `false` guard while retaining
+   the fixed Environment gate and same-repository restriction. This change does
+   not lift it. Until that future approval, even a fully configured Environment
+   must result in a skipped deploy job.
+
+### Plan and visibility availability
+
+The repository was reconfirmed **public** through read-only GitHub repository
+metadata. GitHub's
+[Environment setup documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments#who-can-use-this-feature)
+and [deployment review documentation](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/review-deployments#who-can-use-this-feature)
+state that current GitHub plans support Environments, Environment secrets and
+protection rules for public repositories; legacy Bronze/Silver/Gold plans do
+not. Required reviewers on Free/Pro/Team are limited to public repositories.
+Changing visibility to private/internal would require a new capability audit:
+having an Environment on a paid plan alone does not establish that required
+reviewers and every other protection are supported. Read-only organization
+metadata did not disclose its plan; the actual plan and new Environment's
+controls have not been verified. Ops must confirm every checklist control,
+including self-review prevention and no administrator
+bypass. If any is unavailable, report a **blocker** and leave uploads disabled;
+do not weaken the controls to fit the plan or visibility.
 
 If fully automatic secret-safe previews are required even for workflow-changing
 PRs, an independently enforced trusted execution boundary is still needed.
@@ -125,7 +203,7 @@ performed; after an approved future preview, verify public access and
 Required future secret names are `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID`, matching
 [Wrangler's environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/).
-Ops owns provisioning after selecting a trust boundary. Use the narrowest
+Ops owns provisioning after confirming the Plan A controls. Use the narrowest
 available Pages upload permissions and account scope. Account-scoped Pages Edit
 access must not be assumed to isolate one project; a stolen token may affect
 other projects. The hardcoded target constrains this code, not a stolen credential.

@@ -66,12 +66,14 @@ jobs:
       artifact-id: ${{ steps.artifact.outputs.artifact-id }}
 
   deploy:
-    name: Upload disabled pending an external trust boundary
+    name: Upload disabled pending Plan A activation
     needs: build
     if: ${{ false && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
+    environment:
+      name: cloudflare-pr-preview
     steps:
       - name: Download only the artifact produced by the build job
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
