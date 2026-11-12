@@ -1,19 +1,14 @@
 import { animationData } from './crocodile-frames.ts';
 
-export interface GridPoint {
-  col: number;
-  row: number;
-  rank: number;
+export interface DensityField {
+  cols: number;
+  rows: number;
+  values: Float32Array;
 }
 
-interface BirdSprite {
+interface BirdPose {
+  kind: 'flying' | 'perched';
   index: number;
-  text: string;
-}
-
-interface GlyphImage {
-  pixels: Uint8ClampedArray;
-  width: number;
 }
 
 const ramp = ' .:-=+*#%@';
@@ -50,19 +45,15 @@ export function crocodileFrameIndex(seconds: number): number {
   return Math.round(closingStart + (closed - closingStart) * eased);
 }
 
-export function framePoints(index: number): GridPoint[] {
+function intensity(character: string): number {
+  return (rank.get(character) ?? 0) / (ramp.length - 1);
+}
+
+export function crocodileField(index: number): DensityField {
   const frame = frames[index];
-  const points: GridPoint[] = [];
-  for (let offset = 0; offset < frame.length; offset++) {
-    const intensity = rank.get(frame[offset]) ?? 0;
-    if (intensity === 0) continue;
-    points.push({
-      col: offset % animationData.cols,
-      row: Math.floor(offset / animationData.cols),
-      rank: intensity,
-    });
-  }
-  return points;
+  const values = new Float32Array(frame.length);
+  for (let offset = 0; offset < frame.length; offset++) values[offset] = intensity(frame[offset]);
+  return { cols: animationData.cols, rows: animationData.rows, values };
 }
 
 function extractRegion(
@@ -72,7 +63,7 @@ function extractRegion(
   bottom: number,
   left: number,
   right: number,
-): BirdSprite {
+): DensityField {
   const source = frames[index];
   const baseline = frames[baselineIndex];
   let minRow = bottom;
@@ -89,88 +80,48 @@ function extractRegion(
       maxCol = Math.max(maxCol, col);
     }
   }
-  if (maxRow < 0) return { index, text: '' };
-  const lines: string[] = [];
-  for (let row = minRow; row <= maxRow; row++) {
-    let line = '';
-    for (let col = minCol; col <= maxCol; col++) {
-      const offset = row * animationData.cols + col;
-      line += source[offset] === baseline[offset] ? ' ' : source[offset];
+  if (maxRow < 0) return { cols: 0, rows: 0, values: new Float32Array(0) };
+  const cols = maxCol - minCol + 1;
+  const rows = maxRow - minRow + 1;
+  const values = new Float32Array(cols * rows);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const offset = (minRow + row) * animationData.cols + minCol + col;
+      if (source[offset] !== baseline[offset]) values[row * cols + col] = intensity(source[offset]);
     }
-    lines.push(line.trimEnd());
   }
-  return { index, text: lines.join('\n').trimEnd() };
+  return { cols, rows, values };
 }
 
-function perchedSprite(index: number): BirdSprite {
-  return extractRegion(index, perchedReferenceIndex, 47, 54, 56, 92);
-}
-
-function flyingSprite(index: number): BirdSprite {
-  return extractRegion(index, birdReferenceIndex, 0, animationData.rows - 1, 0, animationData.cols - 1);
-}
-
-function birdSprite(seconds: number): BirdSprite | null {
+function birdPose(seconds: number): BirdPose | null {
   if (seconds < 2.3 || seconds >= 26.3) return null;
   if (seconds >= 4.8 && seconds < 24.8) {
     const frameCount = Math.floor(1.5 * animationData.fps);
-    const pose = Math.floor(4.8 * animationData.fps)
-      + Math.floor((seconds - 4.8) * 10) % frameCount;
-    return perchedSprite(pose);
+    const index = Math.floor(4.8 * animationData.fps) + Math.floor((seconds - 4.8) * 10) % frameCount;
+    return { kind: 'perched', index };
   }
-  if (seconds < 4.8) return flyingSprite(Math.min(frameIndex(seconds), perchedReferenceIndex));
+  if (seconds < 4.8) return { kind: 'flying', index: Math.min(frameIndex(seconds), perchedReferenceIndex) };
   const wingFrames = [Math.floor(3.5 * animationData.fps), Math.floor(3.9 * animationData.fps)];
-  return flyingSprite(wingFrames[Math.floor((seconds - 24.8) * 8) % wingFrames.length]);
+  return { kind: 'flying', index: wingFrames[Math.floor((seconds - 24.8) * 8) % wingFrames.length] };
 }
 
-function glyphImage(text: string): GlyphImage | null {
-  const lines = text.split('\n');
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  context.font = '16px "Courier New", Courier, monospace';
-  const cellWidth = context.measureText('M').width;
-  const cellHeight = 16;
-  canvas.width = Math.ceil(Math.max(...lines.map((line) => line.length)) * cellWidth);
-  canvas.height = lines.length * cellHeight;
-  context.font = '16px "Courier New", Courier, monospace';
-  context.fillStyle = '#000';
-  context.textBaseline = 'top';
-  lines.forEach((line, row) => context.fillText(line, 0, row * cellHeight));
-  const image = context.getImageData(0, 0, canvas.width, canvas.height);
-  return { pixels: image.data, width: canvas.width };
+function poseField(pose: BirdPose): DensityField {
+  return pose.kind === 'perched'
+    ? extractRegion(pose.index, perchedReferenceIndex, 47, 54, 56, 92)
+    : extractRegion(pose.index, birdReferenceIndex, 0, animationData.rows - 1, 0, animationData.cols - 1);
 }
 
-function rasterizeBird(sprite: BirdSprite): GridPoint[] {
-  if (!sprite.text) return [];
-  const image = glyphImage(sprite.text);
-  if (!image) return [];
-  const lines = sprite.text.split('\n');
-  const cellWidth = image.width / Math.max(...lines.map((line) => line.length));
-  const points: GridPoint[] = [];
-  for (let row = 0; row < lines.length; row++) {
-    for (let col = 0; col < lines[row].length; col++) {
-      if (lines[row][col] === ' ') continue;
-      for (let y = 0; y < 4; y++) {
-        for (let x = 0; x < 3; x++) {
-          const pixelX = Math.min(image.width - 1, Math.floor((col + (x + 0.5) / 3) * cellWidth));
-          const pixelY = Math.floor((row + (y + 0.5) / 4) * 16);
-          const alpha = image.pixels[(pixelY * image.width + pixelX) * 4 + 3];
-          if (alpha > 40) points.push({ col: col + x / 3, row: row + y / 4, rank: Math.max(1, Math.round(alpha / 255 * 9)) });
-        }
-      }
-    }
-  }
-  return points;
-}
+const birdFields = new Map<string, DensityField>();
 
-const birdCache = new Map<number, GridPoint[]>();
-
-export function birdPoints(seconds: number): GridPoint[] {
-  const sprite = birdSprite(seconds);
-  if (!sprite) return [];
-  if (!birdCache.has(sprite.index)) birdCache.set(sprite.index, rasterizeBird(sprite));
-  return birdCache.get(sprite.index) ?? [];
+export function birdField(seconds: number): DensityField | null {
+  const pose = birdPose(seconds);
+  if (!pose) return null;
+  const key = `${pose.kind}:${pose.index}`;
+  const cached = birdFields.get(key);
+  if (cached) return cached;
+  const field = poseField(pose);
+  birdFields.set(key, field);
+  return field;
 }
 
 export const animationGrid = {

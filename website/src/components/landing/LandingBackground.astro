@@ -1,25 +1,37 @@
 <div class="landing-background" aria-hidden="true" data-dot-matrix>
-  <canvas data-layer="animation"></canvas>
+  <canvas data-layer="crocodile"></canvas>
+</div>
+<div class="landing-flight" aria-hidden="true" data-dot-flight>
+  <canvas data-layer="bird"></canvas>
 </div>
 
 <script>
-  const container = document.querySelector<HTMLElement>('[data-dot-matrix]');
-  if (container) {
+  const background = document.querySelector<HTMLElement>('[data-dot-matrix]');
+  const flight = document.querySelector<HTMLElement>('[data-dot-flight]');
+  if (background && flight) {
     const { startDotMatrix } = await import('./dot-matrix');
-    startDotMatrix(container);
+    startDotMatrix(background, flight);
   }
 </script>
 
 <style>
-  .landing-background {
+  .landing-background,
+  .landing-flight {
     position: fixed;
     inset: 0;
-    z-index: 0;
     overflow: hidden;
     pointer-events: none;
   }
 
-  .landing-background canvas {
+  .landing-background {
+    z-index: 0;
+  }
+
+  .landing-flight {
+    z-index: 30;
+  }
+
+  canvas {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -27,7 +39,7 @@
     pointer-events: none;
   }
 
-  .landing-background[data-unavailable='true'] canvas {
+  [data-unavailable='true'] canvas {
     display: none;
   }
 </style>
