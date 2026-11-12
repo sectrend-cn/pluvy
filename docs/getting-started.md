@@ -164,12 +164,6 @@ edit selects that statement; a pure deletion keeps a nearby line anchor; untrack
 in full. Ownership and placement constraints still apply to every changed file. Reports use `scope`
 to distinguish `full_files` from `affected_definitions_and_statements`.
 
-Known limitation: an edit inside an existing multi-line class field declaration that does not touch
-the diagnostic anchor line (the member's first line) loses member-anchored aggregate or multi-line
-diagnostics in the change modes; `type.broad`, `type.annotation` and `structure.guarded_projection`
-are lost the same way. This is existing engine behaviour (change scopes do not expand class
-members), not a defect introduced by this task; use `--all` to audit such edits.
-
 Other semantics: an empty full audit counts as a configuration error (exit 2); an empty change audit
 reports 0 files; syntax errors only produce a warning on stderr without changing the exit code, and
 the remaining checks continue on the recovered syntax tree, so their results may be inaccurate;
@@ -179,9 +173,6 @@ warnings do not affect exit 0.
 `usage_files`, `disabled_checkers`, plus the mode and the file counts. That structure is delivered as
 currently implemented and is not promised as a stable external ABI; on upgrade, go by the actual
 output.
-
-Every mode is read-only throughout: no fixing, stash, stage, restore, deletion or rewriting of source
-files.
 
 ## Triage
 
@@ -194,9 +185,8 @@ files.
    marker — `#` for Python, `//` for Go, Java and the JavaScript family; but the mechanism may only be
    used for exceptions with **explicit (human) approval obtained in advance** — approval comes before
    and independently of the reason, the reason only records that approval and is not a proof of
-   safety, and the exception must be reconsidered when how the code is used changes. Block-comment
-   forms, wildcards, lists, `type.suppression` itself and a missing reason all report a
-   `type.suppression` error; abusing suppression is itself an error. See
+   safety, and the exception must be reconsidered when how the code is used changes. Invalid forms — block
+   comments, wildcards, lists, a missing reason — report `type.suppression`. See
    [Approved next-line diagnostic exceptions](comment-suppressions.md) for the syntax and validation
    rules.
 3. **Policy revision**: threshold, exclusion or owner adjustments are policy changes and need their

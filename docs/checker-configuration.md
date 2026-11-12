@@ -251,8 +251,6 @@ skipped.
 Remove any `checkers["syntax.invalid"]` entry from existing policies; it is now
 rejected as an unknown checker. Parser warnings have no enable/disable option.
 
-The repository's own policy keeps every checker enabled and retains the existing
-thresholds, ownership assignments, dependency boundaries, and extension paths.
 Changing enable flags is a policy change subject to the same full-audit and review
 requirements as changing thresholds or boundaries. Staged-policy changes remain
 blocked by the staged gate; unstaged options do not alter index-based checks.
