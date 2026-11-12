@@ -3,9 +3,16 @@
 Plan B separates the token-less PR build from a trusted default-branch
 `workflow_run` publisher. There is no per-run human approval and no unconditional
 upload guard. Admission failures are errors, including missing credentials.
-**Publishing is not active in this PR.** The publisher must first exist on `main`,
-and Ops must configure the Environment. Admission has a positive path under the
-PR-head policy below. This PR must not be merged by the agent.
+**First-time activation** requires the trusted publisher workflow to exist on
+`main` and Ops to complete the Environment credentials and settings below.
+The publisher file is on `main` after that first integration. Subsequent
+same-repository PRs that change `website/**` or `docs/**` and target `main`
+are previewed automatically while they remain **open and unmerged**. Merging
+those later PRs is not required for preview publishing. Opening, synchronizing,
+or reopening them runs the token-less build; a successful completion triggers
+the trusted `workflow_run` publisher from `main`. Admission has a positive
+path under the PR-head policy below. Missing Environment credentials still
+fail closed.
 
 ## Build and trust boundary
 
@@ -145,9 +152,10 @@ and separately prove that a regenerated merge cannot relabel the artifact.
 The artifact remains untrusted even when these identity checks pass: a PR can
 change the build YAML at the same registered path and ID. Static validation and
 never executing PR or artifact code remain the content boundary. Admission uses
-the available head-currentness evidence; automatic upload requires a future merge
-of the trusted publisher to `main` and completed Ops setup. No live publishing
-from this PR is claimed.
+the available head-currentness evidence. Automatic upload requires the trusted
+publisher on `main` (the first-integration merge) and completed Ops Environment
+setup; afterwards, website and docs PRs do not need to be merged for their
+previews to publish.
 
 ## Static files and trusted tooling
 
@@ -217,20 +225,21 @@ does not constrain what a stolen account token could do elsewhere.
    Upload project, its production branch is `main`, and its Git integration,
    custom domains, and preview access settings are appropriate. Those Cloudflare
    facts have not been verified through authenticated access in this task.
-7. Automatic upload can start only after the trusted publisher exists on `main`
-   and these settings are complete. This PR cannot exercise `workflow_run`
-   publishing from its branch.
-   After those prerequisites, verify deployed headers, docs, 404s, deployment URL,
-   and branch alias through an independently authorized preview. Do not trigger a
-   production deployment or test live tokens from this PR.
+7. First-time activation is complete only after the trusted publisher exists on
+   `main` **and** these Environment settings and credentials are in place.
+   After that, unmerged website/docs PRs targeting `main` automatically run the
+   preview build and, on success, the trusted publisher. Verify deployed
+   headers, docs, 404s, deployment URL, and branch alias through an independently
+   authorized preview. Do not use a preview PR to trigger a production
+   deployment or to read live token values.
 
 ## Production effects and local verification
 
-`.github/workflows/deploy-website.yml` remains byte-identical to both `origin/main`
-and the task's starting commit. A future merge would trigger that existing
-production website workflow because website/docs paths were already changed on
-this branch. Merging, deploying, changing `main`, configuring Environments, and
-reading/writing secrets are outside this implementation task.
+`.github/workflows/deploy-website.yml` is the production website workflow on
+`main`. Merging a website or docs PR into `main` still triggers it. That is
+separate from PR preview publishing, which does not require the preview PR to
+be merged. Configuring Environments and reading or writing secrets remain Ops
+work.
 
 Run `python3 -m unittest discover -s .github/tests -v` for admission and artifact
 security cases. Both preview build and engineering CI run this suite. It imports
