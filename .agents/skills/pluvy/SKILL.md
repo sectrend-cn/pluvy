@@ -68,13 +68,13 @@ root.
 |---|---|
 | `0` | No error-severity findings (warnings do not affect it) |
 | `1` | Error-severity findings are present |
-| `2` | Configuration/encoding/filesystem/Git failure (including a staged policy change, until a separate `--all` full audit passes and the change is committed) |
+| `2` | Configuration/encoding/filesystem/Git failure (including `--staged` while a policy change is staged) |
 
 ## Post-run checks
 
-1. The gate output ends with a line like `Architecture base: N files`. If N is
-   0 while the task really changed code, the base choice is wrong: reselect it
-   and rerun; do not treat the run as a pass.
+1. The gate output ends with a line like `Architecture base: N files; M findings.`.
+   If N is 0 while the task really changed code, the base choice is wrong:
+   reselect it and rerun; do not treat the run as a pass.
 2. If the task changed the policy file, judge it with a separate `pluvy --all`,
    not a `--base` run alone, and have the policy change reviewed.
 3. Unrelated dirty changes that predate the task are swept into `--base HEAD`
@@ -316,9 +316,11 @@ option, and `syntax.invalid` is not a checker. Malformed configuration fails
 closed with exit code 2.
 
 Thresholds, excludes, owners, boundaries and enable flags are architecture
-decisions: changing any of them requires a separate full audit and review, and
-a staged policy change stays blocked until that audit passes and the change is
-committed. Disabling a checker or raising a limit is never remediation. The
+decisions: changing any of them requires a separate full audit and review
+before the change is committed. `--staged` refuses with exit code 2 while a
+policy change is staged, but the gate does not record whether the audit ran, so
+the audit and review are the committer's obligation. Disabling a checker or
+raising a limit is never remediation. The
 full option list, defaults, types and examples for each checker are on the page
 linked from the [checker index](references/checkers.md).
 

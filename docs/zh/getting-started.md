@@ -8,13 +8,49 @@
 pluvy 是只读的解析型工程策略门禁：任何运行模式都不修改、暂存、还原、删除或重写源
 文件，也不改动 Git 配置。命令、策略示例和契约原文保持英文原文，说明文字使用中文。
 
+## Quick start
+
+在要检查的 Git 仓库根目录执行：
+
+```sh
+uv tool install pluvy
+mkdir -p .pluvy
+echo '{"version": 2, "include": ["src/*", "tests/*"], "checkers": {}}' > .pluvy/pluvy.json
+pluvy --all
+```
+
+输出每行一条 finding，最后是汇总。以一个声明了 `def load(value: Any) -> Any` 的
+`src/app.py`，加上一个调用 `load(1)` 后断言 `True` 的测试为例：
+
+```text
+src/app.py:4:17: type.annotation: Preserve a concrete contract instead of Any
+src/app.py:4:17: type.broad: Do not erase contracts with typing.Any
+src/app.py:4:25: type.annotation: Preserve a concrete contract instead of Any
+src/app.py:4:25: type.broad: Do not erase contracts with typing.Any
+tests/test_app.py:5:5: warning: unused.return: Return value from 'load' is discarded
+tests/test_app.py:6:5: test.tautology: Assertion in test_load cannot fail because it restates the same expression or a literal true. Assert an independently produced value or outcome instead.
+Diagnostic scope: full_files.
+Usage reference scope: 2 files.
+Architecture all: 2 files; 6 findings.
+```
+
+每条 finding 的格式为 `path:line:column: rule: message`；rule 前带 `warning:` 的是
+warning，不影响退出码。Python 的 `typing.Any` 会同时报 `type.annotation` 与 `type.broad`，
+所以每个位置出现两次。末行给出模式、审计文件数与 finding 数。本例存在 error 级 finding，
+因此返回 exit 1；在存量代码库上这是正常的首次读数，见
+[存量仓库的首次全量审计](#存量仓库的首次全量审计)。
+
+如果源码不在 `src/` 与 `tests/` 下，请调整 `include`：它选不中任何受支持源文件时，`--all`
+返回 exit 2。首次读数复审之后提交 `.pluvy/pluvy.json`，之后的改动对照某个基准 commit
+做门禁，例如 `pluvy --base origin/main`。下面各节逐步展开。
+
 ## Installation
 
 ### 前置条件
 
 - Python 3.12 或更高版本。
-- 建议使用 `uv` 管理独立的工具环境；`uv` 自身的获取方式与仓库开发命令见
-  [README 的 Development 节](../../README.md#development)。
+- 建议使用 `uv` 管理独立的工具环境，获取方式见
+  [uv 安装指南](https://docs.astral.sh/uv/getting-started/installation/)。
 
 ### 从 PyPI 安装
 
@@ -32,8 +68,10 @@ python -m pip install pluvy
 
 只想临时运行一次而不安装时，使用 `uvx pluvy --all`。
 
-安装把 `pluvy` 放到用户级可执行目录（例如 `~/.local/bin`），请确认该目录在 `PATH`
-中。若已存在同名的 uv 工具安装，需要替换时给 `uv tool install` 加 `--force`。
+`uv tool install` 把 `pluvy` 放到 uv 的工具可执行目录（`uv tool dir --bin` 可打印该目录，
+通常是 `~/.local/bin`）；该目录不在 `PATH` 中时，执行 `uv tool update-shell` 加入。`pip`
+则把 `pluvy` 放到所安装 Python 环境的 scripts 目录。若已存在同名的 uv 工具安装，需要替换时给
+`uv tool install` 加 `--force`。
 
 ### 获取源码
 
@@ -74,7 +112,7 @@ agent 使用的 skill 来自仓库：把检出中的 `.agents/skills/pluvy/`
 其中 `checkers` 为空对象（或省略该键）时，全部 checker 保持默认启用：
 
 ```json
-{"version": 2, "include": ["src/*"], "exclude": [], "checkers": {}}
+{"version": 2, "include": ["src/*", "tests/*"], "exclude": [], "checkers": {}}
 ```
 
 策略里可以按需补上的内容：
@@ -101,8 +139,11 @@ agent 使用的 skill 来自仓库：把检出中的 `.agents/skills/pluvy/`
 ### 变更策略的纪律
 
 策略变更（调整阈值、增加排除、改动 owner/boundary）是架构决策，不是消除告警的手段。
-bootstrap 首版和每次修订都需要另行执行全量审计 `--all` 并复审。`--staged` 一旦发现 index
-中的策略变更就直接以 exit 2 拒绝，直到全量审计通过并提交。
+bootstrap 首版和每次修订都需要在提交前另行执行全量审计 `--all` 并复审。策略变更停留在 index
+中时，`--staged` 直接以 exit 2 拒绝，而不是用未经复审的策略审计暂存代码。工具不记录全量审计
+是否执行过：变更一旦提交，`--staged` 就会接受它，所以审计与复审属于提交流程，而不是门禁强制
+的检查。因此运行 `pluvy --staged` 的 pre-commit hook 会拦下任何包含策略变更的提交；复审后的
+策略变更请单独提交，并只对这一次提交跳过 hook（例如 `git commit --no-verify`）。
 
 全部选项、策略结构、各语言覆盖范围以及实现限制见
 [Checker configuration](../checker-configuration.md)。
@@ -135,7 +176,7 @@ pluvy --all --format json
 |---|---|
 | `0` | 无 error 级 finding（warning 不影响） |
 | `1` | 存在 error 级 finding |
-| `2` | 配置/编码/文件系统/Git 失败（含 staged 下策略变更，直到另行 `--all` 全量审计通过并提交） |
+| `2` | 配置/编码/文件系统/Git 失败（含策略变更已暂存时的 `--staged`） |
 
 变更模式（`--base` / `--staged`）完整解析快照，但报告的是**受影响定义与模块语句**：函数内
 的编辑扩展到整个函数（含装饰器与签名），类头编辑选中整个类，模块语句编辑选中该语句；纯删除
@@ -149,6 +190,15 @@ warning 不影响 exit 0。
 `--format json` 输出当前报告结构：`scope`、`findings`（每项带 `severity`）、`usage_files`、
 `disabled_checkers`，以及模式与文件计数。该结构按当前实现交付，未承诺作为对外稳定 ABI，
 升级时请以实际输出为准。
+
+### 排错
+
+| 输出 | 原因 | 处理 |
+|---|---|---|
+| `Architecture gate error: [Errno 2] No such file or directory: '.../.pluvy/pluvy.json'` | `--root` 下没有策略，或在子目录中运行 | 补上策略，或回到仓库根运行、或传 `--root` |
+| `Architecture gate error: fatal: Needed a single revision` | `--base` 指定的 commit 不存在，例如首次提交前的 `--base HEAD` | 先提交，或改用 `--all` |
+| `Architecture gate error: Policy changed in index; review it and run --all before adoption` | index 中有策略变更时运行 `--staged` | 按 [变更策略的纪律](#变更策略的纪律) 处理 |
+| `Architecture base: 0 files; 0 findings.` 且 exit 0 | 与基准没有差异，例如任务改动已提交后运行 `--base HEAD` | 不算通过：以任务首个 commit 的父 commit 为基准重跑 |
 
 ## Triage
 
@@ -188,8 +238,8 @@ warning 不影响 exit 0。
 （error/warning 计数与关键项）；人工开发按同样口径执行。情形与命令对照表（改动未提交、
 任务已产生 commit、起始 commit 不可知、staged 审计边界）、三条政策规则、配套自检与报告
 格式的权威在 [pluvy skill](../../.agents/skills/pluvy/SKILL.md)。配套自检含
-files-count 自检：报告末行形如 `Architecture base: N files`，N=0 而任务确有改动时不得视为
-通过。
+files-count 自检：报告末行形如 `Architecture base: N files; M findings.`，N=0 而任务确有改动时
+不得视为通过。
 
 ## Agent integration
 
@@ -206,7 +256,8 @@ skill 目录来自仓库检出中的 `.agents/skills/pluvy/`（含 `SKILL.md` �
    的目录（如用户级 skills 目录），单一真相的收益也在那里。
    破坏面：仓库内留有目录 symlink 时，`--all`（bootstrap 首跑、策略复审、起始 commit 不可知
    时的回退）与带真实改动的 `--base`（其 usage 证据同样走全盘磁盘枚举）都会 exit 2。唯一仍
-   能静默通过的是 0 文件退化形态，即 Per-task gating 一节配套指令 1 已要求识别的假通过（files=0
+   能静默通过的是 0 文件退化形态，即 [Per-task gating](#per-task-gating) 一节 files-count 自检
+   已要求识别的假通过（files=0
    而任务确有改动时必须重选 base）；`--staged` 不走磁盘枚举，但不用于任务后门禁。实际影响在
    第一个真实任务处即暴露。
 3. **AGENTS.md 指针片段**：以 `AGENTS.md` 作为指令入口的 agent，把下面的片段加进它的指令

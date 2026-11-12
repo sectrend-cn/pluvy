@@ -1,6 +1,7 @@
 ---
 import { basePath, docsPath, landingContent, type Language } from '../../i18n.ts';
 import TextSegments from '../TextSegments.astro';
+import { formatText } from '../../typography/chinese-text.ts';
 
 interface Props {
   lang?: Language;
@@ -41,8 +42,9 @@ const output = [
     <div class="workflow__heading legible">
       <h2 id="workflow-title" class="display-title"><TextSegments text={content.titleA} lang={lang} />{' '}<br /><em><TextSegments text={content.titleB} lang={lang} /></em></h2>
       <ul class="scopes">
-        {content.scopes.map((scope) => <li><code>{scope}</code></li>)}
+        {content.scopes.map((scope) => <li><code>{scope.flag}</code><p>{formatText(scope.use, lang)}</p></li>)}
       </ul>
+      <p class="trust">{formatText(content.trust, lang)}</p>
       <a class="text-link" href={`${base}${docsPath(lang)}/getting-started/#running`}>{content.guide}</a>
     </div>
     <div class="workflow__evidence">
@@ -101,6 +103,18 @@ const output = [
     font-family: var(--mono);
     font-size: 0.8rem;
     font-weight: 600;
+  }
+
+  .scopes p {
+    margin: 0.35rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .trust {
+    margin: 1.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
   }
 
   h2 em {

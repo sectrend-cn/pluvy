@@ -79,8 +79,8 @@ th,
 :where(code, pre, kbd, samp, input, textarea, .mono,
   .button, .text-link, .site-nav, .site-footer__links, .hero__command,
   .evidence-meta, .evidence-block__bar, .code-comparison,
-  .post-list__date, .post-list__tags, .article-header__meta, .journal__meta,
-  .principles__list > li > span, .language-note span, .capabilities__grid > li > span,
+  .post-list__date, .post-list__tags, .article-header__meta,
+  .principles__list > li > span,
   .exit-codes h3, .exit-codes dt) {
   text-autospace: no-autospace;
 }
