@@ -6,7 +6,7 @@ const websiteRoot = path.dirname(fileURLToPath(new URL('../package.json', import
 const sourceRoot = path.join(websiteRoot, '..', 'docs');
 const outputRoot = path.join(websiteRoot, 'src', 'content', 'docs');
 const repository = 'https://github.com/sectrend-cn/pluvy/blob/main';
-const siteBase = '/pluvy';
+const siteBase = (process.env.ASTRO_BASE ?? '/pluvy').replace(/\/+$/, '');
 
 const locales = [
   { source: sourceRoot, output: outputRoot, slugPrefix: 'docs', repositoryPrefix: '../' },
