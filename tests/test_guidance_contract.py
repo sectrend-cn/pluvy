@@ -106,6 +106,7 @@ CHECKER_DOCUMENT_LINKS = tuple(f"checkers/{identifier}.md" for identifier in sor
 
 CONTRACT_ANCHORS = frozenset(
     {
+        "quick-start",
         "installation",
         "configuration",
         "running",

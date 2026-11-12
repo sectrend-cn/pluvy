@@ -10,14 +10,52 @@ restores, deletes or rewrites source files, and none of them changes Git configu
 A Chinese translation of this page is available at
 [zh/getting-started.md](zh/getting-started.md).
 
+## Quick start
+
+From the root of the Git repository you want to check:
+
+```sh
+uv tool install pluvy
+mkdir -p .pluvy
+echo '{"version": 2, "include": ["src/*", "tests/*"], "checkers": {}}' > .pluvy/pluvy.json
+pluvy --all
+```
+
+The output lists one finding per line, then a summary. For a `src/app.py` that declares
+`def load(value: Any) -> Any` and a test that calls `load(1)` and then asserts `True`:
+
+```text
+src/app.py:4:17: type.annotation: Preserve a concrete contract instead of Any
+src/app.py:4:17: type.broad: Do not erase contracts with typing.Any
+src/app.py:4:25: type.annotation: Preserve a concrete contract instead of Any
+src/app.py:4:25: type.broad: Do not erase contracts with typing.Any
+tests/test_app.py:5:5: warning: unused.return: Return value from 'load' is discarded
+tests/test_app.py:6:5: test.tautology: Assertion in test_load cannot fail because it restates the same expression or a literal true. Assert an independently produced value or outcome instead.
+Diagnostic scope: full_files.
+Usage reference scope: 2 files.
+Architecture all: 2 files; 6 findings.
+```
+
+Each finding reads `path:line:column: rule: message`; a `warning:` prefix before the rule marks a
+warning, which never changes the exit code. A Python `typing.Any` reports under both
+`type.annotation` and `type.broad`, which is why each position appears twice. The last line names
+the mode, the number of audited files and the number of findings. Here the run exits 1 because
+error-level findings are present; on
+an existing codebase that is the normal first reading, see
+[First full audit of an existing repository](#first-full-audit-of-an-existing-repository).
+
+If your sources live outside `src/` and `tests/`, adjust `include`: when it selects no supported
+source file, `--all` exits 2. Once the first reading has been reviewed, commit
+`.pluvy/pluvy.json` and gate later changes against a base commit, for example
+`pluvy --base origin/main`. The sections below cover each step in detail.
+
 ## Installation
 
 ### Prerequisites
 
 - Python 3.12 or later.
-- Using `uv` to manage a dedicated tool environment is recommended; for obtaining `uv` itself and
-  for the repository development commands, see
-  [the Development section of the README](../README.md#development).
+- Using `uv` to manage a dedicated tool environment is recommended; see the
+  [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) to obtain it.
 
 ### Installation from PyPI
 
@@ -35,9 +73,11 @@ python -m pip install pluvy
 
 To run once without installing, use `uvx pluvy --all`.
 
-The installation places `pluvy` in the user-level executable directory (for example
-`~/.local/bin`), so make sure that directory is on your `PATH`. If a uv tool installation of the same
-name already exists and you need to replace it, pass `--force` to `uv tool install`.
+`uv tool install` places `pluvy` in uv's tool executable directory (`uv tool dir --bin` prints it,
+typically `~/.local/bin`); if that directory is not on your `PATH`, `uv tool update-shell` adds it.
+`pip` places `pluvy` in the scripts directory of the Python environment it installs into. If a uv
+tool installation of the same name already exists and you need to replace it, pass `--force` to
+`uv tool install`.
 
 ### Obtaining the source
 
@@ -83,7 +123,7 @@ working policy by hand, in which an empty `checkers` object (or omitting that ke
 checker enabled by default:
 
 ```json
-{"version": 2, "include": ["src/*"], "exclude": [], "checkers": {}}
+{"version": 2, "include": ["src/*", "tests/*"], "exclude": [], "checkers": {}}
 ```
 
 What you can add to the policy as needed:
@@ -116,9 +156,13 @@ existing findings.
 
 A policy change (adjusting thresholds, adding exclusions, changing owners/boundaries) is an
 architecture decision, not a way to make findings disappear. The first bootstrap version and every
-revision each need a separate full audit with `--all` and a review. As soon as `--staged` sees a
-policy change in the index it refuses with exit 2, until the full audit passes and the change is
-committed.
+revision each need a separate full audit with `--all` and a review before the change is committed.
+While a policy change sits in the index, `--staged` refuses with exit 2 instead of auditing staged
+code against an unreviewed policy. The tool does not record whether the full audit ran: once the
+change is committed, `--staged` accepts it, so the audit and review are part of the commit process,
+not something the gate enforces. A pre-commit hook that runs `pluvy --staged` therefore blocks any
+commit that contains the policy change; commit the reviewed policy change on its own and skip the
+hook for that commit only (for example with `git commit --no-verify`).
 
 See [Checker configuration](checker-configuration.md) for all options, the policy structure,
 per-language coverage and implementation limits.
@@ -155,7 +199,7 @@ Exit codes:
 |---|---|
 | `0` | No error-level finding (warnings do not matter) |
 | `1` | At least one error-level finding |
-| `2` | Configuration, encoding, file-system or Git failure (including a policy change under staged, until a separate `--all` full audit passes and is committed) |
+| `2` | Configuration, encoding, file-system or Git failure (including `--staged` while a policy change is staged) |
 
 The change modes (`--base` / `--staged`) resolve the snapshot in full but report the **affected
 definitions and module statements**: an edit inside a function expands to the whole function
@@ -173,6 +217,15 @@ warnings do not affect exit 0.
 `usage_files`, `disabled_checkers`, plus the mode and the file counts. That structure is delivered as
 currently implemented and is not promised as a stable external ABI; on upgrade, go by the actual
 output.
+
+### Troubleshooting
+
+| Output | Cause | What to do |
+|---|---|---|
+| `Architecture gate error: [Errno 2] No such file or directory: '.../.pluvy/pluvy.json'` | No policy under `--root`, or the command ran from a subdirectory | Add the policy, or run from the repository root or pass `--root` |
+| `Architecture gate error: fatal: Needed a single revision` | The `--base` commit does not exist, for example `--base HEAD` before the first commit | Commit first, or use `--all` |
+| `Architecture gate error: Policy changed in index; review it and run --all before adoption` | `--staged` with a policy change in the index | Follow [Discipline for changing the policy](#discipline-for-changing-the-policy) |
+| `Architecture base: 0 files; 0 findings.` with exit 0 | Nothing differs from the base, for example `--base HEAD` after the task's changes were committed | Not a pass: rerun with the parent of the task's first commit as the base |
 
 ## Triage
 
@@ -221,8 +274,8 @@ items; human development follows the same rules. The situation-to-command table 
 changes, commits produced by the task, unknown start commit, staged-audit boundary), the three
 policy rules, the supporting self-checks and the report format are authoritative in the
 [pluvy skill](../.agents/skills/pluvy/SKILL.md). Those self-checks include the
-files-count check: the report's last line reads `Architecture base: N files`, and N=0 cannot
-count as a pass when the task really changed code.
+files-count check: the report's last line reads `Architecture base: N files; M findings.`, and
+N=0 cannot count as a pass when the task really changed code.
 
 ## Agent integration
 
@@ -243,10 +296,11 @@ The skill directory comes from `.agents/skills/pluvy/` in the repository checkou
    Blast radius: while a directory symlink remains inside the repository, `--all` (the bootstrap
    first run, policy review, and the fallback when the start commit is unknown) and a `--base` with
    real changes (whose usage evidence also goes through whole-disk enumeration) both exit 2. The only
-   shape that still passes silently is the 0-file degenerate one, that is, the false pass that
-   supporting instruction 1 in Per-task gating already requires you to detect (when files=0 while the
-   task really changed something, you must choose another base); `--staged` does not walk the disk,
-   but it is not used for post-task gating. The real impact shows up at the first real task.
+   shape that still passes silently is the 0-file degenerate one, that is, the false pass that the
+   files-count check in [Per-task gating](#per-task-gating) already requires you to detect (when
+   files=0 while the task really changed something, you must choose another base); `--staged` does
+   not walk the disk, but it is not used for post-task gating. The real impact shows up at the first
+   real task.
 3. **AGENTS.md pointer snippet**: for an agent that uses `AGENTS.md` as its instruction entry point,
    add the snippet below to that instruction file. Integration is manual pasting and does not
    rewrite AGENTS.md (it is the user's own policy asset):

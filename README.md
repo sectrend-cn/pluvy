@@ -101,8 +101,9 @@ The first `--all` on an existing codebase usually exits `1`: that is the
 baseline reading, not a failure of the tool. Gate pull requests with `--base`
 so new changes are held to the policy, work through the `--all` findings over
 time fixing the code first, and treat threshold, exclusion and owner changes as
-architecture decisions, each with its own full audit and review; a staged policy
-change is refused until that audit passes. Exceptions use an approved next-line
+architecture decisions, each with its own full audit and review before the
+change is committed; `--staged` refuses to run while a policy change is staged.
+Exceptions use an approved next-line
 suppression that names one rule and a reason; see
 [comment suppressions](docs/comment-suppressions.md).
 
@@ -133,6 +134,8 @@ This repository gates itself in
 ### Pre-commit
 
 Once the policy is committed, a pre-commit hook can run `pluvy --staged`.
+The hook blocks commits that change the policy; see
+[Discipline for changing the policy](docs/getting-started.md#discipline-for-changing-the-policy).
 Install hooks yourself; Pluvy never changes Git configuration.
 
 ## Extending
