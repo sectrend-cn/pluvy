@@ -4,7 +4,7 @@ description: Read-only analysis keeps the policy gate independent from the chang
 pubDate: 2026-11-05
 authors: [Pluvy team]
 tags: [engineering, read-only]
-draft: false
+draft: true
 ---
 
 Pluvy has a deliberately narrow contract: examine an exact source snapshot, apply the repository's engineering policy, and report what the analysis found. It does not repair the source, stage a change, restore a file, or rewrite Git configuration.
