@@ -1,0 +1,68 @@
+name: Cloudflare PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "website/**"
+      - "docs/**"
+
+permissions: {}
+
+concurrency:
+  group: cloudflare-preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build static preview without Cloudflare credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      ASTRO_BASE: /
+    steps:
+      - name: Check out the immutable PR head commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js 22 without shared caches
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Check static upload validation and documentation bases
+        run: |
+          python3 -m unittest discover -s .github/tests -v
+          node --test website/tests/sync-docs.test.mjs
+
+      - name: Install website dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Build the static website
+        working-directory: website
+        run: npm run build
+
+      - name: Check rendered favicon URLs across site bases
+        working-directory: website
+        run: node --test tests/base-layout.test.mjs
+
+      - name: Package untrusted static output without following links
+        run: |
+          set -euo pipefail
+          [[ -d website/dist && ! -L website/dist ]] || exit 1
+          tar --create --file "$RUNNER_TEMP/website-preview.tar" --directory website/dist .
+
+      - name: Upload this run's untrusted archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: website-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/website-preview.tar
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0

@@ -1,0 +1,117 @@
+name: Publish Cloudflare PR preview
+
+on:
+  workflow_run:
+    workflows: ["Cloudflare PR preview"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  admission:
+    name: Verify source workflow and current PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pr-number: ${{ steps.admit.outputs.pr-number }}
+      artifact-id: ${{ steps.admit.outputs.artifact-id }}
+    steps:
+      - name: Check out only the trusted default-branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Admit the source run against live GitHub evidence
+        id: admit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python3 -I .github/scripts/preview_publish.py admit
+
+  publish:
+    name: Upload the verified PR's static preview
+    needs: admission
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-pr-preview
+    concurrency:
+      group: cloudflare-preview-publish-${{ needs.admission.outputs.pr-number }}
+      cancel-in-progress: false
+    env:
+      EXPECTED_PR_NUMBER: ${{ needs.admission.outputs.pr-number }}
+      EXPECTED_ARTIFACT_ID: ${{ needs.admission.outputs.artifact-id }}
+    steps:
+      - name: Check out only the trusted default-branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Repeat admission after acquiring the PR concurrency slot
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python3 -I .github/scripts/preview_publish.py admit
+
+      - name: Download only the verified artifact from the triggering run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          artifact-ids: ${{ needs.admission.outputs.artifact-id }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/preview-incoming
+          merge-multiple: true
+
+      - name: Copy only validated static bytes into a fresh directory
+        run: python3 -I .github/scripts/preview_publish.py prepare
+
+      - name: Set up Node.js 22 without shared caches
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Install fixed Wrangler without credentials or lifecycle scripts
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/preview-tooling" "$RUNNER_TEMP/preview-deploy" "$RUNNER_TEMP/preview-config"
+          touch "$RUNNER_TEMP/preview-config/user.npmrc" "$RUNNER_TEMP/preview-config/global.npmrc"
+          cd "$RUNNER_TEMP/preview-tooling"
+          env -i PATH="$PATH" \
+            npm --userconfig="$RUNNER_TEMP/preview-config/user.npmrc" \
+            --globalconfig="$RUNNER_TEMP/preview-config/global.npmrc" \
+            --cache="$RUNNER_TEMP/preview-npm-cache" \
+            --prefix="$RUNNER_TEMP/preview-tooling" \
+            install --ignore-scripts --no-audit --no-fund --save-exact wrangler@4.160.1
+
+      - name: Verify currentness again immediately before upload
+        id: current
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python3 -I .github/scripts/preview_publish.py admit
+
+      - name: Upload only to the dedicated verified PR branch
+        working-directory: ${{ runner.temp }}/preview-deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR_NUMBER: ${{ steps.current.outputs.pr-number }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            echo "Required preview Environment credentials are unavailable."
+            exit 1
+          fi
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || exit 1
+          env -i PATH="$PATH" CI=true WRANGLER_SEND_METRICS=false \
+            XDG_CONFIG_HOME="$RUNNER_TEMP/preview-config" \
+            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN" \
+            CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
+            node "$RUNNER_TEMP/preview-tooling/node_modules/wrangler/bin/wrangler.js" \
+            pages deploy "$RUNNER_TEMP/preview-upload" \
+            --project-name pluvy-preview --branch "pr-$PR_NUMBER"
