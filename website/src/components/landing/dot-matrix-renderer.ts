@@ -9,37 +9,44 @@ import {
   WebGLRenderer,
 } from 'three';
 
+export type DotChannel = 'crocodile' | 'bird';
+
 export interface RenderedPoint {
   x: number;
   y: number;
   size: number;
   alpha: number;
-  offsetX?: number;
-  offsetY?: number;
+  channel: DotChannel;
 }
 
-export type DotChannel = 'crocodile' | 'bird';
+export type DotPalette = Record<DotChannel, string>;
 
 const vertexShader = `
   attribute float aSize;
   attribute float aAlpha;
+  attribute float aBird;
   uniform float uPixelRatio;
   varying float vAlpha;
+  varying float vBird;
   void main() {
     vAlpha = aAlpha;
+    vBird = aBird;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = aSize * uPixelRatio;
   }
 `;
 
 const fragmentShader = `
-  uniform vec3 uColor;
+  uniform vec3 uCrocodile;
+  uniform vec3 uBird;
   varying float vAlpha;
+  varying float vBird;
   void main() {
     float distanceToCenter = length(gl_PointCoord - vec2(0.5));
     float coverage = 1.0 - smoothstep(0.35, 0.5, distanceToCenter);
     if (coverage <= 0.0) discard;
-    gl_FragColor = vec4(uColor, vAlpha * coverage);
+    gl_FragColor = vec4(mix(uCrocodile, uBird, vBird), vAlpha * coverage);
+    #include <colorspace_fragment>
   }
 `;
 
@@ -49,7 +56,8 @@ export class DotLayer {
   private readonly camera = new OrthographicCamera(0, 1, 1, 0, 0.01, 10);
   private readonly geometry = new BufferGeometry();
   private readonly material: ShaderMaterial;
-  private readonly ink = new Color('#1d211c');
+  private readonly crocodile = new Color('#60655f');
+  private readonly bird = new Color('#5c7c2f');
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
@@ -60,7 +68,8 @@ export class DotLayer {
       vertexShader,
       fragmentShader,
       uniforms: {
-        uColor: { value: this.ink },
+        uCrocodile: { value: this.crocodile },
+        uBird: { value: this.bird },
         uPixelRatio: { value: this.renderer.getPixelRatio() },
       },
       transparent: true,
@@ -79,23 +88,27 @@ export class DotLayer {
     this.camera.updateProjectionMatrix();
   }
 
-  setColor(color: string): void {
-    this.ink.set(color);
+  setPalette(palette: DotPalette): void {
+    this.crocodile.set(palette.crocodile);
+    this.bird.set(palette.bird);
   }
 
   update(points: RenderedPoint[]): void {
     const positions = new Float32Array(points.length * 3);
     const sizes = new Float32Array(points.length);
     const alphas = new Float32Array(points.length);
+    const birds = new Float32Array(points.length);
     points.forEach((point, index) => {
       positions[index * 3] = point.x;
       positions[index * 3 + 1] = point.y;
       sizes[index] = point.size;
       alphas[index] = point.alpha;
+      birds[index] = point.channel === 'bird' ? 1 : 0;
     });
     this.geometry.setAttribute('position', new BufferAttribute(positions, 3));
     this.geometry.setAttribute('aSize', new BufferAttribute(sizes, 1));
     this.geometry.setAttribute('aAlpha', new BufferAttribute(alphas, 1));
+    this.geometry.setAttribute('aBird', new BufferAttribute(birds, 1));
     this.geometry.setDrawRange(0, points.length);
     this.renderer.render(this.scene, this.camera);
   }

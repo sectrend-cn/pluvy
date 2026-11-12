@@ -321,6 +321,7 @@ svg {
   }
 
   [data-dot-matrix],
+  [data-dot-flight],
   .theme-toggle,
   .skip-link {
     display: none;
