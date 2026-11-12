@@ -22,9 +22,14 @@ The build uses Node 22, `npm ci`, `npm run build`, and `website/dist`, with
 documentation base remains `/pluvy`; trailing slashes are normalized to avoid
 double slashes at the root.
 
+`BaseLayout.astro` reuses the existing `basePath()` contract for the favicon.
+The rendered URL is `/favicon.svg` for the root preview and
+`/pluvy/favicon.svg` for the default GitHub Pages base. A root base must never
+emit `//favicon.svg`, which a browser interprets as another host.
+
 The existing `deploy-website.yml` remains byte-identical. It deploys only on
 matching pushes to `main` or manual dispatch. Publishing this feature branch
-and opening its draft PR cannot trigger it. Existing CI may run engineering
+and opening or updating this PR cannot trigger it. Existing CI may run engineering
 checks on the branch push and PR. Release publication requires a version tag.
 A future merge into `main` would trigger the existing website deploy because
 this change touches website and documentation inputs; merging is outside this task.
@@ -217,6 +222,12 @@ paths, executable Pages inputs, symlinks/hardlinks/special files, duplicates,
 missing indexes and oversized members, and exercise missing-credential skipping.
 Run `node --test website/tests/sync-docs.test.mjs` with Node 22 for default,
 root, explicit GitHub Pages and nested/trailing-slash documentation link cases.
+Run `node --test website/tests/base-layout.test.mjs` after dependency installation
+and documentation sync to build the real site in temporary output directories.
+It checks rendered favicon URLs and same-origin resolution on landing, Chinese,
+blog and 404 pages for root, default, nested and trailing-slash bases. The
+token-less preview build runs this matrix before packaging its original output;
+the matrix does not modify the preview artifact directory.
 Validate the workflow with actionlint. Build both root and default bases using
 the real locked website dependencies; run the normal repository engineering
 checks. These checks do not exercise GitHub runner isolation, protected environment
