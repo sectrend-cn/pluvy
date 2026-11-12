@@ -195,7 +195,7 @@ capability bindings belong to application composition.
 
 For a new language, declare its identity, suffixes, grammar and adapters; build an
 application profile and compatible rule bundle registry; then compose and register
-its analyzer. All extension parsers now return `TreeContext`. The count-dialect
+its analyzer. The count-dialect
 fixture in `tests/test_extensions.py` uses a registered tree-sitter grammar and
 verifies discovery, CLI findings, source selection and session lifetime through
 the same public extension path.

@@ -97,46 +97,22 @@ gating. A [Chinese translation](docs/zh/getting-started.md) is available.
 
 ## Adopting on an existing repository
 
-The first `--all` on an existing codebase usually exits `1`. That is the
-baseline reading, not a failure of the tool. A practical path:
-
-1. Gate pull requests with `--base` so new changes are held to the policy.
-2. Work through the `--all` findings over time: fix the code first.
-3. Treat threshold, exclusion and owner changes as architecture decisions, each
-   with its own full audit and review. A staged policy change is refused until
-   that audit passes.
-
-Exceptions use an approved next-line suppression that names one rule and a
-reason; see [comment suppressions](docs/comment-suppressions.md).
+The first `--all` on an existing codebase usually exits `1`: that is the
+baseline reading, not a failure of the tool. Gate pull requests with `--base`
+so new changes are held to the policy, work through the `--all` findings over
+time fixing the code first, and treat threshold, exclusion and owner changes as
+architecture decisions, each with its own full audit and review; a staged policy
+change is refused until that audit passes. Exceptions use an approved next-line
+suppression that names one rule and a reason; see
+[comment suppressions](docs/comment-suppressions.md).
 
 ## Policy
 
 Each target repository owns `.pluvy/pluvy.json`; paths inside it are relative to
 the repository root. Start from [the example policy](examples/.pluvy/pluvy.json),
-which declares owners, an import boundary and size limits:
-
-```json
-{
-  "version": 2,
-  "include": ["src/*", "tests/*"],
-  "exclude": [],
-  "checkers": {
-    "function_size": {"lines": 50, "complexity": 10},
-    "architecture.import": {
-      "boundaries": [
-        {
-          "name": "domain does not depend on adapters",
-          "sources": ["src/domain/*"],
-          "forbidden_imports": ["adapters", "adapters.*"]
-        }
-      ]
-    }
-  }
-}
-```
-
-Specify `"enabled": false` only to turn a checker off; omitted checkers and
-options keep their defaults.
+which declares owners, an import boundary and size limits. Specify
+`"enabled": false` only to turn a checker off; omitted checkers and options keep
+their defaults.
 
 ## Integration
 
