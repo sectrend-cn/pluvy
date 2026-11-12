@@ -39,6 +39,6 @@ The policy therefore lives with the project at `.pluvy/pluvy.json` and is commit
 
 ## Automation can still be responsible
 
-Read-only does not mean disconnected. Pluvy fits local development, CI, containers, JSON-consuming tooling, and explicitly configured agent review. The integration can decide how to present findings and whether a task may proceed.
+Read-only does not mean disconnected. Pluvy fits local development, CI, pre-commit hooks, JSON-consuming tooling, and coding agents that run the gate after each task. The integration can decide how to present findings and whether a task may proceed.
 
 What it should not do is confuse a successful gate with permission to modify the repository. Pluvy supplies evidence. Developers and reviewers own the response.
