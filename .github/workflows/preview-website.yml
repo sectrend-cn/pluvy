@@ -26,9 +26,10 @@ jobs:
     env:
       ASTRO_BASE: /
     steps:
-      - name: Check out the PR merge commit
+      - name: Check out the immutable PR head commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Set up Node.js 22 without shared caches

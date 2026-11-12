@@ -16,8 +16,8 @@ from preview_publish import (
     REPOSITORY,
     WORKFLOW_ID,
     Artifact,
-    Checkout,
     GitHubApi,
+    MergeCommit,
     PullRequest,
     Repository,
     Run,
@@ -28,6 +28,7 @@ from preview_publish import (
 
 HEAD = "a" * 40
 MERGE = "b" * 40
+BASE = "c" * 40
 REPO = Repository(REPOSITORY, "sectrend-cn")
 
 
@@ -39,21 +40,16 @@ def source_run() -> Run:
 
 
 class FixtureApi:
-    """Keep endpoint responses concrete and allow one adversarial fact per test.
-
-    A successful fixture explicitly supplies a separate checkout merge SHA.
-    Today's real API has no such evidence; that case has its
-    own rejection test and remains an operational blocker, not a fallback.
-    """
+    """Keep requested build head and current merge-parent evidence independent."""
 
     def __init__(self) -> None:
         self.identity = (WORKFLOW_ID, BUILD_PATH)
         self.live = source_run()
         self.attempt = self.live
-        self.checkout_merge_sha: str | None = MERGE
-        self.pulls = {23: PullRequest(23, "open", False, REPO, REPO, HEAD, "main")}
+        self.pulls = {23: PullRequest(23, "open", False, REPO, REPO, HEAD, "main", True)}
         self.associations: tuple[int, ...] = (23,)
-        self.merge = MERGE
+        self.main = BASE
+        self.merge_commit = MergeCommit(MERGE, (BASE, HEAD))
         self.uploads: tuple[Artifact, ...] = (Artifact(456, "website-preview-123-2", 123, False),)
         self.run_requests: list[tuple[int, int | None]] = []
         self.artifact_requests: list[int] = []
@@ -67,10 +63,6 @@ class FixtureApi:
         self.run_requests.append((run_id, attempt))
         return self.live if attempt is None else self.attempt
 
-    def checkout(self, run_id: int, attempt: int) -> Checkout:
-        """Supply explicit evidence only through the canonical API contract."""
-        return Checkout(self.run(run_id, attempt), self.checkout_merge_sha)
-
     def pull_numbers(self, head_sha: str) -> tuple[int, ...]:
         """Reject accidental PR lookup using the merge SHA or untrusted metadata."""
         if head_sha != HEAD:
@@ -81,11 +73,15 @@ class FixtureApi:
         """Supply current PR state independently of event associations."""
         return self.pulls[number]
 
-    def merge_sha(self, number: int) -> str:
+    def main_sha(self) -> str:
+        """Supply today's base independently of the successful head-tree build."""
+        return self.main
+
+    def merge(self, number: int) -> MergeCommit:
         """Require the verified PR number to select the live merge ref."""
         if number != 23:
             raise ValueError("Wrong merge ref")
-        return self.merge
+        return self.merge_commit
 
     def artifacts(self, run_id: int) -> tuple[Artifact, ...]:
         """Record the run-bound download admission request."""
@@ -110,6 +106,9 @@ class PreviewAdmissionTests(unittest.TestCase):
         self.assertEqual(result.pr_number, 23)
         self.assertEqual(result.artifact.id, 456)
         self.assertEqual(result.artifact.name, "website-preview-123-2")
+        self.assertEqual(result.head_sha, HEAD)
+        self.assertEqual(result.current_merge.parents, (BASE, HEAD))
+        self.assertNotEqual(result.head_sha, result.current_merge.sha)
         self.assertEqual(self.api.run_requests, [(123, None), (123, 2)])
         self.assertEqual(self.api.artifact_requests, [123])
 
@@ -199,17 +198,51 @@ class PreviewAdmissionTests(unittest.TestCase):
         self.reject("head may be stale")
 
     def test_rejects_stale_merge_after_base_branch_moves(self) -> None:
-        self.api.merge = "c" * 40
-        self.reject("Stale merge SHA")
+        self.api.main = "d" * 40
+        self.reject("Stale base or invalid current merge")
 
-    def test_rejects_api_that_exposes_only_pr_head_instead_of_checkout_sha(self) -> None:
-        self.api.checkout_merge_sha = None
-        self.reject("does not expose the triggering checkout merge SHA")
-        self.assertEqual(self.api.artifact_requests, [])
+    def test_admits_head_api_without_claiming_historical_merge_provenance(self) -> None:
+        result = admit(self.trigger, self.api, REPOSITORY, 123)
+        self.assertEqual(result.head_sha, self.api.attempt.head_sha)
+        self.assertNotEqual(result.head_sha, result.current_merge.sha)
+        self.assertEqual(self.api.artifact_requests, [123])
 
-    def test_rejects_head_sha_as_checkout_evidence(self) -> None:
-        self.api.checkout_merge_sha = HEAD
-        self.reject("Stale merge SHA")
+    def test_rejects_head_sha_as_merge_commit(self) -> None:
+        self.api.merge_commit = replace(self.api.merge_commit, sha=HEAD)
+        self.reject("Stale base or invalid current merge")
+
+    def test_rejects_merge_without_exact_current_base_and_head_parents(self) -> None:
+        for parents in ((), (BASE,), (BASE, HEAD, "d" * 40), (HEAD, BASE), (BASE, "d" * 40)):
+            with self.subTest(parents=parents):
+                self.api.merge_commit = replace(self.api.merge_commit, parents=parents)
+                self.reject("Stale base or invalid current merge")
+
+    def test_rejects_current_merge_for_a_different_head(self) -> None:
+        self.api.merge_commit = MergeCommit("e" * 40, (BASE, "d" * 40))
+        self.reject("Stale base or invalid current merge")
+
+    def test_rejects_unmergeable_or_unknown_pr(self) -> None:
+        for mergeable in (False, None):
+            with self.subTest(mergeable=mergeable):
+                self.api.pulls[23] = replace(self.api.pulls[23], mergeable=mergeable)
+                self.reject("not currently mergeable")
+
+    def test_closed_association_with_unknown_mergeability_is_not_selected(self) -> None:
+        self.api.pulls[24] = replace(self.api.pulls[23], number=24, state="closed", mergeable=None)
+        self.api.associations = (23, 24)
+        result = admit(self.trigger, self.api, REPOSITORY, 123)
+        self.assertEqual(result.pr_number, 23)
+        self.assertEqual(result.head_sha, HEAD)
+
+    def test_moved_current_merge_does_not_relabel_the_head_tree_artifact(self) -> None:
+        original = admit(self.trigger, self.api, REPOSITORY, 123)
+        self.api.main = "d" * 40
+        self.api.merge_commit = MergeCommit("e" * 40, (self.api.main, HEAD))
+        current = admit(self.trigger, self.api, REPOSITORY, 123)
+        self.assertEqual(current.head_sha, original.head_sha)
+        self.assertEqual(current.artifact, original.artifact)
+        self.assertNotEqual(current.current_merge, original.current_merge)
+        self.assertNotEqual(current.head_sha, current.current_merge.sha)
 
     def test_rejects_inconsistent_attempt_head(self) -> None:
         self.api.attempt = replace(self.api.attempt, head_sha="c" * 40)
@@ -278,8 +311,11 @@ class PreviewAdmissionTests(unittest.TestCase):
                     archive.addfile(member, io.BytesIO(content))
             prepare_static_upload(archive_path, root / "upload")
             self.assertEqual((root / "upload/metadata.json").read_bytes(), forged)
-            self.api.merge = "c" * 40
-            self.reject("Stale merge SHA")
+            self.api.main = "d" * 40
+            self.reject("Stale base or invalid current merge")
+            self.api.main = BASE
+            self.api.pulls[23] = replace(self.api.pulls[23], head_sha="f" * 40)
+            self.reject("head may be stale")
 
 
 class PreviewApiBoundaryTests(unittest.TestCase):
@@ -295,7 +331,7 @@ class PreviewApiBoundaryTests(unittest.TestCase):
         self.assertEqual(GitHubApi(fetch).workflow(), (WORKFLOW_ID, BUILD_PATH))
         self.assertEqual(paths, ["/actions/workflows/415667994"])
 
-    def test_attempt_api_head_is_not_reinterpreted_as_checkout_evidence(self) -> None:
+    def test_attempt_api_head_is_not_reinterpreted_as_merge_evidence(self) -> None:
         def fetch(path: str) -> str:
             self.assertEqual(path, "/actions/runs/123/attempts/2")
             return (
@@ -308,9 +344,97 @@ class PreviewApiBoundaryTests(unittest.TestCase):
                 '"event":"pull_request","status":"completed","conclusion":"success"}'
             )
 
-        evidence = GitHubApi(fetch).checkout(123, 2)
-        self.assertEqual(evidence.run, source_run())
-        self.assertIsNone(evidence.merge_sha)
+        attempt = GitHubApi(fetch).run(123, 2)
+        self.assertEqual(attempt, source_run())
+        self.assertEqual(attempt.head_sha, HEAD)
+        self.assertNotEqual(attempt.head_sha, MERGE)
+
+    def test_git_api_resolves_current_base_and_merge_parents_independently(self) -> None:
+        responses = {
+            "/git/ref/heads/main": (
+                '{"ref":"refs/heads/main","object":{"type":"commit",'
+                '"sha":"cccccccccccccccccccccccccccccccccccccccc"}}'
+            ),
+            "/git/ref/pull/23/merge": (
+                '{"ref":"refs/pull/23/merge","object":{"type":"commit",'
+                '"sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}'
+            ),
+            f"/git/commits/{MERGE}": (
+                '{"sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","parents":['
+                '{"sha":"cccccccccccccccccccccccccccccccccccccccc"},'
+                '{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}'
+            ),
+        }
+        paths: list[str] = []
+
+        def fetch(path: str) -> str:
+            paths.append(path)
+            return responses[path]
+
+        api = GitHubApi(fetch)
+        self.assertEqual(api.main_sha(), BASE)
+        self.assertEqual(api.merge(23), MergeCommit(MERGE, (BASE, HEAD)))
+        self.assertEqual(
+            paths, ["/git/ref/heads/main", "/git/ref/pull/23/merge", f"/git/commits/{MERGE}"]
+        )
+
+    def test_rejects_wrong_ref_or_non_commit_merge_ref(self) -> None:
+        for response in (
+            '{"ref":"refs/heads/main","object":{"type":"commit","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}',
+            '{"ref":"refs/pull/23/merge","object":{"type":"tree","sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}',
+        ):
+            with self.subTest(response=response):
+
+                def fetch(path: str, response_text: str = response) -> str:
+                    self.assertEqual(path, "/git/ref/pull/23/merge")
+                    return response_text
+
+                with self.assertRaisesRegex(ValueError, "Unexpected Git commit ref"):
+                    GitHubApi(fetch).merge(23)
+
+    def test_rejects_commit_response_that_does_not_match_merge_ref(self) -> None:
+        def fetch(path: str) -> str:
+            if path == "/git/ref/pull/23/merge":
+                return (
+                    '{"ref":"refs/pull/23/merge","object":{"type":"commit",'
+                    '"sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}'
+                )
+            self.assertEqual(path, f"/git/commits/{MERGE}")
+            return '{"sha":"dddddddddddddddddddddddddddddddddddddddd","parents":[]}'
+
+        with self.assertRaisesRegex(ValueError, "disagrees with requested ref"):
+            GitHubApi(fetch).merge(23)
+
+    def test_rejects_missing_or_malformed_merge_parent_evidence(self) -> None:
+        for response in ({}, {"sha": MERGE}, {"sha": MERGE, "parents": [None]}):
+            with self.subTest(response=response), self.assertRaises(ValueError):
+                MergeCommit.from_json(response)
+
+    def test_missing_merge_ref_is_not_replaced_with_run_head(self) -> None:
+        def fetch(path: str) -> str:
+            self.assertEqual(path, "/git/ref/pull/23/merge")
+            raise FileNotFoundError("Server merge ref unavailable")
+
+        with self.assertRaises(FileNotFoundError):
+            GitHubApi(fetch).merge(23)
+
+    def test_api_unknown_mergeability_is_preserved_and_rejected_for_current_pr(self) -> None:
+        def fetch(path: str) -> str:
+            self.assertEqual(path, "/pulls/23")
+            return (
+                '{"number":23,"state":"open","merged":false,"mergeable":null,'
+                '"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
+                '"repo":{"full_name":"sectrend-cn/pluvy","owner":{"login":"sectrend-cn"}}},'
+                '"base":{"ref":"main","repo":{"full_name":"sectrend-cn/pluvy",'
+                '"owner":{"login":"sectrend-cn"}}}}'
+            )
+
+        pr = GitHubApi(fetch).pull(23)
+        self.assertIsNone(pr.mergeable)
+        api = FixtureApi()
+        api.pulls[23] = pr
+        with self.assertRaisesRegex(ValueError, "not currently mergeable"):
+            admit(Trigger(REPO, source_run()), api, REPOSITORY, 123)
 
     def test_rejects_missing_artifact_api_metadata(self) -> None:
         for response in (

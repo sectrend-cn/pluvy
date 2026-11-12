@@ -4,8 +4,8 @@ Plan B separates the token-less PR build from a trusted default-branch
 `workflow_run` publisher. There is no per-run human approval and no unconditional
 upload guard. Admission failures are errors, including missing credentials.
 **Publishing is not active in this PR.** The publisher must first exist on `main`,
-Ops must configure the Environment, and the merge-SHA evidence blocker below must
-be resolved without weakening admission. This PR must not be merged by the agent.
+and Ops must configure the Environment. Admission has a positive path under the
+PR-head policy below. This PR must not be merged by the agent.
 
 ## Build and trust boundary
 
@@ -16,8 +16,11 @@ preview Python module trigger the build. Workflow permissions are empty; the
 build alone has `contents: read`. It requests no Environment and references no
 secrets. The previous in-workflow deploy job has been removed entirely.
 
-The build checks out the PR merge commit with `persist-credentials: false`, uses
-Node 22 without shared caches, runs `npm ci` and `npm run build`, and retains
+The build explicitly checks out `${{ github.event.pull_request.head.sha }}` with
+`persist-credentials: false`. The preview is the **PR branch head tree**, not the
+merge tree with `main`. The immutable head selection is intentional; checkout
+must not omit `ref` or select `refs/pull/*/merge`. The build uses Node 22 without
+shared caches, runs `npm ci` and `npm run build`, and retains
 `ASTRO_BASE=/`. Root favicon URLs must be `/favicon.svg`, never `//favicon.svg`;
 the default production base remains `/pluvy`. The build packages `website/dist`
 as an uncompressed tar without following links. The artifact is named exactly
@@ -60,10 +63,14 @@ Admission requires all of the following:
    unmerged PR may match. Its live head SHA must equal the source head SHA. Both
    PR repositories must be this repository, excluding forks, and its base must
    be `main`. Empty, duplicate, ambiguous, or truncated associations reject.
-4. Trustworthy API evidence must expose the actual triggering checkout merge SHA,
-   distinct from the PR head SHA and bound to the exact Actions attempt. It must equal the live
-   `refs/pull/<verified-number>/merge` commit. Missing evidence, a moved merge ref,
-   a stale head, or a changed run identity rejects rather than skipping success.
+4. The live run and exact-attempt API must both report that same PR head SHA.
+   This is the commit requested by the reviewed checkout configuration, never a
+   historical merge SHA. Separately, the PR must currently be mergeable, and
+   `refs/pull/<verified-number>/merge` must exist and point to a commit whose two
+   parents are current `main` followed by the current verified PR head. Missing
+   refs, unknown/conflicted mergeability, stale parents, and mismatched commit
+   identities reject. This proves only a current merge relationship, not the
+   tree or provenance of the artifact bytes.
 5. The triggering run has exactly one unexpired artifact with name
    `website-preview-<payload-run-id>-<payload-attempt>`. An unexpected name,
    additional artifact, missing artifact, wrong run association, or API failure
@@ -80,7 +87,7 @@ Concurrent publish jobs for a PR serialize; no PR-supplied number sets the group
 Both jobs have timeouts and only `contents: read`, `actions: read`, and
 `pull-requests: read`. No PR comments or write permissions are required.
 
-### Merge-SHA API evidence blocker
+### Head-tree previews and current merge relationships
 
 Read-only inspection of successful build run **43178959208**, attempt **1**, found
 that the run API, exact-attempt API, job API, and check suite all report the PR head
@@ -91,21 +98,30 @@ The [Actions run API](https://docs.github.com/en/rest/actions/workflow-runs)
 provides run/attempt queries, but its head SHA must not be assumed to mean the
 `pull_request` event's checkout SHA.
 
-The implementation therefore rejects the current API response with
-`Actions API does not expose the triggering checkout merge SHA`, before artifact
-download or Environment access. The API adapter explicitly represents the
-checkout merge SHA as unavailable; it never relabels `head_sha` or `head_commit.id`
-as checkout evidence. The admission policy accepts a distinct checkout SHA only
-when an API adapter can prove it for that run/attempt and it equals the current
-server-owned PR merge ref. Positive unit fixtures supply that evidence through
-the typed API seam; they do not establish that GitHub currently provides it.
+The build therefore requests the immutable **head**, and admission requires
+`workflow_run.head_sha == live run.head_sha == attempt.head_sha == live PR.head.sha`.
+A force-push or new PR commit invalidates an earlier build. Historical merge
+checkout evidence is neither available nor required under this policy. Nothing
+from artifact manifests, job logs, or untrusted workflow outputs supplies SHA
+evidence. The current merge ref is resolved independently through the Git ref and
+Git commit APIs, including its two parents; a run head SHA never becomes a merge
+SHA by relabeling it.
 
-**This remains an activation blocker even after merge and Environment setup.**
-A future implementation needs a trustworthy GitHub API source for the triggering
-checkout merge SHA and review of that contract. Do not infer it from the current
-merge ref, mutable PR associations, checkout log text, artifact metadata, a
-PR-written manifest, or the source head SHA. Do not delete this check merely to
-get an upload. No end-to-end automatic preview is claimed.
+If `main` moves after the build, the preview still reflects the **head tree from
+the successful run**, not a new merge with the updated base. A new `synchronize`
+is required to rebuild; moving `main` alone does not trigger this PR build. While
+the server merge ref still has the old base parent, admission rejects it. Once
+GitHub regenerates a valid current relationship, admission may accept the same
+current head artifact, explicitly retaining its head-tree identity. It never
+claims that artifact is the new merge tree. Tests retain the stale-base negative
+and separately prove that a regenerated merge cannot relabel the artifact.
+
+The artifact remains untrusted even when these identity checks pass: a PR can
+change the build YAML at the same registered path and ID. Static validation and
+never executing PR or artifact code remain the content boundary. Admission uses
+the available head-currentness evidence; automatic upload requires a future merge
+of the trusted publisher to `main` and completed Ops setup. No live publishing
+from this PR is claimed.
 
 ## Static files and trusted tooling
 
@@ -173,9 +189,9 @@ does not constrain what a stolen account token could do elsewhere.
    Upload project, its production branch is `main`, and its Git integration,
    custom domains, and preview access settings are appropriate. Those Cloudflare
    facts have not been verified through authenticated access in this task.
-7. Automatic upload can start only after the trusted publisher exists on `main`,
-   these settings are complete, **and trustworthy checkout merge-SHA evidence is
-   available**. This PR cannot exercise `workflow_run` publishing from its branch.
+7. Automatic upload can start only after the trusted publisher exists on `main`
+   and these settings are complete. This PR cannot exercise `workflow_run`
+   publishing from its branch.
    After those prerequisites, verify deployed headers, docs, 404s, deployment URL,
    and branch alias through an independently authorized preview. Do not trigger a
    production deployment or test live tokens from this PR.
@@ -190,8 +206,11 @@ reading/writing secrets are outside this implementation task.
 
 Run `python3 -m unittest discover -s .github/tests -v` for admission and artifact
 security cases. Both preview build and engineering CI run this suite. It imports
-and exercises the actual shared module, including the observed API evidence
-failure; shell tests reject missing credentials before invoking Wrangler.
+and exercises the actual shared module, including positive head-tree admission,
+stale heads/bases, and current merge-parent checks. The upload shell test uses a
+real executable `node` script that prints arguments, never a symlink to coreutils;
+it checks fixed targets and rejects invalid numbers and missing credentials
+without invoking Wrangler.
 
 With Node 22 and locked dependencies, run the website documentation-sync and
 rendered favicon/base matrices. `ASTRO_BASE=/` must build correctly, and

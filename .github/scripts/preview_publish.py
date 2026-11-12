@@ -47,6 +47,11 @@ def _boolean(value: object) -> bool:
     return value
 
 
+def _mergeable(value: object) -> bool | None:
+    """Preserve GitHub's unknown mergeability until the selected PR is checked."""
+    return None if value is None else _boolean(value)
+
+
 def _sha(value: object) -> str:
     """Require a full Git object identity before constructing API paths."""
     text = _text(value)
@@ -133,6 +138,7 @@ class PullRequest:
     base_repository: Repository
     head_sha: str
     base_ref: str
+    mergeable: bool | None
 
     @classmethod
     def from_json(cls, value: object) -> PullRequest:
@@ -150,6 +156,7 @@ class PullRequest:
             Repository.from_json(base.get("repo")),
             _sha(head.get("sha")),
             _text(base.get("ref")),
+            _mergeable(value.get("mergeable")),
         )
 
 
@@ -176,11 +183,23 @@ class Artifact:
 
 
 @dataclass(frozen=True)
-class Checkout:
-    """Bind checkout evidence, or its explicit absence, to a concrete run attempt."""
+class MergeCommit:
+    """Current server-maintained merge relationship, never artifact provenance."""
 
-    run: Run
-    merge_sha: str | None
+    sha: str
+    parents: tuple[str, ...]
+
+    @classmethod
+    def from_json(cls, value: object) -> MergeCommit:
+        """Narrow the Git commit API without guessing absent parent evidence."""
+        if not isinstance(value, dict) or not isinstance(value.get("parents"), list):
+            raise ValueError("Missing Git merge commit parents")
+        parents: list[str] = []
+        for parent in value["parents"]:
+            if not isinstance(parent, dict):
+                raise ValueError("Invalid Git merge commit parent")
+            parents.append(_sha(parent.get("sha")))
+        return cls(_sha(value.get("sha")), tuple(parents))
 
 
 class PreviewApi(Protocol):
@@ -188,10 +207,10 @@ class PreviewApi(Protocol):
 
     def workflow(self) -> tuple[int, str]: ...
     def run(self, run_id: int, attempt: int | None = None) -> Run: ...
-    def checkout(self, run_id: int, attempt: int) -> Checkout: ...
     def pull_numbers(self, head_sha: str) -> tuple[int, ...]: ...
     def pull(self, number: int) -> PullRequest: ...
-    def merge_sha(self, number: int) -> str: ...
+    def main_sha(self) -> str: ...
+    def merge(self, number: int) -> MergeCommit: ...
     def artifacts(self, run_id: int) -> tuple[Artifact, ...]: ...
 
 
@@ -211,16 +230,6 @@ class GitHubApi:
         suffix = "" if attempt is None else f"/attempts/{attempt}"
         return Run.from_json(json.loads(self._fetch(f"/actions/runs/{run_id}{suffix}")))
 
-    def checkout(self, run_id: int, attempt: int) -> Checkout:
-        """Report absent checkout evidence instead of relabeling the API head SHA.
-
-        The Actions attempt API exposes the PR head SHA, not GITHUB_SHA of the
-        pull_request checkout. No available field establishes the merge SHA.
-        A future documented API source must be implemented and reviewed here;
-        logs, artifact metadata and the current merge ref cannot fill this gap.
-        """
-        return Checkout(self.run(run_id, attempt), None)
-
     def pull_numbers(self, head_sha: str) -> tuple[int, ...]:
         """Resolve PRs from the commit API; never accept truncated associations."""
         data = json.loads(self._fetch(f"/commits/{head_sha}/pulls?per_page=100"))
@@ -232,12 +241,24 @@ class GitHubApi:
         """Read current PR state after resolving its number from the source SHA."""
         return PullRequest.from_json(json.loads(self._fetch(f"/pulls/{number}")))
 
-    def merge_sha(self, number: int) -> str:
-        """Resolve the server-maintained merge ref, never a PR-supplied ref."""
-        data = json.loads(self._fetch(f"/git/ref/pull/{number}/merge"))
-        if data["ref"] != f"refs/pull/{number}/merge" or data["object"]["type"] != "commit":
-            raise ValueError("Unexpected PR merge ref")
+    def _commit_ref(self, ref: str) -> str:
+        """Resolve only the requested server-owned ref to a commit identity."""
+        data = json.loads(self._fetch(f"/git/ref/{ref}"))
+        if data["ref"] != f"refs/{ref}" or data["object"]["type"] != "commit":
+            raise ValueError("Unexpected Git commit ref")
         return _sha(data["object"]["sha"])
+
+    def main_sha(self) -> str:
+        """Read current main independently of any PR-supplied base metadata."""
+        return self._commit_ref("heads/main")
+
+    def merge(self, number: int) -> MergeCommit:
+        """Read the current merge commit and its parents through fixed Git APIs."""
+        sha = self._commit_ref(f"pull/{number}/merge")
+        commit = MergeCommit.from_json(json.loads(self._fetch(f"/git/commits/{sha}")))
+        if commit.sha != sha:
+            raise ValueError("Git merge commit disagrees with requested ref")
+        return commit
 
     def artifacts(self, run_id: int) -> tuple[Artifact, ...]:
         """Require a complete, single-artifact listing for exactly this run."""
@@ -280,10 +301,12 @@ class GitHubFetcher:
 
 @dataclass(frozen=True)
 class Admission:
-    """Only verified server facts may reach the download and upload steps."""
+    """Keep the requested build head separate from current relationship evidence."""
 
     pr_number: int
     artifact: Artifact
+    head_sha: str
+    current_merge: MergeCommit
 
 
 def _repository_matches(repository: Repository, trusted: str) -> bool:
@@ -305,8 +328,22 @@ def _verify_run(run: Run, source: Run, trusted: str) -> None:
         raise ValueError("Wrong run id or run attempt")
 
 
+def _verify_pull(pr: PullRequest, numbers: tuple[int, ...], trusted: str) -> None:
+    """Authorize the selected PR's identity, repository, base, and mergeability."""
+    if pr.number not in numbers or pr.number < 1:
+        raise ValueError("Wrong PR identity")
+    if not all(
+        _repository_matches(repo, trusted) for repo in (pr.head_repository, pr.base_repository)
+    ):
+        raise ValueError("Fork or foreign PR repository")
+    if pr.base_ref != "main":
+        raise ValueError("Preview PR must target the trusted default branch")
+    if pr.mergeable is not True:
+        raise ValueError("PR is not currently mergeable")
+
+
 def _current_pull(source: Run, api: PreviewApi, trusted: str) -> PullRequest:
-    """Deploy only the sole current, open, same-repository PR for this head."""
+    """Resolve only the sole current open PR from the server-owned source head."""
     numbers = api.pull_numbers(source.head_sha)
     if len(set(numbers)) != len(numbers):
         raise ValueError("Duplicate PR associations")
@@ -319,23 +356,25 @@ def _current_pull(source: Run, api: PreviewApi, trusted: str) -> PullRequest:
     if len(current) != 1:
         raise ValueError("Expected exactly one current open PR; head may be stale")
     pr = current[0]
-    if pr.number not in numbers or pr.number < 1:
-        raise ValueError("Wrong PR identity")
-    if not all(
-        _repository_matches(repo, trusted) for repo in (pr.head_repository, pr.base_repository)
-    ):
-        raise ValueError("Fork or foreign PR repository")
-    if pr.base_ref != "main":
-        raise ValueError("Preview PR must target the trusted default branch")
+    _verify_pull(pr, numbers, trusted)
     return pr
+
+
+def _current_merge(pr: PullRequest, api: PreviewApi) -> MergeCommit:
+    """Verify only today's two-parent relationship; never infer a build merge SHA."""
+    main = api.main_sha()
+    merge = api.merge(pr.number)
+    if merge.parents != (main, pr.head_sha) or merge.sha in {main, pr.head_sha}:
+        raise ValueError("Stale base or invalid current merge relationship")
+    return merge
 
 
 def admit(trigger: Trigger, api: PreviewApi, trusted: str, expected_run_id: int) -> Admission:
     """Fail closed unless the event and live API jointly prove every invariant.
 
-    GitHub currently reports the PR head, not its checkout merge SHA, in the
-    attempt API. Such evidence is insufficient and deliberately rejects. Never
-    substitute logs, artifacts, a live merge ref alone, or inferred parent SHAs.
+    The build explicitly requests the immutable PR head. API head identities
+    prove currentness, not artifact bytes or historical merge provenance. Today's
+    merge relationship may move independently of the requested build head.
     """
     source = trigger.run
     if not _repository_matches(trigger.repository, trusted) or source.id != expected_run_id:
@@ -348,15 +387,11 @@ def admit(trigger: Trigger, api: PreviewApi, trusted: str, expected_run_id: int)
     if live.head_sha != source.head_sha:
         raise ValueError("Run head SHA disagrees with event")
     pr = _current_pull(source, api, trusted)
-    checkout = api.checkout(source.id, source.run_attempt)
-    _verify_run(checkout.run, source, trusted)
-    if checkout.run.head_sha != source.head_sha:
+    attempt = api.run(source.id, source.run_attempt)
+    _verify_run(attempt, source, trusted)
+    if attempt.head_sha != source.head_sha:
         raise ValueError("Attempt head SHA disagrees with event")
-    if checkout.merge_sha is None:
-        raise ValueError("Actions API does not expose the triggering checkout merge SHA")
-    merge_sha = _sha(checkout.merge_sha)
-    if merge_sha == source.head_sha or api.merge_sha(pr.number) != merge_sha:
-        raise ValueError("Stale merge SHA or unproven triggering checkout SHA")
+    merge = _current_merge(pr, api)
     artifacts = api.artifacts(source.id)
     if len(artifacts) != 1:
         raise ValueError("Missing or unexpected artifact")
@@ -364,7 +399,7 @@ def admit(trigger: Trigger, api: PreviewApi, trusted: str, expected_run_id: int)
     expected_name = f"website-preview-{source.id}-{source.run_attempt}"
     if artifact.name != expected_name or artifact.run_id != source.id or artifact.expired:
         raise ValueError("Wrong artifact name, run id, or expired artifact")
-    return Admission(pr.number, artifact)
+    return Admission(pr.number, artifact, source.head_sha, merge)
 
 
 def _static_path(member: tarfile.TarInfo, root: Path) -> Path:
@@ -482,6 +517,10 @@ def main() -> None:
             raise ValueError("Admission changed while the publisher was queued")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         output.write(f"pr-number={admission.pr_number}\nartifact-id={admission.artifact.id}\n")
+    print(
+        f"Verified PR head {admission.head_sha}; current merge {admission.current_merge.sha} "
+        "is relationship evidence only, not the artifact tree."
+    )
 
 
 if __name__ == "__main__":

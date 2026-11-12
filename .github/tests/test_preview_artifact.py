@@ -267,7 +267,9 @@ class PreviewArtifactTests(unittest.TestCase):
     def test_upload_branch_guard_and_fixed_project_with_inert_node_stand_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "node").symlink_to("/bin/echo")
+            node = root / "node"
+            node.write_text('#!/bin/sh\nprintf "%s " "$@"\nprintf "\\n"\n', encoding="utf-8")
+            node.chmod(0o755)
             environment = {
                 "PATH": f"{root}:{os.defpath}",
                 "RUNNER_TEMP": str(root),
