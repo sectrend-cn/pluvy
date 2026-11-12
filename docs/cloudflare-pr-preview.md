@@ -42,12 +42,15 @@ untrusted. The content boundary is static validation and never executing PR or
 artifact code, not trusting how the build produced the artifact. Anyone who can
 push `main` can change the publisher and its trusted module.
 
-Path filters live in PR-controlled YAML and are not a trusted eligibility gate.
-Admission currently does not check the PR's actual changed files, so a PR can
-widen its filters and publish static output for a YAML-only change. A trusted
-check would need complete GitHub API file-list evidence and head-consistency
-checks; it is deferred to keep this correction small. Static validation and
-never executing PR or artifact code remain the content boundary.
+Path filters remain PR-controlled, backed by a trusted eligibility gate on every
+`admit()` call. The complete paginated GitHub Files API list must match a
+non-negative `changed_files` snapshot capped at 3000. The PR number, head SHA,
+base SHA, and file count must remain identical before and after listing. At
+least one current or previous filename must be a real, case-sensitive website
+or docs input, including renames into or away from those trees. Truncation,
+malformed responses, and API errors fail closed. Artifact manifests, workflow
+outputs, and PR-supplied lists provide no eligibility evidence. Static validation
+and never executing PR or artifact code remain the content boundary for bytes.
 
 ## Admission, currentness, and serialization
 
@@ -70,7 +73,23 @@ Admission requires all of the following:
    unmerged PR may match. Its live head SHA must equal the source head SHA. Both
    PR repositories must be this repository, excluding forks, and its base must
    be `main`. Empty, duplicate, ambiguous, or truncated associations reject.
-4. The live run and exact-attempt API must both report that same PR head SHA.
+4. Trusted file eligibility uses only the verified PR's
+   [GitHub Files API](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files).
+   PR snapshots require `base.sha` and a non-negative integer `changed_files`;
+   counts above the API's 3000-file cap reject before any file-list request.
+   Numbered requests start at page 1 with `per_page=100`, never following Link
+   or JSON URLs. Every full page requires another request, including an empty
+   final page for exact multiples of 100. The complete collected count must
+   equal the snapshot; short/truncated, malformed, oversized, duplicate, missing,
+   or failed pages reject. After listing, the same PR is re-fetched: number,
+   head SHA, base SHA, and count must be identical, its head must still match the
+   run, and it must remain authorized and open. `filename` or optional
+   `previous_filename` must be exactly `website`/`docs` or start with their
+   case-sensitive `/` boundary. Renames in either direction count; lookalike
+   prefixes, dot/traversal segments, leading slashes, and backslashes do not.
+   YAML-only/tests-only lists reject. Every invocation of `admit()` enforces
+   this policy, including after queuing and immediately before upload.
+5. The live run and exact-attempt API must both report that same PR head SHA.
    This is the commit requested by the reviewed checkout configuration, never a
    historical merge SHA. Separately, the PR must currently be mergeable, and
    `refs/pull/<verified-number>/merge` must exist and point to a commit whose two
@@ -78,7 +97,7 @@ Admission requires all of the following:
    refs, unknown/conflicted mergeability, stale parents, and mismatched commit
    identities reject. This proves only a current merge relationship, not the
    tree or provenance of the artifact bytes.
-5. The triggering run has exactly one unexpired artifact with name
+6. The triggering run has exactly one unexpired artifact with name
    `website-preview-<payload-run-id>-<payload-attempt>`. An unexpected name,
    additional artifact, missing artifact, wrong run association, or API failure
    rejects. The trusted download uses that immutable artifact ID and exactly

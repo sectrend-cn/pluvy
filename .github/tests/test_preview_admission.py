@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 import tarfile
 import tempfile
@@ -18,6 +19,7 @@ from preview_publish import (
     Artifact,
     GitHubApi,
     MergeCommit,
+    PullFile,
     PullRequest,
     Repository,
     Run,
@@ -30,6 +32,13 @@ HEAD = "a" * 40
 MERGE = "b" * 40
 BASE = "c" * 40
 REPO = Repository(REPOSITORY, "sectrend-cn")
+PR_RESPONSE = (
+    '{"number":23,"state":"open","merged":false,"mergeable":true,"changed_files":1,'
+    '"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
+    '"repo":{"full_name":"sectrend-cn/pluvy","owner":{"login":"sectrend-cn"}}},'
+    '"base":{"ref":"main","sha":"cccccccccccccccccccccccccccccccccccccccc",'
+    '"repo":{"full_name":"sectrend-cn/pluvy","owner":{"login":"sectrend-cn"}}}}'
+)
 
 
 def source_run() -> Run:
@@ -39,6 +48,38 @@ def source_run() -> Run:
     )
 
 
+def write_file_page(root: Path, page: int, files: tuple[PullFile, ...]) -> Path:
+    """Write concrete file contracts at the external HTTP-body fixture boundary."""
+    path = root / f"files-page-{page}.json"
+    path.write_text(
+        json.dumps(
+            [
+                {"filename": file.filename}
+                if file.previous_filename is None
+                else {"filename": file.filename, "previous_filename": file.previous_filename}
+                for file in files
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+class FilesFetcher:
+    """Serve numbered response fixtures only when the real API requests their fixed paths."""
+
+    def __init__(self, pages: tuple[Path, ...]) -> None:
+        self.pages = pages
+        self.requests: list[str] = []
+
+    def __call__(self, path: str) -> str:
+        self.requests.append(path)
+        for page, fixture in enumerate(self.pages, 1):
+            if path == f"/pulls/23/files?per_page=100&page={page}":
+                return fixture.read_text(encoding="utf-8")
+        raise OSError("Missing or unexpected Files API page")
+
+
 class FixtureApi:
     """Keep requested build head and current merge-parent evidence independent."""
 
@@ -46,7 +87,12 @@ class FixtureApi:
         self.identity = (WORKFLOW_ID, BUILD_PATH)
         self.live = source_run()
         self.attempt = self.live
-        self.pulls = {23: PullRequest(23, "open", False, REPO, REPO, HEAD, "main", True)}
+        self.pulls = {23: PullRequest(23, "open", False, REPO, REPO, HEAD, "main", True, 1, BASE)}
+        self.files: tuple[PullFile, ...] = (PullFile("website/index.html"),)
+        self.files_api: GitHubApi | None = None
+        self.after_listing: PullRequest | None = None
+        self.pull_requests: list[int] = []
+        self.file_requests: list[int] = []
         self.associations: tuple[int, ...] = (23,)
         self.main = BASE
         self.merge_commit = MergeCommit(MERGE, (BASE, HEAD))
@@ -71,7 +117,17 @@ class FixtureApi:
 
     def pull(self, number: int) -> PullRequest:
         """Supply current PR state independently of event associations."""
+        self.pull_requests.append(number)
+        if self.file_requests and self.after_listing is not None:
+            return self.after_listing
         return self.pulls[number]
+
+    def pull_files(self, number: int) -> tuple[PullFile, ...]:
+        """Record the verified PR number and optionally exercise real API pagination."""
+        self.file_requests.append(number)
+        if self.files_api is not None:
+            return self.files_api.pull_files(number)
+        return self.files
 
     def main_sha(self) -> str:
         """Supply today's base independently of the successful head-tree build."""
@@ -111,6 +167,264 @@ class PreviewAdmissionTests(unittest.TestCase):
         self.assertNotEqual(result.head_sha, result.current_merge.sha)
         self.assertEqual(self.api.run_requests, [(123, None), (123, 2)])
         self.assertEqual(self.api.artifact_requests, [123])
+        self.assertEqual(self.api.file_requests, [23])
+        self.assertEqual(self.api.pull_requests, [23, 23])
+
+    def test_accepts_website_or_docs_paths_including_exact_roots(self) -> None:
+        for filename in ("website", "website/src/page.astro", "docs", "docs/zh/start.md"):
+            with self.subTest(filename=filename):
+                self.api.files = (PullFile(filename),)
+                self.assertEqual(admit(self.trigger, self.api, REPOSITORY, 123).pr_number, 23)
+
+    def test_accepts_renames_into_or_away_from_website_and_docs(self) -> None:
+        for file in (
+            PullFile("archive/page.md", "website/page.md"),
+            PullFile("archive/page.md", "docs/page.md"),
+            PullFile("website/page.md", "other/page.md"),
+            PullFile("docs/page.md", "other/page.md"),
+        ):
+            with self.subTest(file=file):
+                self.api.files = (file,)
+                self.assertEqual(admit(self.trigger, self.api, REPOSITORY, 123).head_sha, HEAD)
+
+    def test_rejects_rename_that_touches_neither_input_tree(self) -> None:
+        self.api.files = (PullFile("other/new.md", "other/old.md"),)
+        self.reject("no website or docs input changes")
+
+    def test_rejects_yaml_tests_and_scripts_only(self) -> None:
+        for paths in (
+            (BUILD_PATH,),
+            (".github/tests/test_preview_admission.py",),
+            (".github/scripts/preview_publish.py",),
+            (
+                BUILD_PATH,
+                ".github/tests/test_preview_admission.py",
+                ".github/scripts/preview_publish.py",
+            ),
+        ):
+            with self.subTest(paths=paths):
+                self.api.files = tuple(PullFile(path) for path in paths)
+                self.api.pulls[23] = replace(self.api.pulls[23], changed_files=len(paths))
+                self.reject("no website or docs input changes")
+
+    def test_rejects_boundary_misses_and_noncanonical_paths_in_both_names(self) -> None:
+        for path in (
+            "website-evil/index.html",
+            "websites/page.md",
+            "docsfoo",
+            "docs-other/page.md",
+            "Website/page.md",
+            "Docs/page.md",
+            ".website/page.md",
+            "foo/website/page.md",
+            "../website/page.md",
+            "website/../page.md",
+            "/website/page.md",
+            "./website/page.md",
+            "website\\page.md",
+            "docs/a\\b.md",
+            "docs/../../page.md",
+            "docs//page.md",
+        ):
+            for file in (PullFile(path), PullFile("other/page.md", path)):
+                with self.subTest(file=file):
+                    self.api.files = (file,)
+                    self.reject("no website or docs input changes")
+
+    def test_rejects_zero_changed_files_as_no_preview_inputs(self) -> None:
+        self.api.pulls[23] = replace(self.api.pulls[23], changed_files=0)
+        self.api.files = ()
+        self.reject("no website or docs input changes")
+        self.assertEqual(self.api.file_requests, [23])
+
+    def test_rejects_snapshot_changes_during_file_listing(self) -> None:
+        before = self.api.pulls[23]
+        for after in (
+            replace(before, head_sha="d" * 40),
+            replace(before, base_sha="d" * 40),
+            replace(before, changed_files=2),
+            replace(before, number=24),
+        ):
+            with self.subTest(after=after):
+                self.api = FixtureApi()
+                self.api.after_listing = after
+                self.reject("snapshot changed during file pagination")
+                self.assertEqual(self.api.pull_requests, [23, 23])
+                self.assertEqual(self.api.file_requests, [23])
+
+    def test_rejects_pr_closed_during_file_listing(self) -> None:
+        self.api.after_listing = replace(self.api.pulls[23], state="closed", merged=True)
+        self.reject("no longer current and open")
+
+    def test_rejects_cap_overflow_before_listing_a_3000_file_prefix(self) -> None:
+        self.api.pulls[23] = replace(self.api.pulls[23], changed_files=3001)
+        self.api.files = tuple(PullFile(f"docs/{index}.md") for index in range(3000))
+        self.reject("changed_files exceeds.*3000")
+        self.assertEqual(self.api.file_requests, [])
+        self.assertEqual(self.api.artifact_requests, [])
+
+    def test_every_admit_rechecks_changed_files(self) -> None:
+        for _ in range(3):
+            self.assertEqual(admit(self.trigger, self.api, REPOSITORY, 123).pr_number, 23)
+        self.assertEqual(self.api.file_requests, [23, 23, 23])
+        self.assertEqual(self.api.pull_requests, [23, 23, 23, 23, 23, 23])
+        self.api.files = (PullFile(BUILD_PATH),)
+        self.reject("no website or docs input changes")
+
+    def test_pagination_admits_when_only_page_two_has_a_preview_input(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fetch = FilesFetcher(
+                (
+                    write_file_page(
+                        root, 1, tuple(PullFile(f"other/{index}.md") for index in range(100))
+                    ),
+                    write_file_page(root, 2, (PullFile("docs/start.md"),)),
+                )
+            )
+            self.api.files_api = GitHubApi(fetch)
+            self.api.pulls[23] = replace(self.api.pulls[23], changed_files=101)
+            self.assertEqual(admit(self.trigger, self.api, REPOSITORY, 123).pr_number, 23)
+            self.assertEqual(
+                fetch.requests,
+                [
+                    "/pulls/23/files?per_page=100&page=1",
+                    "/pulls/23/files?per_page=100&page=2",
+                ],
+            )
+
+    def test_full_last_page_requires_an_empty_following_page(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fetch = FilesFetcher(
+                (
+                    write_file_page(
+                        root, 1, tuple(PullFile(f"docs/{index}.md") for index in range(100))
+                    ),
+                    write_file_page(root, 2, ()),
+                )
+            )
+            self.api.files_api = GitHubApi(fetch)
+            self.api.pulls[23] = replace(self.api.pulls[23], changed_files=100)
+            self.assertEqual(admit(self.trigger, self.api, REPOSITORY, 123).pr_number, 23)
+            self.assertEqual(
+                fetch.requests,
+                [
+                    "/pulls/23/files?per_page=100&page=1",
+                    "/pulls/23/files?per_page=100&page=2",
+                ],
+            )
+            write_file_page(root, 2, (PullFile("docs/extra.md"),))
+            self.reject("Incomplete GitHub changed-file listing")
+
+    def test_complete_3000_files_accepts_and_extra_page_content_rejects(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pages: list[Path] = []
+            for page in range(1, 31):
+                files = tuple(PullFile(f"other/{page}-{index}.md") for index in range(100))
+                if page == 30:
+                    files = (*files[:-1], PullFile("website/page.astro"))
+                pages.append(write_file_page(root, page, files))
+            pages.append(write_file_page(root, 31, ()))
+            fetch = FilesFetcher(tuple(pages))
+            self.api.files_api = GitHubApi(fetch)
+            self.api.pulls[23] = replace(self.api.pulls[23], changed_files=3000)
+            self.assertEqual(admit(self.trigger, self.api, REPOSITORY, 123).pr_number, 23)
+            self.assertEqual(len(fetch.requests), 31)
+            self.assertEqual(fetch.requests[-1], "/pulls/23/files?per_page=100&page=31")
+            write_file_page(root, 31, (PullFile("docs/overflow.md"),))
+            self.reject("listing exceeds 3000")
+
+    def test_rejects_short_truncated_or_wrong_count_pages(self) -> None:
+        for actual, expected in ((99, 101), (1, 2), (2, 1), (0, 1)):
+            with (
+                self.subTest(actual=actual, expected=expected),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                self.api = FixtureApi()
+                page = write_file_page(
+                    Path(directory),
+                    1,
+                    tuple(PullFile(f"docs/{index}.md") for index in range(actual)),
+                )
+                fetch = FilesFetcher((page,))
+                self.api.files_api = GitHubApi(fetch)
+                self.api.pulls[23] = replace(self.api.pulls[23], changed_files=expected)
+                self.reject("Incomplete GitHub changed-file listing")
+                self.assertEqual(fetch.requests, ["/pulls/23/files?per_page=100&page=1"])
+
+    def test_rejects_missing_next_page_after_a_full_page(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = write_file_page(
+                Path(directory), 1, tuple(PullFile(f"docs/{index}.md") for index in range(100))
+            )
+            fetch = FilesFetcher((page,))
+            self.api.files_api = GitHubApi(fetch)
+            self.api.pulls[23] = replace(self.api.pulls[23], changed_files=100)
+            with self.assertRaisesRegex(OSError, "Missing or unexpected Files API page"):
+                admit(self.trigger, self.api, REPOSITORY, 123)
+            self.assertEqual(fetch.requests[-1], "/pulls/23/files?per_page=100&page=2")
+
+    def test_rejects_a_repeated_wrong_page(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            files = tuple(PullFile(f"docs/{index}.md") for index in range(100))
+            root = Path(directory)
+            fetch = FilesFetcher((write_file_page(root, 1, files), write_file_page(root, 2, files)))
+            self.api.files_api = GitHubApi(fetch)
+            self.api.pulls[23] = replace(self.api.pulls[23], changed_files=200)
+            self.reject("Duplicate GitHub changed-file entry")
+            self.assertEqual(fetch.requests[-1], "/pulls/23/files?per_page=100&page=2")
+
+    def test_file_listing_fetch_failure_never_becomes_success(self) -> None:
+        def fetch(path: str) -> str:
+            self.assertEqual(path, "/pulls/23/files?per_page=100&page=1")
+            raise OSError("Files API unavailable")
+
+        self.api.files_api = GitHubApi(fetch)
+        with self.assertRaisesRegex(OSError, "Files API unavailable"):
+            admit(self.trigger, self.api, REPOSITORY, 123)
+        self.assertEqual(self.api.artifact_requests, [])
+
+    def test_rejects_non_list_and_oversized_files_api_pages(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for response in ("{}", "null", '"not a list"', "1"):
+                with self.subTest(response=response):
+                    page = root / "invalid-page.json"
+                    page.write_text(response, encoding="utf-8")
+                    self.api.files_api = GitHubApi(FilesFetcher((page,)))
+                    self.reject("Invalid GitHub Files API page")
+            page = write_file_page(
+                root, 1, tuple(PullFile(f"docs/{index}.md") for index in range(101))
+            )
+            self.api.files_api = GitHubApi(FilesFetcher((page,)))
+            self.reject("Invalid GitHub Files API page")
+
+    def test_rejects_malformed_json_while_listing_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "invalid-json.json"
+            page.write_text("[", encoding="utf-8")
+            self.api.files_api = GitHubApi(FilesFetcher((page,)))
+            with self.assertRaises(json.JSONDecodeError):
+                admit(self.trigger, self.api, REPOSITORY, 123)
+
+    def test_file_urls_patch_and_link_metadata_cannot_supply_eligibility(self) -> None:
+        requests: list[str] = []
+
+        def fetch(path: str) -> str:
+            requests.append(path)
+            self.assertEqual(path, "/pulls/23/files?per_page=100&page=1")
+            return (
+                '[{"filename":".github/workflows/preview-website.yml",'
+                '"patch":"website/index.html","blob_url":"https://untrusted.invalid/website/a",'
+                '"raw_url":"https://untrusted.invalid/docs/a",'
+                '"Link":"https://untrusted.invalid/pulls/23/files?page=2"}]'
+            )
+
+        self.api.files_api = GitHubApi(fetch)
+        self.reject("no website or docs input changes")
+        self.assertEqual(requests, ["/pulls/23/files?per_page=100&page=1"])
 
     def test_rejects_forged_sibling_path_or_workflow_id_in_payload(self) -> None:
         for run in (
@@ -302,7 +616,8 @@ class PreviewAdmissionTests(unittest.TestCase):
             archive_path = root / "site.tar"
             forged = (
                 b'{"pr_number":23,"head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
-                b'"merge_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_id":415667994}'
+                b'"merge_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workflow_id":415667994,'
+                b'"files":["website/index.html"]}'
             )
             with tarfile.open(archive_path, "w") as archive:
                 for name, content in (("index.html", b"site"), ("metadata.json", forged)):
@@ -316,6 +631,9 @@ class PreviewAdmissionTests(unittest.TestCase):
             self.api.main = BASE
             self.api.pulls[23] = replace(self.api.pulls[23], head_sha="f" * 40)
             self.reject("head may be stale")
+            self.api.pulls[23] = replace(self.api.pulls[23], head_sha=HEAD)
+            self.api.files = (PullFile(BUILD_PATH),)
+            self.reject("no website or docs input changes")
 
 
 class PreviewApiBoundaryTests(unittest.TestCase):
@@ -330,6 +648,56 @@ class PreviewApiBoundaryTests(unittest.TestCase):
 
         self.assertEqual(GitHubApi(fetch).workflow(), (WORKFLOW_ID, BUILD_PATH))
         self.assertEqual(paths, ["/actions/workflows/415667994"])
+
+    def test_file_entry_narrowing_requires_names_and_preserves_rename_absence(self) -> None:
+        self.assertEqual(
+            PullFile.from_json({"filename": "docs/start.md"}), PullFile("docs/start.md")
+        )
+        self.assertEqual(
+            PullFile.from_json(
+                {"filename": "archive/start.md", "previous_filename": "docs/start.md"}
+            ),
+            PullFile("archive/start.md", "docs/start.md"),
+        )
+        for response in (
+            {},
+            {"filename": ""},
+            {"filename": 1},
+            ["not an entry"],
+            {"filename": "docs/start.md", "previous_filename": None},
+            {"filename": "docs/start.md", "previous_filename": ""},
+            {"filename": "docs/start.md", "previous_filename": 1},
+        ):
+            with self.subTest(response=response), self.assertRaises(ValueError):
+                PullFile.from_json(response)
+
+    def test_pr_snapshot_ingress_accepts_zero_and_requires_count_and_base_sha(self) -> None:
+        def zero_count(path: str) -> str:
+            self.assertEqual(path, "/pulls/23")
+            return PR_RESPONSE.replace('"changed_files":1', '"changed_files":0')
+
+        pr = GitHubApi(zero_count).pull(23)
+        self.assertEqual(pr.changed_files, 0)
+        self.assertEqual(pr.base_sha, BASE)
+        invalid = (
+            PR_RESPONSE.replace('"changed_files":1,', ""),
+            PR_RESPONSE.replace('"changed_files":1', '"changed_files":-1'),
+            PR_RESPONSE.replace('"changed_files":1', '"changed_files":true'),
+            PR_RESPONSE.replace('"changed_files":1', '"changed_files":null'),
+            PR_RESPONSE.replace('"changed_files":1', '"changed_files":"1"'),
+            PR_RESPONSE.replace('"changed_files":1', '"changed_files":1.5'),
+            PR_RESPONSE.replace(f'"sha":"{BASE}",', ""),
+            PR_RESPONSE.replace(BASE, "invalid"),
+        )
+        for response in invalid:
+            with self.subTest(response=response):
+
+                def fetch(path: str, response_text: str = response) -> str:
+                    self.assertEqual(path, "/pulls/23")
+                    return response_text
+
+                with self.assertRaises(ValueError):
+                    GitHubApi(fetch).pull(23)
 
     def test_attempt_api_head_is_not_reinterpreted_as_merge_evidence(self) -> None:
         def fetch(path: str) -> str:
@@ -421,16 +789,12 @@ class PreviewApiBoundaryTests(unittest.TestCase):
     def test_api_unknown_mergeability_is_preserved_and_rejected_for_current_pr(self) -> None:
         def fetch(path: str) -> str:
             self.assertEqual(path, "/pulls/23")
-            return (
-                '{"number":23,"state":"open","merged":false,"mergeable":null,'
-                '"head":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
-                '"repo":{"full_name":"sectrend-cn/pluvy","owner":{"login":"sectrend-cn"}}},'
-                '"base":{"ref":"main","repo":{"full_name":"sectrend-cn/pluvy",'
-                '"owner":{"login":"sectrend-cn"}}}}'
-            )
+            return PR_RESPONSE.replace('"mergeable":true', '"mergeable":null')
 
         pr = GitHubApi(fetch).pull(23)
         self.assertIsNone(pr.mergeable)
+        self.assertEqual(pr.changed_files, 1)
+        self.assertEqual(pr.base_sha, BASE)
         api = FixtureApi()
         api.pulls[23] = pr
         with self.assertRaisesRegex(ValueError, "not currently mergeable"):

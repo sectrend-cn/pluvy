@@ -24,6 +24,8 @@ WORKFLOW_ID = 415667994
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_ENTRIES = 20000
+MAX_PR_FILES = 3000
+FILES_PER_PAGE = 100
 
 
 def _text(value: object) -> str:
@@ -37,6 +39,13 @@ def _positive(value: object) -> int:
     """Require a positive JSON integer, excluding booleans."""
     if type(value) is not int or value < 1:
         raise ValueError("Missing or invalid GitHub integer")
+    return value
+
+
+def _nonnegative(value: object) -> int:
+    """Preserve zero file counts while rejecting missing, negative, or coerced values."""
+    if type(value) is not int or value < 0:
+        raise ValueError("Missing or invalid GitHub file count")
     return value
 
 
@@ -139,6 +148,8 @@ class PullRequest:
     head_sha: str
     base_ref: str
     mergeable: bool | None
+    changed_files: int
+    base_sha: str
 
     @classmethod
     def from_json(cls, value: object) -> PullRequest:
@@ -157,6 +168,42 @@ class PullRequest:
             _sha(head.get("sha")),
             _text(base.get("ref")),
             _mergeable(value.get("mergeable")),
+            _nonnegative(value.get("changed_files")),
+            _sha(base.get("sha")),
+        )
+
+
+def _preview_input(path: str) -> bool:
+    """Recognize only canonical, case-sensitive website/docs paths without normalization."""
+    parts = path.split("/")
+    return (
+        "\\" not in path
+        and parts[0] in {"website", "docs"}
+        and all(part not in {"", ".", ".."} for part in parts)
+    )
+
+
+@dataclass(frozen=True)
+class PullFile:
+    """One API-owned changed path and its optional pre-rename path."""
+
+    filename: str
+    previous_filename: str | None = None
+
+    @classmethod
+    def from_json(cls, value: object) -> PullFile:
+        """Narrow file metadata at ingress; URLs and patch contents have no authority."""
+        if not isinstance(value, dict):
+            raise ValueError("Invalid GitHub changed-file entry")
+        previous = None
+        if "previous_filename" in value:
+            previous = _text(value["previous_filename"])
+        return cls(_text(value.get("filename")), previous)
+
+    def touches_preview(self) -> bool:
+        """Include deletions and renames into or away from a real preview input."""
+        return _preview_input(self.filename) or (
+            self.previous_filename is not None and _preview_input(self.previous_filename)
         )
 
 
@@ -209,6 +256,7 @@ class PreviewApi(Protocol):
     def run(self, run_id: int, attempt: int | None = None) -> Run: ...
     def pull_numbers(self, head_sha: str) -> tuple[int, ...]: ...
     def pull(self, number: int) -> PullRequest: ...
+    def pull_files(self, number: int) -> tuple[PullFile, ...]: ...
     def main_sha(self) -> str: ...
     def merge(self, number: int) -> MergeCommit: ...
     def artifacts(self, run_id: int) -> tuple[Artifact, ...]: ...
@@ -240,6 +288,28 @@ class GitHubApi:
     def pull(self, number: int) -> PullRequest:
         """Read current PR state after resolving its number from the source SHA."""
         return PullRequest.from_json(json.loads(self._fetch(f"/pulls/{number}")))
+
+    def pull_files(self, number: int) -> tuple[PullFile, ...]:
+        """Read complete numbered pages, including an empty page after a full final page."""
+        files: list[PullFile] = []
+        seen: set[str] = set()
+        for page in range(1, MAX_PR_FILES // FILES_PER_PAGE + 2):
+            data = json.loads(
+                self._fetch(f"/pulls/{number}/files?per_page={FILES_PER_PAGE}&page={page}")
+            )
+            if not isinstance(data, list) or len(data) > FILES_PER_PAGE:
+                raise ValueError("Invalid GitHub Files API page")
+            for entry in data:
+                file = PullFile.from_json(entry)
+                if file.filename in seen:
+                    raise ValueError("Duplicate GitHub changed-file entry")
+                seen.add(file.filename)
+                files.append(file)
+            if len(files) > MAX_PR_FILES:
+                raise ValueError("GitHub changed-file listing exceeds 3000 files")
+            if len(data) < FILES_PER_PAGE:
+                return tuple(files)
+        raise ValueError("GitHub changed-file pagination did not finish")
 
     def _commit_ref(self, ref: str) -> str:
         """Resolve only the requested server-owned ref to a commit identity."""
@@ -369,6 +439,24 @@ def _current_merge(pr: PullRequest, api: PreviewApi) -> MergeCommit:
     return merge
 
 
+def _verify_preview_inputs(pr: PullRequest, head_sha: str, api: PreviewApi, trusted: str) -> None:
+    """Bind complete API file evidence to one unchanged, authorized PR snapshot."""
+    if pr.changed_files > MAX_PR_FILES:
+        raise ValueError("PR changed_files exceeds GitHub's 3000-file limit")
+    snapshot = (pr.number, pr.head_sha, pr.base_sha, pr.changed_files)
+    files = api.pull_files(pr.number)
+    current = api.pull(pr.number)
+    if snapshot != (current.number, current.head_sha, current.base_sha, current.changed_files):
+        raise ValueError("PR snapshot changed during file pagination")
+    if current.head_sha != head_sha or current.state != "open" or current.merged:
+        raise ValueError("PR is no longer current and open after file pagination")
+    _verify_pull(current, (pr.number,), trusted)
+    if len(files) != pr.changed_files:
+        raise ValueError("Incomplete GitHub changed-file listing")
+    if not any(file.touches_preview() for file in files):
+        raise ValueError("PR has no website or docs input changes")
+
+
 def admit(trigger: Trigger, api: PreviewApi, trusted: str, expected_run_id: int) -> Admission:
     """Fail closed unless the event and live API jointly prove every invariant.
 
@@ -387,6 +475,7 @@ def admit(trigger: Trigger, api: PreviewApi, trusted: str, expected_run_id: int)
     if live.head_sha != source.head_sha:
         raise ValueError("Run head SHA disagrees with event")
     pr = _current_pull(source, api, trusted)
+    _verify_preview_inputs(pr, source.head_sha, api, trusted)
     attempt = api.run(source.id, source.run_attempt)
     _verify_run(attempt, source, trusted)
     if attempt.head_sha != source.head_sha:
