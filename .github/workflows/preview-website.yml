@@ -6,6 +6,9 @@ on:
     paths:
       - "website/**"
       - "docs/**"
+      - ".github/workflows/preview-website*.yml"
+      - ".github/tests/**"
+      - ".github/scripts/preview_publish.py"
 
 permissions: {}
 
@@ -58,7 +61,6 @@ jobs:
           tar --create --file "$RUNNER_TEMP/website-preview.tar" --directory website/dist .
 
       - name: Upload this run's untrusted archive
-        id: artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: website-preview-${{ github.run_id }}-${{ github.run_attempt }}
@@ -66,131 +68,3 @@ jobs:
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
-    outputs:
-      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
-
-  deploy:
-    name: Upload disabled pending Plan A activation
-    needs: build
-    if: ${{ false && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions: {}
-    environment:
-      name: cloudflare-pr-preview
-    steps:
-      - name: Download only the artifact produced by the build job
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact-id }}
-          path: ${{ runner.temp }}/preview-incoming
-          merge-multiple: true
-
-      - name: Validate and copy static files into a fresh upload directory
-        run: |
-          python3 -I - <<'PY'
-          import os
-          import re
-          import shutil
-          import tarfile
-          from pathlib import Path
-
-          def static_path(member: tarfile.TarInfo, root: Path) -> Path:
-              name = member.name.removeprefix("./")
-              parts = name.rstrip("/").split("/") if member.isdir() else name.split("/")
-              forbidden = {"functions", "node_modules", "package.json", "package-lock.json",
-                           "npm-shrinkwrap.json", "wrangler.toml", "wrangler.json", "wrangler.jsonc"}
-              for part in parts:
-                  if not re.fullmatch(r"[\w@()+,.-]+", part) or part.startswith("."):
-                      raise ValueError("Unsafe static asset path")
-                  if part.casefold() in forbidden or (part.startswith("_") and part != "_astro"):
-                      raise ValueError("Executable or configurable Pages input is forbidden")
-              if len(name) > 1024:
-                  raise ValueError("Static asset path is too long")
-              return root.joinpath(*parts)
-
-          def copy_member(archive: tarfile.TarFile, member: tarfile.TarInfo, target: Path) -> None:
-              if member.isdir():
-                  target.mkdir(parents=True, exist_ok=True)
-                  return
-              target.parent.mkdir(parents=True, exist_ok=True)
-              source = archive.extractfile(member)
-              if source is None:
-                  raise ValueError("Missing regular-file content")
-              with source, target.open("xb") as destination:
-                  shutil.copyfileobj(source, destination)
-
-          def prepare_static_upload(archive_path: Path, root: Path) -> None:
-              if archive_path.is_symlink() or not archive_path.is_file():
-                  raise ValueError("Expected a regular archive")
-              if archive_path.stat().st_size > 256 * 1024 * 1024:
-                  raise ValueError("Static archive is too large")
-              root.mkdir()
-              seen: set[str] = set()
-              total = 0
-              with tarfile.open(archive_path, "r:") as archive:
-                  for index, member in enumerate(archive):
-                      if index >= 20000 or not (member.isfile() or member.isdir()):
-                          raise ValueError("Too many entries or a link/special file")
-                      if member.name in {".", "./"} and member.isdir():
-                          continue
-                      if member.name in {".nojekyll", "./.nojekyll"} and member.isfile() and member.size == 0:
-                          continue
-                      target = static_path(member, root)
-                      identity = target.relative_to(root).as_posix().casefold()
-                      total += member.size
-                      if (
-                          identity in seen
-                          or not 0 <= member.size <= 25 * 1024 * 1024
-                          or total > 256 * 1024 * 1024
-                      ):
-                          raise ValueError("Duplicate asset or static upload size limit exceeded")
-                      seen.add(identity)
-                      copy_member(archive, member, target)
-              if not (root / "index.html").is_file():
-                  raise ValueError("Static index.html is required")
-              (root / "_headers").write_text("/*\n  X-Robots-Tag: noindex, nofollow, noarchive\n", encoding="utf-8")
-
-          temporary = Path(os.environ["RUNNER_TEMP"])
-          prepare_static_upload(temporary / "preview-incoming" / "website-preview.tar", temporary / "preview-upload")
-          PY
-
-      - name: Set up Node.js 22 without shared caches
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: "22"
-          package-manager-cache: false
-
-      - name: Install fixed Wrangler without credentials or lifecycle scripts
-        run: |
-          set -euo pipefail
-          mkdir "$RUNNER_TEMP/preview-tooling" "$RUNNER_TEMP/preview-deploy" "$RUNNER_TEMP/preview-config"
-          touch "$RUNNER_TEMP/preview-config/user.npmrc" "$RUNNER_TEMP/preview-config/global.npmrc"
-          cd "$RUNNER_TEMP/preview-tooling"
-          env -i PATH="$PATH" \
-            npm --userconfig="$RUNNER_TEMP/preview-config/user.npmrc" \
-            --globalconfig="$RUNNER_TEMP/preview-config/global.npmrc" \
-            --cache="$RUNNER_TEMP/preview-npm-cache" \
-            --prefix="$RUNNER_TEMP/preview-tooling" \
-            install --ignore-scripts --no-audit --no-fund --save-exact wrangler@4.160.1
-
-      - name: Upload only to the dedicated PR branch when credentials are available
-        working-directory: ${{ runner.temp }}/preview-deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PR_NUMBER: ${{ github.event.number }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
-            echo "Preview credentials unavailable; skipping upload."
-            exit 0
-          fi
-          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || exit 1
-          env -i PATH="$PATH" CI=true WRANGLER_SEND_METRICS=false \
-            XDG_CONFIG_HOME="$RUNNER_TEMP/preview-config" \
-            CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN" \
-            CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
-            node "$RUNNER_TEMP/preview-tooling/node_modules/wrangler/bin/wrangler.js" \
-            pages deploy "$RUNNER_TEMP/preview-upload" \
-            --project-name pluvy-preview --branch "pr-$PR_NUMBER"

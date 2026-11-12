@@ -1,8 +1,7 @@
-"""Exercise the actual inline upload validator without credentials or deployment."""
+"""Exercise the shared upload validator without credentials or deployment."""
 
 import io
 import os
-import re
 import subprocess
 import sys
 import tarfile
@@ -11,11 +10,11 @@ import textwrap
 import unittest
 from pathlib import Path
 
-WORKFLOW = Path(__file__).parents[1] / "workflows" / "preview-website.yml"
-MATCH = re.search(r"          python3 -I - <<'PY'\n(.*?)          PY\n", WORKFLOW.read_text(), re.S)
-if MATCH is None:
-    raise RuntimeError("The workflow must contain its inline static upload validator")
-VALIDATOR = textwrap.dedent(MATCH.group(1))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from preview_publish import prepare_static_upload
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+WORKFLOW = Path(__file__).parents[1] / "workflows" / "preview-website-publish.yml"
 
 
 def file_member(name: str) -> tarfile.TarInfo:
@@ -38,12 +37,20 @@ def validate(root: Path, members: list[tarfile.TarInfo]) -> subprocess.Completed
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
     """Keep validation subprocesses isolated from the caller's environment."""
     return subprocess.run(
-        [sys.executable, "-I", "-c", VALIDATOR],
+        [sys.executable, "-I", str(SCRIPTS / "preview_publish.py"), "prepare"],
         env={"RUNNER_TEMP": str(root)},
         capture_output=True,
         text=True,
         check=False,
     )
+
+
+def upload_script() -> str:
+    """Exercise the final trusted shell step without invoking a live uploader."""
+    upload = WORKFLOW.read_text().split(
+        "      - name: Upload only to the dedicated verified PR branch", 1
+    )[1]
+    return textwrap.dedent(upload.split("        run: |\n", 1)[1])
 
 
 class PreviewArtifactTests(unittest.TestCase):
@@ -84,6 +91,7 @@ class PreviewArtifactTests(unittest.TestCase):
             "a//b.html",
             "a/./b.html",
             "a\\b.html",
+            "caf\u00e9.html",
             "a\nb.html",
             "_worker.js",
             "_worker.js/index.js",
@@ -123,6 +131,8 @@ class PreviewArtifactTests(unittest.TestCase):
             tarfile.FIFOTYPE,
             tarfile.CHRTYPE,
             tarfile.BLKTYPE,
+            tarfile.CONTTYPE,
+            tarfile.GNUTYPE_SPARSE,
         ):
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
                 member = tarfile.TarInfo("asset")
@@ -175,19 +185,112 @@ class PreviewArtifactTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse((root / "preview-upload").exists())
 
-    def test_upload_skips_missing_credentials_without_starting_wrangler(self) -> None:
-        workflow = WORKFLOW.read_text()
-        upload = workflow.split("      - name: Upload only to the dedicated PR branch", 1)[1]
-        script = textwrap.dedent(upload.split("        run: |\n", 1)[1])
-        result = subprocess.run(
-            ["/bin/bash", "-c", script],
-            env={"PATH": os.defpath, "CLOUDFLARE_API_TOKEN": "", "CLOUDFLARE_ACCOUNT_ID": ""},
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("skipping upload", result.stdout)
+    def test_shared_validator_requires_a_fresh_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = validate(root, [file_member("index.html")])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with self.assertRaises(FileExistsError):
+                prepare_static_upload(
+                    root / "preview-incoming/website-preview.tar", root / "preview-upload"
+                )
+
+    def test_rejects_duplicate_inert_markers_and_malformed_directories(self) -> None:
+        root_member = tarfile.TarInfo("./")
+        root_member.type = tarfile.DIRTYPE
+        malformed = tarfile.TarInfo("assets//nested/")
+        malformed.type = tarfile.DIRTYPE
+        for members in (
+            [root_member, root_member],
+            [tarfile.TarInfo(".nojekyll"), tarfile.TarInfo("./.nojekyll")],
+            [malformed],
+        ):
+            with self.subTest(members=members), tempfile.TemporaryDirectory() as directory:
+                result = validate(Path(directory), [file_member("index.html"), *members])
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_rejects_excessive_entry_count(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            members = [file_member("index.html")]
+            for number in range(20000):
+                member = tarfile.TarInfo(f"directory-{number}")
+                member.type = tarfile.DIRTYPE
+                members.append(member)
+            result = validate(Path(directory), members)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Too many entries", result.stderr)
+
+    def test_rejects_unexpected_outer_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = validate(root, [file_member("index.html")])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            (root / "preview-incoming/metadata.json").write_text('{"pr_number":999}')
+            result = run_validator(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unexpected incoming artifact files", result.stderr)
+
+    def test_rejects_compressed_or_corrupt_archives(self) -> None:
+        for kind in ("gzip", "corrupt"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                incoming = root / "preview-incoming"
+                incoming.mkdir()
+                archive_path = incoming / "website-preview.tar"
+                if kind == "gzip":
+                    with tarfile.open(archive_path, "w:gz") as archive:
+                        archive.addfile(file_member("index.html"), io.BytesIO(b"<h1>preview</h1>"))
+                else:
+                    archive_path.write_bytes(b"corrupt tar")
+                result = run_validator(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse((root / "preview-upload/_headers").exists())
+
+    def test_upload_rejects_missing_credentials_without_starting_wrangler(self) -> None:
+        for token, account in (("", ""), ("test-only", ""), ("", "test-only")):
+            with self.subTest(token_missing=not token, account_missing=not account):
+                result = subprocess.run(
+                    ["/bin/bash", "-c", upload_script()],
+                    env={
+                        "PATH": os.defpath,
+                        "CLOUDFLARE_API_TOKEN": token,
+                        "CLOUDFLARE_ACCOUNT_ID": account,
+                    },
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("credentials are unavailable", result.stdout)
+                self.assertEqual(result.stderr, "")
+
+    def test_upload_branch_guard_and_fixed_project_with_inert_node_stand_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "node").symlink_to("/bin/echo")
+            environment = {
+                "PATH": f"{root}:{os.defpath}",
+                "RUNNER_TEMP": str(root),
+                "CLOUDFLARE_API_TOKEN": "test-only",
+                "CLOUDFLARE_ACCOUNT_ID": "test-only",
+            }
+            for number in ("", "0", "-1", "01", "main", "23;exit 0", "23\n", "23"):
+                with self.subTest(number=number):
+                    result = subprocess.run(
+                        ["/bin/bash", "-c", upload_script()],
+                        env={**environment, "PR_NUMBER": number},
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.stderr, "")
+                    if number == "23":
+                        self.assertEqual(result.returncode, 0)
+                        self.assertIn("--project-name pluvy-preview --branch pr-23", result.stdout)
+                        self.assertIn(f"pages deploy {root}/preview-upload", result.stdout)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(result.stdout, "")
 
 
 if __name__ == "__main__":
