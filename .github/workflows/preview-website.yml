@@ -6,9 +6,6 @@ on:
     paths:
       - "website/**"
       - "docs/**"
-      - ".github/workflows/preview-website*.yml"
-      - ".github/tests/**"
-      - ".github/scripts/preview_publish.py"
 
 permissions: {}
 

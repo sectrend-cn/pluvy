@@ -11,10 +11,10 @@ PR-head policy below. This PR must not be merged by the agent.
 
 `.github/workflows/preview-website.yml` is named `Cloudflare PR preview`. Its only
 trigger is `pull_request` with `opened`, `synchronize`, and `reopened`. Changes to
-`website/**`, `docs/**`, either preview workflow, `.github/tests/**`, or the trusted
-preview Python module trigger the build. Workflow permissions are empty; the
-build alone has `contents: read`. It requests no Environment and references no
-secrets. The previous in-workflow deploy job has been removed entirely.
+**only `website/**` and `docs/**`** trigger the build. A workflow-only or tests-only
+change does not trigger it. Workflow permissions are empty; the build alone has
+`contents: read`. It requests no Environment and references no secrets. The
+previous in-workflow deploy job has been removed entirely.
 
 The build explicitly checks out `${{ github.event.pull_request.head.sha }}` with
 `persist-credentials: false`. The preview is the **PR branch head tree**, not the
@@ -41,6 +41,13 @@ build YAML at that same path and retain that ID. Its artifact is always
 untrusted. The content boundary is static validation and never executing PR or
 artifact code, not trusting how the build produced the artifact. Anyone who can
 push `main` can change the publisher and its trusted module.
+
+Path filters live in PR-controlled YAML and are not a trusted eligibility gate.
+Admission currently does not check the PR's actual changed files, so a PR can
+widen its filters and publish static output for a YAML-only change. A trusted
+check would need complete GitHub API file-list evidence and head-consistency
+checks; it is deferred to keep this correction small. Static validation and
+never executing PR or artifact code remain the content boundary.
 
 ## Admission, currentness, and serialization
 
@@ -178,10 +185,12 @@ does not constrain what a stolen account token could do elsewhere.
 3. Configure **no required reviewers and no manual approval gate**. No wait timer
    or custom approval rule should prevent automatic execution. Environment
    reviewers are configured in GitHub settings, never in workflow YAML.
-4. Set deployment branches and tags to **Selected**. Allow **only the default
-   branch `main` (`refs/heads/main`)**. Do **not** add `refs/pull/*/merge`: that was
-   Plan A and would make a PR job requesting this Environment eligible. The
-   `workflow_run` publisher uses the default branch and needs no PR merge rule.
+4. Set deployment branches and tags to **Selected branches and tags**. Add exactly
+   one **Branch** rule whose pattern is **`main`**. The
+   [GitHub branch-policy API](https://docs.github.com/en/rest/deployments/branch-policies)
+   represents this as `{ "name": "main", "type": "branch" }`. Do **not** add
+   `refs/pull/*/merge`. The `workflow_run` publisher uses the default-branch ref
+   as `GITHUB_REF`; the Branch rule's pattern must be `main`.
 5. Turn **administrator bypass OFF**. Confirm all controls are available for the
    repository's actual plan and visibility using
    [GitHub's Environment settings guidance](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
