@@ -69,6 +69,7 @@ test('Chinese finding panels distinguish scan evidence from unverified advice', 
 
 test('docs are English-only with agent-friendly llms.txt and raw Markdown outputs', async () => {
   const enLanding = await readFile(path.join(output, 'index.html'), 'utf8');
+  assert.match(enLanding, /<header\b[^>]*class="hero__header[^"]*"[^>]*>[\s\S]*?<h1\b[^>]*id="hero-title"/);
   assert.match(enLanding, /class="github-icon[^"]*"/);
   assert.doesNotMatch(enLanding, /Hold new changes to the policy/);
   assert.doesNotMatch(enLanding, />llms-full\.txt</);
