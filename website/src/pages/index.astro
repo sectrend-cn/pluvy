@@ -2,7 +2,6 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/landing/Hero.astro';
 import Principles from '../components/landing/Principles.astro';
-import Workflow from '../components/landing/Workflow.astro';
 import FinalCta from '../components/landing/FinalCta.astro';
 import LandingBackground from '../components/landing/LandingBackground.astro';
 import type { Language } from '../i18n.ts';
@@ -21,7 +20,6 @@ const lang: Language = 'en';
     <div class="landing-content">
       <Hero lang={lang} />
       <Principles lang={lang} />
-      <Workflow lang={lang} />
       <FinalCta lang={lang} />
     </div>
   </div>

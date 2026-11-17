@@ -47,13 +47,14 @@ const copy = {
             <div class:list={['code-comparison', { 'has-advice': item.kind !== 'resolved' }]} data-code-comparison>
               <div class="code-group code-group--issue">
                 <span class="code-group__label">{item.kind === 'resolved' ? copy.beforeLabel : copy.sourceLabel}</span>
-                <DemoCode lines={item.source} label={item.kind === 'resolved' ? copy.beforeLabel : copy.sourceLabel} />
+                <DemoCode lines={item.source} label={item.kind === 'resolved' ? copy.beforeLabel : copy.sourceLabel} lang={lang} />
               </div>
               <div class:list={['code-group', 'code-group--fix', { 'code-group--diagnostic': item.kind !== 'resolved' }]}>
                 <span class="code-group__label">{item.kind === 'resolved' ? copy.afterLabel : copy.diagnosticLabel}</span>
                 <DemoCode
                   lines={item.kind === 'resolved' ? item.after : item.source}
                   label={item.kind === 'resolved' ? copy.afterLabel : copy.diagnosticLabel}
+                  lang={lang}
                   highlightFindings={item.kind !== 'resolved'}
                 />
               </div>

@@ -16,7 +16,6 @@ const finding = zh
 ---
 
 <aside class="agent-advice" aria-label={zh ? '门禁返回给 Agent 的修复要求' : 'Gate feedback returned to Agent'}>
-  <div class="agent-advice__pending" aria-hidden="true"><span class="pending-dot"></span>{zh ? '对照 .pluvy/pluvy.json 检查语法树' : 'Checking syntax tree against .pluvy/pluvy.json'}</div>
   <div class="agent-advice__result">
     <div class="agent-advice__route">
       <strong>PLUVY <span aria-hidden="true">→</span> AGENT</strong>
@@ -41,10 +40,7 @@ const finding = zh
     font: 12px/1.4 var(--sans);
     pointer-events: none;
   }
-  .agent-advice__pending,
-  .agent-advice__result { grid-area: 1 / 1; min-width: 0; }
-  .agent-advice__pending { display: none; align-items: center; gap: 9px; color: #61704f; }
-  .pending-dot { width: 6px; height: 6px; border-radius: 50%; background: #789743; }
+  .agent-advice__result { min-width: 0; }
   .agent-advice__route {
     display: flex;
     flex-wrap: wrap;
@@ -74,21 +70,6 @@ const finding = zh
     height: 17px;
     color: #5a713d;
     font: 10px var(--mono);
-  }
-  :global([data-scan-state='scanning']) .agent-advice__result,
-  :global([data-scan-state='manual']) .agent-advice__result { opacity: 0; visibility: hidden; }
-  :global([data-scan-state='scanning']) .agent-advice__pending,
-  :global([data-scan-state='manual']) .agent-advice__pending { display: flex; }
-  :global([data-scan-state='complete']) .agent-advice__result { animation: advice-enter 450ms ease-out both; }
-  :global([data-scan-state='complete']) li { animation: advice-enter 400ms 160ms ease-out both; }
-  :global([data-scan-state='complete']) li:nth-child(2) { animation-delay: 300ms; }
-  @keyframes advice-enter {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    :global([data-scan-state]) .agent-advice__result,
-    :global([data-scan-state]) li { animation: none; }
   }
   @media (max-width: 767px) {
     .agent-advice { padding: 10px 12px; font-size: 11px; }

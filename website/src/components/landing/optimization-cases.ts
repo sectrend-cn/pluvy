@@ -1,9 +1,8 @@
 import type { Language } from '../../i18n.ts';
 
-export interface DemoCodeLine {
-  readonly text: string;
-  readonly signal: 'none' | 'finding';
-}
+export type DemoCodeLine =
+  | { readonly text: string; readonly signal: 'none' }
+  | { readonly text: string; readonly signal: 'finding'; readonly note: Record<Language, string> };
 
 interface CaseCopy {
   readonly tab: string;
@@ -48,12 +47,12 @@ export const optimizationCases: readonly OptimizationCase[] = [
       },
     },
     source: [
-      { text: '// @ts-ignore -- unblock build', signal: 'finding' },
-      { text: 'export function parseOrder(raw: any): any {', signal: 'finding' },
+      { text: '// @ts-ignore -- unblock build', signal: 'finding', note: { en: '// type.suppression: foreign directive', 'zh-CN': '// type.suppression：禁止压制诊断' } },
+      { text: 'export function parseOrder(raw: any): any {', signal: 'finding', note: { en: '// type.broad: erases contract with any', 'zh-CN': '// type.broad：用 any 擦除契约' } },
       { text: '  try {', signal: 'none' },
       { text: '    const [amount, currency] = raw.split(" ");', signal: 'none' },
       { text: '    return { total: Number(amount), currency };', signal: 'none' },
-      { text: '  } catch (error) {', signal: 'finding' },
+      { text: '  } catch (error) {', signal: 'finding', note: { en: '// flow.swallow: swallows failure', 'zh-CN': '// flow.swallow：捕获后吞掉异常' } },
       { text: '    return null;', signal: 'none' },
       { text: '  }', signal: 'none' },
       { text: '}', signal: 'none' },
@@ -90,8 +89,8 @@ export const optimizationCases: readonly OptimizationCase[] = [
     source: [
       { text: 'test("parses order total", () => {', signal: 'none' },
       { text: '  const order = parseOrder("12.50 EUR");', signal: 'none' },
-      { text: '  expect(order).toBeDefined();', signal: 'finding' },
-      { text: '  expect(order.currency).toBe(order.currency);', signal: 'finding' },
+      { text: '  expect(order).toBeDefined();', signal: 'finding', note: { en: '// test.vacuous: checks no behavior', 'zh-CN': '// test.vacuous：未验证具体行为' } },
+      { text: '  expect(order.currency).toBe(order.currency);', signal: 'finding', note: { en: '// test.tautology: mirrors itself', 'zh-CN': '// test.tautology：自身对比恒为真' } },
       { text: '});', signal: 'none' },
     ],
   },
@@ -113,11 +112,11 @@ export const optimizationCases: readonly OptimizationCase[] = [
       },
     },
     source: [
-      { text: 'import { chargeCard } from "../adapters/stripe";', signal: 'finding' },
+      { text: 'import { chargeCard } from "../adapters/stripe";', signal: 'finding', note: { en: '// architecture.import: forbidden layer', 'zh-CN': '// architecture.import：违反依赖方向' } },
       { text: '', signal: 'none' },
       { text: 'export function settle(amount: number, unit?: string): string {', signal: 'none' },
       { text: '  const currency = unit ?? "USD";', signal: 'none' },
-      { text: '  return chargeCard(amount, currency as Currency);', signal: 'finding' },
+      { text: '  return chargeCard(amount, currency as Currency);', signal: 'finding', note: { en: '// type.assertion: unchecked cast', 'zh-CN': '// type.assertion：未经校验的强转' } },
       { text: '}', signal: 'none' },
     ],
   },

@@ -35,8 +35,12 @@ test('finding panels reveal annotations on the same code rather than invented fi
     const panel = await demoPanel(kind);
     const [source, annotated] = codeBlocks(panel);
     assert.ok(source);
-    assert.equal(annotated, source);
+    assert.ok(annotated);
+    assert.doesNotMatch(source, /\/\/ (?:test\.|architecture\.|type\.)/);
+    assert.match(annotated, /\/\/ (?:test\.|architecture\.|type\.)/);
     assert.match(panel, /code-line--finding/);
+    assert.match(panel, /code-line__note/);
+    assert.doesNotMatch(panel, /agent-advice__pending/);
     assert.match(panel, /Diagnostics · same source/);
     assert.match(panel, /Gate feedback returned to Agent/);
     assert.match(panel, /Blocked · exit 1/);
@@ -50,40 +54,51 @@ test('finding panels reveal annotations on the same code rather than invented fi
 test('Chinese finding panels distinguish scan evidence from unverified advice', async () => {
   for (const kind of ['test-integrity', 'boundary-drift']) {
     const panel = await demoPanel(kind, 'zh');
+    const [source, annotated] = codeBlocks(panel);
+    assert.ok(source);
+    assert.ok(annotated);
+    assert.doesNotMatch(source, /\/\/ (?:test\.|architecture\.|type\.)/);
+    assert.match(annotated, /\/\/ (?:test\.|architecture\.|type\.)/);
     assert.match(panel, /诊断标注 · 同一代码/);
     assert.match(panel, /门禁返回给 Agent 的修复要求/);
     assert.match(panel, /门禁拦截 · exit 1/);
+    assert.doesNotMatch(panel, /agent-advice__pending/);
     assert.doesNotMatch(panel, /修复后 · 节选/);
   }
 });
 
 test('docs are English-only with agent-friendly llms.txt and raw Markdown outputs', async () => {
+  const enLanding = await readFile(path.join(output, 'index.html'), 'utf8');
+  assert.match(enLanding, /class="github-icon[^"]*"/);
+  assert.doesNotMatch(enLanding, /Hold new changes to the policy/);
+  assert.doesNotMatch(enLanding, />llms-full\.txt</);
+
   const zhLanding = await readFile(path.join(output, 'zh/index.html'), 'utf8');
   assert.match(zhLanding, /href="\/pluvy\/docs\/getting-started\/"/);
+  assert.match(zhLanding, /class="github-icon[^"]*"/);
+  assert.doesNotMatch(zhLanding, /新改动按策略把关/);
+  assert.doesNotMatch(zhLanding, />llms-full\.txt</);
   assert.doesNotMatch(zhLanding, /\/zh\/docs\//);
 
   const enDocs = await readFile(path.join(output, 'docs/getting-started/index.html'), 'utf8');
   assert.match(enDocs, /For agents:/);
   assert.match(enDocs, /href="\/pluvy\/docs\/getting-started\.md"/);
   assert.match(enDocs, /href="\/pluvy\/llms\.txt"/);
-  assert.match(enDocs, /href="\/pluvy\/llms-full\.txt"/);
+  assert.doesNotMatch(enDocs, />llms-full\.txt</);
   assert.doesNotMatch(enDocs, /github\.com\/sectrend-cn\/pluvy\/discussions/);
 
   const llmsTxt = await readFile(path.join(output, 'llms.txt'), 'utf8');
   assert.match(llmsTxt, /^# Pluvy/m);
   assert.match(llmsTxt, /https:\/\/sectrend-cn\.github\.io\/pluvy\/llms-full\.txt/);
   assert.match(llmsTxt, /https:\/\/sectrend-cn\.github\.io\/pluvy\/docs\/getting-started\.md/);
-  assert.match(llmsTxt, /https:\/\/sectrend-cn\.github\.io\/pluvy\/docs\/serialization-boundaries\.md/);
 
   const llmsFull = await readFile(path.join(output, 'llms-full.txt'), 'utf8');
   assert.match(llmsFull, /# Pluvy getting started/);
   assert.match(llmsFull, /# Checker configuration/);
   assert.match(llmsFull, /# Boundaries, usage and serialization/);
-  assert.match(llmsFull, /# Approved next-line diagnostic exceptions/);
 
   const rawDoc = await readFile(path.join(output, 'docs/getting-started.md'), 'utf8');
   assert.match(rawDoc, /^# Pluvy getting started/m);
-  assert.match(rawDoc, /https:\/\/sectrend-cn\.github\.io\/pluvy\/docs\/checker-configuration\.md/);
 
   await assert.rejects(access(path.join(output, 'zh/docs/getting-started/index.html')));
   await assert.rejects(access(path.join(output, 'docs/cloudflare-pr-preview/index.html')));

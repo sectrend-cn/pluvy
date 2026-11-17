@@ -20,19 +20,6 @@ const englishLanding = {
       { number: '03', title: 'Architecture that drifts', before: 'Forbidden imports, misplaced modules, and unowned files—checked against owners and boundaries declared in ', code: '.pluvy/pluvy.json', after: ' and reviewed like code.' },
     ],
   },
-  workflow: {
-    titleA: 'Hold new changes to the policy.',
-    titleB: 'Clear old debt on your schedule.',
-    scopes: [
-      { flag: '--base <commit>', use: 'Only what the change touches, so existing debt never blocks new work.' },
-      { flag: '--all', use: 'Every selected file, including existing debt.' },
-      { flag: '--staged', use: 'Staged changes, before you commit.' },
-    ],
-    trust: 'Safe in CI, hooks and agent sessions: Pluvy reports findings and never edits your code.',
-    guide: 'Read the run guide',
-    policy: 'POLICY',
-    run: 'RUN',
-  },
   final: {
     titleA: 'Put a gate after',
     titleB: 'every agent task.',
@@ -63,19 +50,6 @@ export const landingContent: Record<Language, LandingContent> = {
         { number: '02', title: '被悄悄擦掉的契约', before: '像 ', code: 'Any', after: ' 这样的宽泛类型、未经校验的断言转换、捕获后吞掉的异常，以及用字面量默认值掩盖的缺失数据。' },
         { number: '03', title: '逐渐走样的架构', before: '违反依赖方向、放错位置的模块和缺少归属的文件——对照 ', code: '.pluvy/pluvy.json', after: ' 中声明的归属与边界检查，并像代码一样评审。' },
       ],
-    },
-    workflow: {
-      titleA: '新改动按策略把关，',
-      titleB: '存量问题按节奏清理。',
-      scopes: [
-        { flag: '--base <commit>', use: '只检查改动涉及的部分，存量问题不阻塞新工作。' },
-        { flag: '--all', use: '检查所有选中文件，暴露存量问题。' },
-        { flag: '--staged', use: '提交前检查暂存区。' },
-      ],
-      trust: '可以放心跑在 CI、hook 和 Agent 会话里：Pluvy 只报告问题，从不改动你的代码。',
-      guide: '查看运行指南',
-      policy: '策略',
-      run: '运行',
     },
     final: {
       titleA: '在每个 Agent 任务后',

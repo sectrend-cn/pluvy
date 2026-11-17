@@ -1,9 +1,11 @@
 ---
+import type { Language } from '../../i18n.ts';
 import type { DemoCodeLine } from './optimization-cases.ts';
 
 interface Props {
   lines: readonly DemoCodeLine[];
   label: string;
+  lang?: Language;
   highlightFindings?: boolean;
 }
 
@@ -37,10 +39,10 @@ function highlightTypeScript(line: string): CodeToken[] {
   return tokens.length > 0 ? tokens : [{ text: line || ' ', kind: 'plain' }];
 }
 
-const { lines, label, highlightFindings = false } = Astro.props;
+const { lines, label, lang = 'en', highlightFindings = false } = Astro.props;
 ---
 
-<pre tabindex="0" aria-label={label} class:list={{ 'is-annotated': highlightFindings }}><code>{lines.map((line) => <span class:list={['code-line', { 'code-line--finding': highlightFindings && line.signal === 'finding' }]}>{highlightTypeScript(line.text).map((token) => <span class={`token-${token.kind}`}>{token.text}</span>)}</span>)}</code></pre>
+<pre tabindex="0" aria-label={label} class:list={{ 'is-annotated': highlightFindings }}><code>{lines.map((line) => <span class:list={['code-line', { 'code-line--finding': highlightFindings && line.signal === 'finding' }]}><span class="code-line__source">{highlightTypeScript(line.text).map((token) => <span class={`token-${token.kind}`}>{token.text}</span>)}</span>{highlightFindings && line.signal === 'finding' && <span class="code-line__note">{'  '}{line.note[lang]}</span>}</span>)}</code></pre>
 
 <style>
   pre {
@@ -62,10 +64,15 @@ const { lines, label, highlightFindings = false } = Astro.props;
     white-space: pre;
   }
 
-  .code-line--finding {
+  .code-line--finding .code-line__source {
     text-decoration: underline;
-    text-decoration-color: #f2c16c80;
+    text-decoration-color: #f2c16ca6;
     text-underline-offset: 4px;
+  }
+
+  .code-line__note {
+    color: #f2c97d;
+    font-style: italic;
   }
 
   .token-keyword { color: #c9a5ff; font-weight: 600; }
