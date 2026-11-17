@@ -69,12 +69,18 @@ test('Chinese finding panels distinguish scan evidence from unverified advice', 
 
 test('docs are English-only with agent-friendly llms.txt and raw Markdown outputs', async () => {
   const enLanding = await readFile(path.join(output, 'index.html'), 'utf8');
+  const enHeroHeading = enLanding.match(/<h1\b[^>]*id="hero-title"[^>]*>([\s\S]*?)<\/h1>/)?.[1];
+  assert.ok(enHeroHeading);
+  assert.doesNotMatch(enHeroHeading, /<br\b/);
   assert.match(enLanding, /<header\b[^>]*class="hero__header[^"]*"[^>]*>[\s\S]*?<h1\b[^>]*id="hero-title"/);
   assert.match(enLanding, /class="github-icon[^"]*"/);
   assert.doesNotMatch(enLanding, /Hold new changes to the policy/);
   assert.doesNotMatch(enLanding, />llms-full\.txt</);
 
   const zhLanding = await readFile(path.join(output, 'zh/index.html'), 'utf8');
+  const zhHeroHeading = zhLanding.match(/<h1\b[^>]*id="hero-title"[^>]*>([\s\S]*?)<\/h1>/)?.[1];
+  assert.ok(zhHeroHeading);
+  assert.doesNotMatch(zhHeroHeading, /<br\b/);
   assert.match(zhLanding, /href="\/pluvy\/docs\/getting-started\/"/);
   assert.match(zhLanding, /class="github-icon[^"]*"/);
   assert.doesNotMatch(zhLanding, /新改动按策略把关/);
