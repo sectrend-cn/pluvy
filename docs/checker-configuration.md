@@ -394,10 +394,14 @@ and `from json import dumps`, plus single-assignment callable/module aliases suc
 as `encode = json.dumps` or `codec = json`. It also treats members named
 `dump_json` or `model_dump_json` as encoders without requiring a pydantic import
 or a resolved receiver type; any same-named member call must still reach a
-permitted output. Alias chains and local shadowing use
-the existing semantic index. Strings containing source examples and unrelated methods named
-`dumps` are not encoding calls. Other serializers can be registered in the
-encoding API configuration below.
+permitted output. Name-level identities follow stable aliases and parentheses,
+while member-level recognition (built-in pydantic entry points and `*.member`
+entries) matches only the explicit member name at the call site. Therefore
+`dump = ADAPTER.dump_json; dump(item)` and `(item.model_dump_json)()` are not
+recognized, unlike the corresponding `json.dumps` forms. Alias chains and local
+shadowing use the existing semantic index. Strings containing source examples
+and unrelated methods named `dumps` are not encoding calls. Other serializers
+can be registered in the encoding API configuration below.
 
 The existing `third_party_modules` policy remains directional. A JSON encoding
 is permitted when supplied directly to a configured library, including keyword
@@ -735,7 +739,10 @@ constructors can establish the library receiver; a method named `toJson` alone
 cannot. A configured `*.toJson` encoder entry can declare receiver-agnostic
 recognition for explicit-receiver calls, while implicit receiver calls remain
 unproved. Gson's multi-argument overloads include streaming APIs and are not
-classified automatically without overload proof. Fully qualified type syntax,
+classified automatically without overload proof. A `*.member` encoder entry
+matches by member name and also covers calls this adapter excludes by overload:
+with `*.toJson` configured, the streaming overload `gson.toJson(item, writer)` is
+recognized as an encoder. Fully qualified type syntax,
 `var` inference, arbitrary serializer subclasses and streaming lifecycles are
 not claimed by this adapter. Exact configured imported/static API identities
 are also supported.

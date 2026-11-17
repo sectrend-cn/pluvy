@@ -76,11 +76,13 @@ reports swallowed wide captures and coalescing chains that hide failures behind
 literal defaults. It shares no traversal or evidence with `semantics/flow.py`,
 whose carrier forwarding serves encoding output proof.
 
-`EncodingRule` consumes `EncodingSyntax`, which identifies qualified encoders,
-receiver-agnostic member encoders (`member_encoder`/`member_encoders`), decoders,
-argument consumers and actual output APIs. Its `argument` capability returns the
-canonical `ParameterSlot` for a payload; this lets shared semantics enforce
-configured positional/keyword output selectors without reading grammar fields.
+`EncodingRule` consumes `EncodingSyntax`, which defines `member_encoder` for
+receiver-agnostic member recognition and also identifies qualified encoders,
+decoders, argument consumers and actual output APIs. `GrammarEncoding` provides
+the default `member_encoder` implementation backed by its `member_encoders` set.
+Its `argument` capability returns the canonical `ParameterSlot` for a payload;
+this lets shared semantics enforce configured positional/keyword output
+selectors without reading grammar fields.
 `BroadTypeOptions.encoding` owns validated additive encoder, decoder and output
 API declarations, including the restricted `*.member` encoder form. Explicit
 decoder evidence wins over configured output matches. A decoder rejection takes precedence

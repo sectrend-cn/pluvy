@@ -119,6 +119,11 @@ def test_model_dump_and_a_bare_imported_call_are_not_member_encoders() -> None:
     assert _erasure("from codec import dump_json\nvalue = dump_json(item)") == ()
 
 
+def test_member_encoder_recognition_does_not_follow_aliases_or_parentheses() -> None:
+    assert _erasure("dump = ADAPTER.dump_json\nvalue = dump(item)") == ()
+    assert _erasure("value = (item.model_dump_json)()") == ()
+
+
 def test_same_named_member_call_is_reported_except_at_a_proven_output() -> None:
     assert len(_erasure("value = codec.dump_json(item)")) == 1
     assert _erasure("print(codec.dump_json(item))") == ()

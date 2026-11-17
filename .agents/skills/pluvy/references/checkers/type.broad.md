@@ -63,7 +63,11 @@ a `*.` prefix followed by one ASCII identifier. Names are exact and case-sensiti
 and use resolved import
 identities rather than local spellings, so `from orjson import dumps as pack`
 matches `orjson.dumps`. A `*.member` entry matches explicit-receiver member calls
-by member name; bare calls and Java implicit-receiver calls do not match. Boolean,
+by member name; bare calls and Java implicit-receiver calls do not match.
+Member-level recognition (built-in pydantic entry points and `*.member` entries)
+matches only the explicit member name at the call site and does not follow
+aliases or parenthesized callees; `dump = ADAPTER.dump_json; dump(item)` and
+`(item.model_dump_json)()` are not recognized. Boolean,
 string and fractional indexes are rejected.
 These lists extend built-in recognition; they never remove built-in encoders,
 decoders or output checks, and they never exempt `Any`, casts or incoming library

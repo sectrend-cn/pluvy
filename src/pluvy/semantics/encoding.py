@@ -112,7 +112,7 @@ class EncodingRule:
             hit = self._hit(callee, name, member, options)
             if hit is None:
                 continue
-            if self._permitted(node, hit, names, outputs):
+            if self._permitted(node, name, hit.member_level, names, outputs):
                 continue
             findings.append(
                 Finding(
@@ -141,11 +141,16 @@ class EncodingRule:
         return index.text(member) if member is not None else ""
 
     def _permitted(
-        self, node: Node, hit: _EncoderHit, names: QualifiedNames, outputs: ValueFlow
+        self,
+        node: Node,
+        name: str,
+        member_level: bool,
+        names: QualifiedNames,
+        outputs: ValueFlow,
     ) -> bool:
-        if hit.member_level:
+        if member_level:
             return outputs.permitted(node)
         target = self.syntax.result_binding(node, names)
         if target is not None:
             return outputs.binding_permitted(target, node)
-        return self.syntax.single_result(hit.display) and outputs.permitted(node)
+        return self.syntax.single_result(name) and outputs.permitted(node)
