@@ -6,6 +6,7 @@ import pytest
 import tree_sitter_python
 from pydantic import ValidationError
 from tree_sitter import Language as Grammar
+from tree_sitter import Node
 
 from pluvy.analysis.session import AnalysisSession, SemanticBinding
 from pluvy.cli import main
@@ -15,6 +16,7 @@ from pluvy.languages.python.encoding import PythonEncodingSyntax
 from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
 from pluvy.parsing.treesitter import TreeParser
 from pluvy.policy.models import Policy
+from pluvy.semantics.aliases import QualifiedNames
 from pluvy.semantics.encoding import EncodingRule
 from pluvy.source import Language, Source
 
@@ -43,10 +45,13 @@ def _encoder_policy(entries: tuple[str, ...]) -> Policy:
 
 
 class _NonSingleResultEncodingSyntax(PythonEncodingSyntax):
-    """Deny single-result handling so member hits must bypass it."""
+    """Deny single-result handling and offer a binding so member hits bypass both."""
 
     def single_result(self, name: str) -> bool:
         return False
+
+    def result_binding(self, node: Node, names: QualifiedNames) -> Node | None:
+        return node
 
 
 def _adapter_findings(code: str, syntax: PythonEncodingSyntax) -> tuple[Finding, ...]:

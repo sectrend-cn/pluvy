@@ -80,12 +80,13 @@ whose carrier forwarding serves encoding output proof.
 receiver-agnostic member recognition and also identifies qualified encoders,
 decoders, argument consumers and actual output APIs. `GrammarEncoding` provides
 the default `member_encoder` implementation backed by its `member_encoders` set.
-A structured `EncodingSyntax` implementation that does not inherit
+A structural `EncodingSyntax` implementation that does not inherit
 `GrammarEncoding` must define `member_encoder` itself; registration does not
 validate protocol members, and a missing definition fails closed during analysis
-with an analysis error such as
-`AnalysisError: Rule bundle … failed: member_encoder`. The `argument` capability
-on `EncodingSyntax` returns the canonical `ParameterSlot` for a payload;
+with an `AnalysisError` such as
+`Rule bundle … failed: '…' object has no attribute 'member_encoder'`. The
+`argument` capability on `EncodingSyntax` returns the canonical `ParameterSlot`
+for a payload;
 this lets shared semantics enforce configured positional/keyword output
 selectors without reading grammar fields.
 `BroadTypeOptions.encoding` owns validated additive encoder, decoder and output
