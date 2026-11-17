@@ -426,7 +426,12 @@ to `vendor` and also consumed by application code is reported at its encoding.
 A `json.loads(json.dumps(payload))` round trip remains an error even if `json`
 is listed as a third-party module. This also covers stable aliases of the decoder
 and single-assignment carriers passed into it. Merely configuring the encoder's
-module does not exempt its output from this rule.
+module does not exempt its output from this rule. When the receiving library's
+module is listed in `third_party_modules`, a member-level encoder result passed
+directly to one of that library's class methods, such as
+`VendorModel.model_validate_json(item.model_dump_json())`, receives the same
+directional library-input exemption as `json.dumps`. Declaring that method as an
+exact `decoders` entry for its resolved identity rejects this round trip.
 
 Actual serialization output is permitted independently of third-party policy:
 

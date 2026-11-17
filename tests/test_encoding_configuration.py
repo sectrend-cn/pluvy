@@ -3,12 +3,19 @@
 from pathlib import Path
 
 import pytest
+import tree_sitter_python
 from pydantic import ValidationError
+from tree_sitter import Language as Grammar
 
+from pluvy.analysis.session import AnalysisSession, SemanticBinding
 from pluvy.cli import main
 from pluvy.diagnostics import Finding, Report
 from pluvy.engine import check
+from pluvy.languages.python.encoding import PythonEncodingSyntax
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.parsing.treesitter import TreeParser
 from pluvy.policy.models import Policy
+from pluvy.semantics.encoding import EncodingRule
 from pluvy.source import Language, Source
 
 _POLICY = Policy.model_validate_json("""{
@@ -33,6 +40,21 @@ def _encoder_policy(entries: tuple[str, ...]) -> Policy:
     return Policy.model_validate_json(
         '{"checkers":{"type.broad":{"encoding":{"encoders":[' + encoded + "]}}}}"
     )
+
+
+class _NonSingleResultEncodingSyntax(PythonEncodingSyntax):
+    """Deny single-result handling so member hits must bypass it."""
+
+    def single_result(self, name: str) -> bool:
+        return False
+
+
+def _adapter_findings(code: str, syntax: PythonEncodingSyntax) -> tuple[Finding, ...]:
+    source = Source("sample.py", code.encode(), Language.PYTHON)
+    parser = TreeParser(Grammar(tree_sitter_python.language()))
+    session = AnalysisSession(Policy())
+    session.prepare((source,), {Language.PYTHON: SemanticBinding(parser, PythonSemanticSyntax())})
+    return EncodingRule(syntax).check(session.context(source, parser))
 
 
 @pytest.mark.parametrize(
@@ -109,6 +131,14 @@ def test_go_member_encoder_with_bytes_and_error_keeps_the_internal_finding() -> 
     findings = _findings(code, Language.GO, policy)
     assert len(findings) == 1
     assert "Encode" in findings[0].message
+
+
+def test_member_encoder_hits_bypass_the_adapter_single_result_path() -> None:
+    syntax = _NonSingleResultEncodingSyntax()
+    assert _adapter_findings("print(codec.dump_json(item))", syntax) == ()
+    findings = _adapter_findings("value = codec.dump_json(item)", syntax)
+    assert len(findings) == 1
+    assert "dump_json" in findings[0].message
 
 
 def test_bare_encoder_entry_does_not_match_a_member_call() -> None:
