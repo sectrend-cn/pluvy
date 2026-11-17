@@ -9,9 +9,8 @@ Each repository commits its own policy at this default path. Start with
 repository's architecture. All selection and checker paths are relative to the
 repository root, not `.pluvy/`.
 
-The bundled agent skill repeats these facts per checker under
-[the checker index](../.agents/skills/pluvy/references/checkers.md), one
-page per checker in `references/checkers/`; change both carriers in the same batch.
+Per-checker configuration examples are also bundled in the agent skill under
+[the checker index](../.agents/skills/pluvy/references/checkers.md).
 
 `--config` selects the policy path; it stays relative to `--root` in every mode and
 must name a path inside the root. There is no automatic fallback to a root-level
@@ -59,8 +58,8 @@ only default options.
 | --- | --- | --- |
 | `structure.guarded_projection` | `min_fields: 3` (integer, at least 2) | Repeated guarded field copies in every supported language |
 | `function_size` | `lines: 50`, `statements: 50`, `complexity: 10`, `nesting: 3`, `parameters: 5` | All five function metrics |
-| `test.integrity` | `paths: 20 test-path globs` | Tautological assertions and tests without a meaningful assertion |
-| `test.deletion` | `paths: 20 test-path globs`, `snapshot_paths: ("*.snap", "__snapshots__/*", "*/__snapshots__/*")`, `removed_assertions: 3` (integer, at least 0) | Removed test files, assertion erosion and changed snapshot paths in changed audits |
+| `test.integrity` | `paths`: 20 default test-file globs | Tautological assertions and tests without a meaningful assertion |
+| `test.deletion` | `paths`: 20 default test-file globs, `snapshot_paths: ["*.snap", "__snapshots__/*", "*/__snapshots__/*"]`, `removed_assertions: 3` (integer, at least 0) | Removed test files, assertion erosion and changed snapshot paths in changed audits |
 | `flow.handling` | `max_chain: 3` (positive integer) | Swallowed exception handlers and long `??` chains whose defaults are all bare literals |
 | `type.contract` | `max_members: 4`, `optional_fields: 3`, `null_defaults: 3` (positive integers) | Aggregated nullable declarations, bare nullish fallbacks and oversized unions in TypeScript and TSX |
 | `type.annotation` | None | Broad or bare Python annotations |
@@ -109,12 +108,12 @@ they do not remove files from other checkers.
 
 `test.integrity.paths` selects which files the test-integrity checker analyzes.
 `test.deletion.paths` shares the same default and dialect for changed test files.
-The default is `("test_*.py", "*/test_*.py", "*_test.py", "tests/*", "*/tests/*",
+The default is `["test_*.py", "*/test_*.py", "*_test.py", "tests/*", "*/tests/*",
 "*.test.js", "*.test.jsx", "*.test.ts", "*.test.tsx", "*.test.mjs", "*.test.cjs",
 "*.test.mts", "*.test.cts", "*.spec.js", "*.spec.jsx", "*.spec.ts", "*.spec.tsx",
-"*_test.go", "*Test.java", "*Tests.java")`. The same `fnmatchcase` semantics
+"*_test.go", "*Test.java", "*Tests.java"]`. The same `fnmatchcase` semantics
 apply: matching is case-sensitive, `*` spans `/`, and `**` or brace alternation
-have no special meaning. An empty tuple selects no files.
+have no special meaning. An empty list selects no files.
 
 The schema covers 22 logical checkers, which produce 29 built-in diagnostic IDs.
 Language syntax, region boundaries and a configuration example are documented in
@@ -125,7 +124,7 @@ this JSON are rejected.
 
 ## Language coverage
 
-Six built-in analyzers cover seven languages: Python (`.py`, `.pyi`), Go
+Six built-in analyzers cover five languages (including JSX and TSX syntax): Python (`.py`, `.pyi`), Go
 (`.go`), Java (`.java`), JavaScript and JSX (`.js`, `.jsx`, `.mjs`, `.cjs`),
 TypeScript (`.ts`, `.mts`, `.cts`) and TSX (`.tsx`). Every checker is enabled by
 default for each selected file. `enabled: false` disables that checker for every
@@ -177,7 +176,7 @@ JavaScript.
 
 `type.broad` recognizes different markers in each language, in addition to the
 JSON encoding forms described in
-[Configuring encoding APIs](#configuring-encoding-apis):
+[Serialization boundaries](serialization-boundaries.md):
 
 | Language | `type.broad` markers |
 | --- | --- |
@@ -192,8 +191,8 @@ Python broad annotation markers such as `Any` or `object` are reported by
 `type.broad`, so one annotation can produce a finding from each checker.
 Coverage of a diagnostic does not promise complete evidence for every construct:
 resolution limits are described in
-[Third-party boundaries and usage](#third-party-boundaries-and-usage) and
-[Configuring encoding APIs](#configuring-encoding-apis).
+[Third-party boundaries and usage](serialization-boundaries.md#third-party-boundaries-and-usage) and
+[Configuring encoding APIs](serialization-boundaries.md#configuring-encoding-apis).
 
 ## Run-level deletion gate
 
@@ -255,211 +254,6 @@ Changing enable flags is a policy change subject to the same full-audit and revi
 requirements as changing thresholds or boundaries. Staged-policy changes remain
 blocked by the staged gate; unstaged options do not alter index-based checks.
 
-## Third-party boundaries and usage
-
-Declare third-party import specifiers explicitly at policy level:
-
-```json
-{
-  "third_party_modules": ["vendor.client", "@vendor/sdk", "example.com/vendor/sdk"],
-  "checkers": {}
-}
-```
-
-The default is an empty list. Entries match the actual import module exactly;
-import aliases retain that identity. Do not list application modules to bypass
-typing. This setting grants a directional boundary exception, not a file or
-checker exemption. Internal dictionaries and other broad carriers remain checked.
-Disabling `type.boundary` disables its diagnostics but does not alter third-party
-classification used by the other type and field checks.
-
-A dictionary, or a directly forwarded dictionary parameter, can erase value
-types when every read supplies an argument to a configured library. Python
-`**kwargs`, Go maps and TypeScript `Record` annotations are recognized. Type
-assertions and suppression directives remain errors. JavaScript receives the
-same usage and boundary analysis; it still needs a separate type-aware checker.
-
-For a callback registered as a library argument, its return dictionary is library
-input. Its incoming dictionary parameters must be converted at callback ingress.
-The check recognizes declared constructors, concrete-return conversion functions
-and Python scalar conversions, including extraction of dictionary entries.
-A callback also called by application code does not gain a broad return contract.
-Library results cannot be returned or passed through application code raw. Values
-already constructed with a concrete generic library contract, and explicit `new`
-expressions, retain that contract. Type-only schema metadata and fields materialized
-by a configured external metaclass are not raw application result carriers.
-Mechanical recognition of a conversion does not prove its validator is honest.
-
-In Python, decorator factories supply declaration behavior rather than application
-payloads, while ordinary third-party payload results still require ingress
-conversion. This does not add a general payload exemption for decorators'
-arguments.
-
-Objects passed to configured libraries, including callback return objects, have
-all their declared fields treated as consumed. Configured external base classes
-also consume their class objects through metaclass construction. This repository
-lists `pydantic` for its externally materialized model fields. Field reads resolve
-through concrete receivers, annotations, constructors, imports and known bases;
-a write, initialization or deletion alone is not a read.
-
-Usage analysis runs automatically for Python, Go, Java, JavaScript/JSX and TypeScript/TSX.
-It resolves lexical scopes, closures, literal imports and Go files in the same
-package. Public Python module APIs, exported Go/JS/TS functions, non-private,
-annotated or overloaded Java methods, recognized runtime entry points and
-declaration-only signatures retain their external-use contracts.
-Methods linked by resolved inheritance share parameter-use evidence. A read in
-any implementation makes the corresponding parameter used throughout its
-override family, including base and sibling implementations. Positional arguments
-match by position, keyword-only arguments by name, and variadic slots separately.
-Extra arguments and parameters unread throughout the family remain findings;
-unrelated same-named methods and constructors do not gain this exemption. This
-also applies to imported bases and JS/TS `extends` clauses. Structural interface
-relationships without resolved inheritance still require review. Python
-`self`/`cls`, JS `this`, and blank `_` bindings are not unused-parameter candidates.
-TypeScript constructor parameters marked `public`, `protected`, `private` or
-`readonly` can declare instance properties, and `unused.parameter` accepts
-resolved reads of those properties as usage of the exact constructor parameter
-declaration. Initialization and writes alone remain insufficient, and ordinary
-parameters or unrelated declarations with the same name remain reportable.
-
-`--all` links all selected snapshots. Changed audits read unchanged reference
-files from the same view: working files for `--base`, index blobs for `--staged`.
-Only the originally selected files receive findings; JSON `files` retains that
-scope and `usage_files` discloses the reference scope. These reads do not modify
-source or the index. In-process callers can use `AnalyzerRegistry.analyze_sources`
-with the built-in registry to obtain the same cross-file resolution; `engine.check`
-checks one snapshot. Custom registries can register a `SemanticParser` explicitly.
-
-Every finding now includes `severity`, defaulting to `error`. `unused.return` is
-always a `warning`, `test.vacuous` is a `warning` when a test's only assertions
-are snapshot matchers, and `test.deletion` reports a changed snapshot path as a
-`warning`; text labels them and JSON retains them in `findings`. A known
-non-void local or resolved imported function result discarded as a standalone
-call, Python/Go `_` assignment, or JS `void` expression produces a warning.
-Unknown external return types are not guessed. Warnings alone leave exit status 0.
-
-Result classification uses the call expression as well as the declaration.
-TypeScript/TSX direct generic results such as `run<R>(work: () => R): R`
-substitute explicit type arguments or infer the result from resolved callbacks.
-Python supports the corresponding imported `Callable[..., R]` contract with a
-PEP 695 parameter or an imported `typing.TypeVar` declaration. JavaScript supports
-direct forwarding of an unchanged callback parameter. A callback's declared
-contract takes precedence over its body; an unannotated callback with no value
-returns supplies no-result evidence. Expression bodies can call resolved local
-or imported functions. Each invocation is classified independently.
-
-Promises, coroutines, generators and containers remain value results, even when
-their payload is `void` or `None`. Java `Void` and Go empty structs also remain
-values; these languages cannot substitute a no-result type for a generic value
-parameter. Their existing declaration and overload fallback remains unchanged.
-
-Inference distinguishes no-result, value-result and unresolved evidence.
-Unresolved cases retain the declaration-based warning behavior. It does not
-implement compiler overload selection, arbitrary type aliases, class-level
-generic substitution, generic callback contextual typing or general dataflow.
-Overloaded TypeScript callbacks, reassigned callbacks, destructured/rest
-parameters, unsupported wrappers and unresolved external callbacks do not prove
-`void`. Python keyword argument binding and generic relationships outside direct
-callback results retain the fallback. Nested generic calls inside a resolved
-callback expression are supported; forwarding through generic parameter
-environments is not. There is no compiler runtime dependency.
-
-Cross-file inference reads declarations and callbacks from the same selected
-snapshot view as usage resolution. No result is cached on a declaration or across
-analysis sessions; staged checks use index content even when worktree signatures
-or callback bodies differ. Exact-line suppression is applied after inference,
-so a suppression targeting a now-proven void call becomes stale.
-
-These are bounded semantic checks, not compiler or whole-program proofs. Dynamic
-imports, arbitrary aliases, reflection, dynamic attributes, complex generic flow,
-framework registration and external consumers may require review. An unresolved
-member read or protocol dispatch defers same-named member candidates instead of
-asserting they are unused. Exported APIs are not automatically declared dead.
-Import resolution uses the available policy-selected snapshots; package/build
-alias resolution is not a replacement for language tooling. Review remaining
-candidates before changing code. The gate never removes or rewrites unused code.
-
-Java evidence is syntax-backed rather than javac type checking. Overload selection,
-generic substitution, reflection, annotation processing, generated accessors,
-wildcard/static-member project linking, fully qualified expression resolution and
-external classpaths are not resolved at compiler level. Nested or anonymous class
-ownership, generated members and unresolved external references retain the shared
-engine's inference limits.
-
-## Python JSON encoding
-
-`type.broad` also reports calls to Python's `json.dumps` that replace concrete
-internal values with JSON text. It recognizes module imports, renamed imports
-and `from json import dumps`, plus single-assignment callable/module aliases such
-as `encode = json.dumps` or `codec = json`. It also treats members named
-`dump_json` or `model_dump_json` as encoders without requiring a pydantic import
-or a resolved receiver type; any same-named member call must still reach a
-permitted output. Name-level identities follow stable aliases and parentheses,
-while member-level recognition (built-in pydantic entry points and `*.member`
-entries) matches only the explicit member name at the call site. Therefore
-`dump = ADAPTER.dump_json; dump(item)` and `(item.model_dump_json)()` are not
-recognized, unlike the corresponding `json.dumps` forms. Alias chains and local
-shadowing use the existing semantic index. Strings containing source examples
-and unrelated methods named `dumps` are not encoding calls. Other serializers
-can be registered in the encoding API configuration below.
-
-The existing `third_party_modules` policy remains directional. A JSON encoding
-is permitted when supplied directly to a configured library, including keyword
-arguments, inline container values and returns from callbacks used exclusively
-by that library. A local binding is permitted only when it has one assignment
-and every resolved read leads to a permitted library input or proven output. Internal consumers,
-retained fields, ordinary helper returns and reassigned carriers remain findings.
-An internal transformation between encoding and the library call does not receive
-an exemption. Dictionary keys are not treated as outbound payload values.
-
-For example, with `vendor` in `third_party_modules`:
-
-```python
-import json
-import vendor
-
-vendor.send(body=json.dumps({"count": 1}))
-```
-
-is permitted. An internal `return json.dumps(payload)` is reported. A value sent
-to `vendor` and also consumed by application code is reported at its encoding.
-A `json.loads(json.dumps(payload))` round trip remains an error even if `json`
-is listed as a third-party module. This also covers stable aliases of the decoder
-and single-assignment carriers passed into it. Merely configuring the encoder's
-module does not exempt its output from this rule. When the receiving library's
-module is listed in `third_party_modules`, a member-level encoder result passed
-directly to one of that library's class methods, such as
-`VendorModel.model_validate_json(item.model_dump_json())`, receives the same
-directional library-input exemption as `json.dumps`. Declaring that method as an
-exact `decoders` entry for its resolved identity rejects this round trip.
-
-Actual serialization output is permitted independently of third-party policy:
-
-- Unshadowed `print`/`builtins.print` to the terminal.
-- Imported `sys.stdout.write` and `sys.stderr.write`.
-- `write_text` on a recognized `pathlib.Path` construction or stable local alias.
-- `write` on an enclosing writable text `open`, `builtins.open` or `io.open`
-  context binding, and `print(..., file=...)` to that file or a standard stream.
-
-`print(json.dumps(payload))` is therefore allowed. A local JSON string may be
-forwarded to these outputs only when every resolved read reaches permitted output.
-`StringIO` writes, unknown or shadowed destinations, reassigned carriers, and
-arbitrary methods named `write` or `send` remain insufficient evidence. This
-output exception belongs to JSON encoding; it does not exempt broad annotations
-or casts passed to `print`.
-
-JSON encoding shares the existing broad-type checker and its
-`checkers["type.broad"].enabled` setting, which defaults to enabled. Disabling
-`type.boundary` does not change the
-third-party evidence used by this check or permit internal JSON encoding.
-Python JSON checks consume the shared tree and boundary evidence, including
-available syntax after tree-sitter recovery; there is no second AST rejection path.
-Reassigned or dynamically selected callables, monkey-patched imports, unresolved
-library receivers, and arbitrary cross-function data flow remain review limits.
-Stable single-assignment aliases are supported; this is not control-flow-sensitive
-alias analysis. Other serializers and unrecognized output APIs remain outside
-this JSON check's coverage.
-
 ## Source structure
 
 `architecture.structure` enforces declared source-placement conventions. A file
@@ -503,310 +297,7 @@ real consumers. Those remain source-structure review obligations. The configured
 `*_rules.py` convention covers this project's language rule modules; other
 projects should declare their own domain-specific placements.
 
-## Shared JSON analysis across languages
-
-Alias resolution and output forwarding now belong to shared semantic engines.
-Python supplies its JSON and file/terminal API interpretation; JavaScript,
-TypeScript and TSX supply the native `JSON.stringify`/`JSON.parse` interpretation.
-All use the existing `type.broad` checker and `third_party_modules` policy.
-Disabling `type.boundary` does not disable serialization checking or its boundary
-evidence; disabling `type.broad` disables its JSON findings.
-
-For JavaScript/TypeScript/TSX:
-
-```javascript
-const encode = JSON.stringify;
-console.log(encode({ count: 1 }));
-const body = encode({ count: 1 });
-consume(body);
-```
-
-The console output is permitted; the encoding passed to `consume` is reported.
-
-Recognized outputs are unshadowed `console.log/info/warn/error/debug`, standard
-`process.stdout/stderr.write`, and imported `fs`/`node:fs` write/append file APIs
-(including `fs/promises` and `node:fs/promises`). For filesystem APIs only the
-payload argument establishes output; a serialized filename does not. Imports and
-stable callable aliases preserve identity. Arbitrary methods named `write`,
-shadowed globals, and imports from unrelated modules do not establish output.
-
-Stable module aliases such as `const codec = JSON` are recognized. A JSON carrier
-may pass through single-assignment locals or inline object/array values only if
-every observed use reaches a proven output or configured library input. Decoder
-aliases and internal consumers remain findings. A reassigned carrier cannot use
-this exemption. Computed members, destructured aliases, runtime monkey-patching,
-control-flow-sensitive reassignment, and cross-function value flow are not proved.
-Go and Java also register serializer-specific adapters; their exact signatures
-and output proofs are documented below.
-
-## Configuring encoding APIs
-
-Extend the existing `type.broad` checker to recognize third-party serializers and
-project-approved output APIs. These lists add to the built-in behavior; empty or
-omitted lists do not remove built-in encoders, decoders or output checks.
-
-```json
-{
-  "checkers": {
-    "type.broad": {
-      "encoding": {
-        "encoders": ["orjson.dumps", "@vendor/codec.encode"],
-        "decoders": ["orjson.loads", "@vendor/codec.decode"],
-        "outputs": [
-          {"call": "transport.publish", "arguments": [1], "keywords": ["body"]}
-        ]
-      }
-    }
-  }
-}
-```
-
-The [example policy](../examples/.pluvy/pluvy.json) contains a smaller
-version of this configuration. Choose API names from the actual target project.
-
-- `encoders`: exact qualified functions whose result is serialized data, or the
-  restricted receiver-agnostic member form `*.member`. Their results must flow
-  exclusively to permitted outputs; registration is not an exemption. A bare
-  method-name entry remains an exact qualified identity.
-- `decoders`: exact qualified reconstruction functions. Passing an encoding into
-  these remains a finding, including via callable aliases or forwarded locals.
-- `outputs`: exact `call` identities with payload selectors. `arguments` contains
-  zero-based positional indexes; `keywords` contains Python keyword names. At least
-  one selector is required. An empty selector list does not mean all arguments.
-
-For the example output, `publish("topic", encoded)` and `publish(body=encoded)`
-are permitted, while `publish(encoded, "payload")` does not establish an output
-for `encoded`. Containers and forwarded locals use the existing all-consumers rule.
-Comments do not shift argument positions. Positional offsets after `*args` or
-`...args` are unknown and cannot establish a configured output; explicitly named
-Python keywords still can. `**kwargs` is not inferred into named payload slots.
-
-Names use resolved import identities, not local spellings. Python
-`from orjson import dumps as pack` matches `orjson.dumps`; JavaScript/TypeScript
-`import { encode as pack } from "@vendor/codec"` matches `@vendor/codec.encode`.
-Stable callable/module aliases are followed. Names are exact and case-sensitive;
-blank names, whitespace and wildcard patterns are rejected, except for the
-restricted `*.member` encoder form (a `*.` prefix followed by one ASCII
-identifier). Indexes must be nonnegative integers, not strings or booleans.
-Unknown fields are errors, even when `type.broad` is disabled.
-
-The configuration uses the same shared rule in Python, Go, Java, JavaScript,
-TypeScript and TSX. It does not install serializer libraries. Exact qualified API
-identities cannot resolve arbitrary instance methods, computed members, dynamic
-imports or global names without import/built-in evidence. A `*.member` encoder
-entry declares receiver-agnostic recognition for explicit-receiver member calls
-by that name; bare or implicit-receiver calls still need an exact identity. APIs
-needing receiver-type or lifecycle proof still need a language adapter. Declare
-functions returning serialized data as encoders; in-place streaming encoders need
-separate API-specific interpretation.
-
-`third_party_modules` remains an independent directional library-input policy.
-A module need not be listed there to register its encoder or a precise output.
-If an output's module is also configured third-party, the existing broader library
-input exemption still applies independently of its payload selectors. Decoder
-rejection always takes precedence over both output declarations and third-party
-input exemptions. This configuration does not exempt `Any`, casts, or raw incoming
-library results, and does not disable builtin round-trip protection.
-
-### Source-owned instance output callbacks
-
-All supported languages can explicitly approve a class-owned callback or
-method (a named receiver type in Go) without treating every member with the same name as an output:
-
-```json
-{
-  "checkers": {
-    "type.broad": {
-      "encoding": {
-        "instance_outputs": [
-          {
-            "path": "src/analysis/command.ts",
-            "class_name": "Cli",
-            "member": "out",
-            "arguments": [0]
-          }
-        ]
-      }
-    }
-  }
-}
-```
-
-This declaration permits `this.out(JSON.stringify(entry))` inside `Cli` in that
-exact source snapshot. Function-valued properties such as
-`private readonly out: (line: string) => void` are supported. The declaration is
-an approval of the member's output responsibility, including injected
-implementations; a callback signature alone does not establish actual I/O.
-Review the injection contract and implementations before declaring the boundary.
-
-This is a configured exception, not automatic proof of callable targets. The
-checker does not follow assignments or injection sites to verify every possible
-implementation. If the member can call either an allowed output or a forbidden
-internal consumer, this declaration still approves the member call. Approve it
-only when that trust is intended; review or remove it when the injection contract
-or implementations change. This limitation applies to every language adapter.
-
-Paths are exact, case-sensitive, normalized repository-relative POSIX paths,
-matching the paths reported by the analyzer. Absolute paths, backslashes,
-whitespace, wildcards, empty components, `.` and `..` are rejected. Class and
-member names currently use ASCII JavaScript identifiers (including `$` and `_`).
-A nonempty `arguments` list selects zero-based nonnegative integer positions;
-booleans, strings, fractions, keywords and unknown fields are rejected. No
-path/class/member pattern or whole-file exemption is supported.
-
-For JavaScript, TypeScript and TSX, only direct `this.member(...)` calls within
-instance methods or field initializers
-are recognized. Nested arrows retain the enclosing instance; ordinary nested
-functions, explicit TypeScript `this` parameters, object methods, static contexts,
-getters/setters, decorated members,
-computed members, inherited-only members, receiver aliases and extracted
-callbacks do not establish this approval. The owning class must have one named
-declaration in the snapshot, and the selected member must have one direct
-instance declaration. Classes with computed or literal member names cannot establish an
-unambiguous member identity. Parser-recovered snapshots fail closed.
-
-Unmatched declarations are inert, with no separate configuration diagnostic.
-This allows a shared policy during single-file and changed-file checks. Duplicate
-class names or ambiguous members are also inert; they never select an arbitrary
-owner. Audit actual matching sites when adopting or moving declarations. The language-specific forms below use the same exact selectors. Runtime rebinding of methods and dynamic
-prototype mutation remain outside source-local lexical ownership analysis.
-
-Every serialized carrier use must still reach an allowed output. Conditional
-result branches can forward the value, including
-`this.out(json ? JSON.stringify(entry) : text)`; conditions themselves do not
-forward it. Other payload positions, unknown positions after spreads, internal
-consumers, transforms and reconstruction remain findings. Existing builtin and
-imported output recognition and decoder precedence are unchanged. This approval
-does not exempt broad annotations, assertions or incoming library data.
-
-The contract and selector matching belong to shared encoding semantics. The
-JavaScript adapter owns lexical `this`, member declarations and static/dynamic
-context checks. Conditional result flow belongs to the JavaScript semantic
-adapter and also applies to existing outputs. Ownership/import policy paths
-already cover these modules; no gate exclusions or limits need adjustment.
-
-#### Python
-
-Declare the source path, class and direct method or callback field. The actual
-first positional instance parameter establishes ownership; its name need not be
-`self`. Calls such as `self.out(json.dumps(entry))`, including conditional result
-branches and closures capturing that same binding, can use the approval. Fields
-may be declared on the class or initialized on the instance in `__init__`.
-
-Decorated methods (including static/class methods and properties), variadic
-receivers, reassigned/shadowed receivers, receiver aliases, inherited-only
-members and duplicate declarations do not establish approval. Python keyword
-payloads are not inferred from positional selectors: `self.out(line=encoded)`
-remains checked. Existing qualified `outputs` declarations still support Python
-keyword selectors.
-
-#### Go
-
-Use `class_name` for the named struct receiver type, `member` for its direct
-method or function-valued field, and the exact file containing that type and
-receiver method. For example, `Cli` / `out` approves `c.out(data)` from
-`func (c *Cli) run(...)` when `out` is directly declared on `Cli`. Pointer/value
-receivers and closures capturing the unchanged receiver are supported. Embedded
-or nested fields, receiver aliases/reassignment, ordinary function parameters
-and uncertain ownership remain checked.
-
-Imported `encoding/json.Marshal` and `encoding/json.MarshalIndent` are native
-encoders; `encoding/json.Unmarshal` is a decoder. Import aliases and stable
-callable aliases preserve identity. For `data, err := json.Marshal(value)`, only
-`data` is the serialized carrier: checking or reporting `err` is independent.
-Every observed use of the single-assignment data binding must reach output.
-This two-target, single-RHS shape is explicit; multi-assignment inference is not
-applied to arbitrary configured encoders. Predeclared/reassigned carriers,
-aggregate result forwarding, byte/string transformations and streaming encoder
-lifecycles remain outside this proof. Configured encoder APIs otherwise describe
-single serialized return values.
-
-Recognized Go terminals include imported `fmt.Print`/`Println`,
-`os.Stdout.Write`/`os.Stderr.Write` payload 0 and `os.WriteFile` payload 1. Arbitrary
-writer methods and memory buffers do not become outputs from their spelling.
-
-#### Java
-
-Direct `this.out(encoded)` requires one directly declared instance method.
-`this.out.accept(encoded)` can approve the field named `out` when its declared
-type is explicitly imported `java.util.function.Consumer`. Its payload positions
-refer to `accept` arguments. This supports injected callbacks without granting
-every `accept` method an exemption. Lambdas preserve the enclosing `this`.
-Static contexts/fields/methods, anonymous classes, inherited-only methods,
-overloads, duplicate fields, extracted callbacks and other receivers remain
-unproved. Implicit receiver calls and compiler overload selection are not inferred.
-
-Imported/declared receiver types identify one-argument `Gson.toJson`,
-`ObjectMapper.writeValueAsString` and `writeValueAsBytes`. Their corresponding
-`Gson.fromJson` and `ObjectMapper.readValue`/`readTree` consumers reject
-reconstruction. Explicitly typed locals, parameters, fields and direct
-constructors can establish the library receiver; a method named `toJson` alone
-cannot. A configured `*.toJson` encoder entry can declare receiver-agnostic
-recognition for explicit-receiver calls, while implicit receiver calls remain
-unproved. Gson's multi-argument overloads include streaming APIs and are not
-classified automatically without overload proof. A `*.member` encoder entry
-matches by member name and also covers calls this adapter excludes by overload:
-with `*.toJson` configured, the streaming overload `gson.toJson(item, writer)` is
-recognized as an encoder. Fully qualified type syntax,
-`var` inference, arbitrary serializer subclasses and streaming lifecycles are
-not claimed by this adapter. Exact configured imported/static API identities
-are also supported.
-
-`System.out`/`System.err` `print` and `println` recognize payload 0, subject to
-shadowing checks. Local variable initializers and conditional result branches
-retain all-consumer flow. The encoded value used as a condition, in another
-argument, or by an internal consumer still produces a finding.
-
-Custom Python construction uses `BroadTypeOptions(encoding=EncodingOptions(...))`
-inside `Checkers(type_broad=...)`; use `BroadTypeOptions(enabled=False)` to disable
-that checker. `CheckerOptions` remains the concrete option type for checkers without
-additional settings. JSON `enabled` settings retain their existing behavior.
-
-These declarations are project policy, not proof that an API performs I/O. Review
-the actual API contract and payload positions before adding an output. Normal
-policy review and staged-policy safeguards apply. No project exclusions or checker
-thresholds need to change to adopt this configuration.
-
-## Checker-owned registration
-
-`Checkers` explicitly composes typed configuration fragments. It declares no
-checker fields or checker-name list itself. Owners declare their concrete options,
-configuration key and diagnostic mapping beside the associated checker contracts:
-
-| Owner | Configuration |
-| --- | --- |
-| Function measurements | `metrics/options.py` |
-| Architecture checks | `architecture/options.py` |
-| Serialization checks | `semantics/encoding_options.py` |
-| Boundary and usage checks | `semantics/options.py` |
-| Shared type and syntax switches | `policy/type_options.py` |
-
-`policy/contracts.py` owns strict, frozen base contracts and `CheckerDefinition`.
-Each fragment declares concrete Pydantic fields, derives JSON aliases from its
-checker definitions, and contributes `CheckerState` values through cooperative
-`checker_states()` composition. A state contains only identity, diagnostic mapping
-and an enable flag. Option payloads remain in their original concrete fields;
-there is no heterogeneous option store, cast, dynamic model or serialization step.
-
-`disabled_checkers()` and `disabled_rules()` consume those states uniformly.
-`function_size` declares its five diagnostic IDs at its owner; it needs no special
-branch in shared policy code. Rule implementations and built-in requirement
-profiles reference the same definitions. Validation rejects duplicate names,
-empty/duplicate diagnostic IDs, overlapping diagnostic ownership and differences
-between registered checker names and the composed schema's field aliases.
-
-A new checker contributes a typed fragment and adds that fragment to the explicit
-application composition. Its schema, defaults and disabled-diagnostic expansion
-then participate automatically. Runtime discovery of arbitrary checker schemas is
-outside this API. Each overriding `checker_states()` must include
-`super().checker_states()`; the field-registration invariant rejects omissions.
-
-Policy JSON, the Python option constructors and imports from `policy.models`
-are supported. That module owns composition and re-exports canonical option
-classes rather than defining them. Package-level `MetricRule`
-and `ArchitectureRule` exports load their concrete implementations lazily, so
-importing checker contracts does not create an execution-to-policy import cycle.
-
-`policy/contracts.py` holds the leaf contracts and imports no application modules.
-The composition module imports owner contracts, and runtime checkers consume their
-owner's definitions and concrete policy fields.
+Third-party boundary declarations (`third_party_modules`), cross-file usage
+resolution, built-in serializer rules and `checkers["type.broad"].encoding`
+options (`encoders`, `decoders`, `outputs` and `instance_outputs`) are
+documented in [Boundaries, usage and serialization](serialization-boundaries.md).

@@ -99,11 +99,11 @@ gating. A [Chinese translation](docs/zh/getting-started.md) is available.
 
 The first `--all` on an existing codebase usually exits `1`: that is the
 baseline reading, not a failure of the tool. Gate pull requests with `--base`
-so new changes are held to the policy, work through the `--all` findings over
-time fixing the code first, and treat threshold, exclusion and owner changes as
-architecture decisions, each with its own full audit and review before the
-change is committed; `--staged` refuses to run while a policy change is staged.
-Exceptions use an approved next-line
+so new changes are held to the policy immediately, and work through `--all`
+findings over time by fixing the code first. Treat threshold, exclusion and
+owner changes as architecture decisions: each requires its own `--all` audit and
+review before commit, and `--staged` refuses to run while a policy change is
+staged. Exceptions use an approved next-line
 suppression that names one rule and a reason; see
 [comment suppressions](docs/comment-suppressions.md).
 
@@ -146,12 +146,12 @@ Language plugins own suffixes and grammar interpretation; rules implement
 
 ## Development
 
-Set up a development environment from this checkout:
+Set up a development environment from this checkout (requires
+[uv](https://docs.astral.sh/uv/getting-started/installation/)):
 
 ```sh
-python -m pip install --no-cache-dir uv==0.8.22
 uv sync --locked --group dev
-. .venv/bin/activate
+uv run --no-sync pytest -q
 ```
 
 The required checks are listed in `AGENTS.md` and run in

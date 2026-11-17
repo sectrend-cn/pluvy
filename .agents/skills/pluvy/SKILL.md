@@ -125,7 +125,7 @@ evidence and applies the policy. What it does not do:
   those files.
 - A passing syntax gate does not certify compliance with every policy rule.
 
-Six analyzers cover seven languages:
+Six analyzers cover five languages (including JSX and TSX syntax):
 
 | Analyzer | Source suffixes |
 |---|---|

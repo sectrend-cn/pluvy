@@ -21,7 +21,7 @@ compatibility behavior.
 | Registration | Language discovery and rule ownership are registered separately; `AnalyzerRegistry` validates composed analyzers |
 
 Checker configuration and its compatibility contract are described in
-[Checker-owned registration](checker-configuration.md#checker-owned-registration).
+[Checker-owned registration](#checker-owned-registration).
 
 Required capabilities are explicit. A rule that consumes semantic evidence
 requires it through `RuleRequirements`; metrics and architecture rules receive
@@ -112,7 +112,7 @@ registered languages. Java interprets invocation nodes and functional-interface
 fields; Go supplies the proven first payload binding of a byte/error result.
 Shared flow checks that binding's every read and leaves sibling error results
 independent. Exact supported signatures and conservative limits are documented in
-[Checker configuration](checker-configuration.md#source-owned-instance-output-callbacks).
+[Serialization boundaries](serialization-boundaries.md#source-owned-instance-output-callbacks).
 
 ## Shared guarded projection analysis
 
@@ -242,3 +242,49 @@ custom parser that raises `SyntaxFailure` supplies `tuple[ParseWarning, ...]` an
 must explain in its warnings which dependent checks are unavailable. Recovery
 differences must remain tested and documented. Source selection stays
 snapshot-based and gate execution stays read-only.
+
+## Checker-owned registration
+
+`Checkers` explicitly composes typed configuration fragments. It declares no
+checker fields or checker-name list itself. Owners declare their concrete options,
+configuration key and diagnostic mapping beside the associated checker contracts:
+
+| Owner | Configuration |
+| --- | --- |
+| Function measurements | `metrics/options.py` |
+| Architecture checks | `architecture/options.py` |
+| Serialization checks | `semantics/encoding_options.py` |
+| Boundary and usage checks | `semantics/options.py` |
+| Shared type and syntax switches | `policy/type_options.py` |
+
+`policy/contracts.py` owns strict, frozen base contracts and `CheckerDefinition`.
+Each fragment declares concrete Pydantic fields, derives JSON aliases from its
+checker definitions, and contributes `CheckerState` values through cooperative
+`checker_states()` composition. A state contains only identity, diagnostic mapping
+and an enable flag. Option payloads remain in their original concrete fields;
+there is no heterogeneous option store, cast, dynamic model or serialization step.
+
+`disabled_checkers()` and `disabled_rules()` consume those states uniformly.
+`function_size` declares its five diagnostic IDs at its owner; it needs no special
+branch in shared policy code. Rule implementations and built-in requirement
+profiles reference the same definitions. Validation rejects duplicate names,
+empty/duplicate diagnostic IDs, overlapping diagnostic ownership and differences
+between registered checker names and the composed schema's field aliases.
+
+A new checker contributes a typed fragment and adds that fragment to the explicit
+application composition. Its schema, defaults and disabled-diagnostic expansion
+then participate automatically. Runtime discovery of arbitrary checker schemas is
+outside this API. Each overriding `checker_states()` must include
+`super().checker_states()`; the field-registration invariant rejects omissions.
+
+Policy JSON, the Python option constructors (for example
+`BroadTypeOptions(encoding=EncodingOptions(...))` inside `Checkers(type_broad=...)`
+and `CheckerOptions` for checkers without extra settings) and imports from
+`policy.models` are supported. That module owns composition and re-exports
+canonical option classes rather than defining them. Package-level `MetricRule`
+and `ArchitectureRule` exports load their concrete implementations lazily, so
+importing checker contracts does not create an execution-to-policy import cycle.
+
+`policy/contracts.py` holds the leaf contracts and imports no application modules.
+The composition module imports owner contracts, and runtime checkers consume their
+owner's definitions and concrete policy fields.

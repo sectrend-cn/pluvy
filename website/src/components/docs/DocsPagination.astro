@@ -2,31 +2,41 @@
 import DocsMobileNav from './DocsMobileNav.astro';
 import { basePath } from '../../i18n.ts';
 
-const { dir, pagination } = Astro.locals.starlightRoute;
+const { dir, lang, pagination } = Astro.locals.starlightRoute;
 const { prev, next } = pagination;
 const isRtl = dir === 'rtl';
+const zh = lang.startsWith('zh');
 const base = basePath();
+const homeHref = zh ? `${base}zh/` : base;
+const copy = {
+  helpTitle: zh ? '遇到问题？' : 'Still need help?',
+  openIssue: zh ? '提交 Issue' : 'Open an issue',
+  falsePositive: zh ? '报告误报' : 'Report a false positive',
+  previous: zh ? '上一页' : 'Previous',
+  next: zh ? '下一页' : 'Next',
+  home: zh ? '首页' : 'Home',
+};
 ---
 
 <aside class="docs-help" aria-labelledby="docs-help-title">
-  <h2 id="docs-help-title">Still need help?</h2>
+  <h2 id="docs-help-title">{copy.helpTitle}</h2>
   <div class="docs-help__links">
-    <a href="https://github.com/sectrend-cn/pluvy/issues">Open an issue</a>
-    <a href="https://github.com/sectrend-cn/pluvy/discussions">Ask the community</a>
+    <a href="https://github.com/sectrend-cn/pluvy/issues">{copy.openIssue}</a>
+    <a href="https://github.com/sectrend-cn/pluvy/issues/new?template=false-positive.md">{copy.falsePositive}</a>
   </div>
 </aside>
 
 <div class="pagination-links print:hidden" dir={dir}>
-  {!prev && <a href={base} rel="prev">
+  {!prev && <a href={homeHref} rel="prev">
     <span aria-hidden="true">{isRtl ? '→' : '←'}</span>
-    <span>Previous<br /><span class="link-title">Home</span></span>
+    <span>{copy.previous}<br /><span class="link-title">{copy.home}</span></span>
   </a>}
   {prev && <a href={prev.href} rel="prev">
     <span aria-hidden="true">{isRtl ? '→' : '←'}</span>
-    <span>Previous<br /><span class="link-title">{prev.label}</span></span>
+    <span>{copy.previous}<br /><span class="link-title">{prev.label}</span></span>
   </a>}
   {next && <a href={next.href} rel="next">
-    <span>Next<br /><span class="link-title">{next.label}</span></span>
+    <span>{copy.next}<br /><span class="link-title">{next.label}</span></span>
     <span aria-hidden="true">{isRtl ? '←' : '→'}</span>
   </a>}
 </div>

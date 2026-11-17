@@ -1,149 +1,124 @@
 import type { Language } from '../../i18n.ts';
 
 export interface DemoCodeLine {
-  text: string;
-  signal: 'none' | 'finding';
+  readonly text: string;
+  readonly signal: 'none' | 'finding';
 }
 
 interface CaseCopy {
-  tab: string;
-  description: string;
-  advice: readonly string[];
+  readonly tab: string;
+  readonly description: string;
+  readonly advice: readonly [string, string];
 }
 
 interface CaseBase {
-  finding: string;
-  file: string;
-  source: readonly DemoCodeLine[];
-  copy: Record<Language, CaseCopy>;
+  readonly finding: string;
+  readonly file: string;
+  readonly source: readonly DemoCodeLine[];
+  readonly copy: Record<Language, CaseCopy>;
 }
 
-interface ScanSnapshot {
-  date: string;
-  version: string;
+export interface ResolvedCase extends CaseBase {
+  readonly kind: 'resolved';
+  readonly after: readonly DemoCodeLine[];
 }
 
-interface ResolvedCase extends CaseBase {
-  kind: 'resolved';
-  after: readonly DemoCodeLine[];
-  commit: string;
-  fixedOn: string;
+export interface DiagnosticCase extends CaseBase {
+  readonly kind: 'test-integrity' | 'boundary-drift';
+  readonly findingsCount: number;
 }
 
-interface OptionalFieldsCase extends CaseBase {
-  kind: 'optional-fields';
-  count: number;
-  limit: number;
-  snapshot: ScanSnapshot;
-}
-
-interface GuardedProjectionsCase extends CaseBase {
-  kind: 'guarded-projections';
-  count: number;
-  snapshot: ScanSnapshot;
-}
-
-export type OptimizationCase = ResolvedCase | OptionalFieldsCase | GuardedProjectionsCase;
-
-const snapshot: ScanSnapshot = { date: '2026-11-09', version: '0.0.2' };
+export type OptimizationCase = ResolvedCase | DiagnosticCase;
 
 export const optimizationCases: readonly OptimizationCase[] = [
   {
     kind: 'resolved',
-    finding: 'type.broad',
-    file: 'src/analysis/observation/agent-trace.ts',
-    commit: 'acfa790',
-    fixedOn: '2026-10-12',
+    finding: 'type.broad · flow.swallow · type.suppression',
+    file: 'src/orders.ts',
     copy: {
       en: {
-        tab: 'Narrowing',
-        description: 'Two helpers repeat field checks. The recorded refactor replaces them with one schema.',
-        advice: ['Two handwritten guards removed', 'One schema declares the shape'],
+        tab: 'Erased contracts',
+        description: 'An agent silences a failing check with @ts-ignore, any, and a swallowed catch. Restoring the contract clears all 3 findings.',
+        advice: ['Remove suppression and broad any', 'Throw or handle a specific failure'],
       },
       'zh-CN': {
-        tab: '类型判断',
-        description: '两个辅助函数重复检查字段。真实重构用一份 Schema 集中声明结构。',
-        advice: ['删除两个手写判断函数', '用一份 Schema 声明结构'],
+        tab: '擦除契约',
+        description: 'Agent 用 @ts-ignore、any 和吞异常让检查变绿；恢复具体契约即可一次消除 3 处违规。',
+        advice: ['移除抑制注释与宽泛 any', '显式抛出或处理具体异常'],
       },
     },
     source: [
-      { text: 'const parsed: unknown = JSON.parse(row.toolResultsJson ?? "null");', signal: 'none' },
-      { text: 'if (!Array.isArray(parsed) || parsed.length === 0) return null;', signal: 'finding' },
-      { text: 'const first: unknown = parsed[0];', signal: 'none' },
-      { text: 'function toolResultCallId(value: unknown): string | undefined {', signal: 'none' },
-      { text: '  if (value === null || typeof value !== "object" || !("callId" in value)) return undefined;', signal: 'finding' },
-      { text: '  return typeof value.callId === "string" ? value.callId : undefined;', signal: 'finding' },
-      { text: '}', signal: 'none' },
-      { text: 'function toolResultContent(value: unknown): string {', signal: 'none' },
-      { text: '  if (value === null || typeof value !== "object" || !("content" in value)) return "";', signal: 'finding' },
-      { text: '  return typeof value.content === "string" ? value.content : "";', signal: 'finding' },
+      { text: '// @ts-ignore -- unblock build', signal: 'finding' },
+      { text: 'export function parseOrder(raw: any): any {', signal: 'finding' },
+      { text: '  try {', signal: 'none' },
+      { text: '    const [amount, currency] = raw.split(" ");', signal: 'none' },
+      { text: '    return { total: Number(amount), currency };', signal: 'none' },
+      { text: '  } catch (error) {', signal: 'finding' },
+      { text: '    return null;', signal: 'none' },
+      { text: '  }', signal: 'none' },
       { text: '}', signal: 'none' },
     ],
     after: [
-      { text: 'const traceItem = z.object({', signal: 'none' },
-      { text: '  callId: z.string().nullish().catch(null),', signal: 'none' },
-      { text: '  content: z.string().nullish().catch(null),', signal: 'none' },
-      { text: '});', signal: 'none' },
-      { text: 'const traceResultsParser = new NullableJsonParser(', signal: 'none' },
-      { text: '  new ZodJsonParser(z.array(traceItem))', signal: 'none' },
-      { text: ');', signal: 'none' },
-      { text: 'const first = traceResultsParser', signal: 'none' },
-      { text: '  .parse(row.toolResultsJson ?? "null")?.[0] ?? null;', signal: 'none' },
-    ],
-  },
-  {
-    kind: 'optional-fields',
-    finding: 'type.nullable',
-    file: 'src/analysis/cli/arguments.ts:17',
-    count: 6,
-    limit: 3,
-    snapshot,
-    copy: {
-      en: {
-        tab: 'Optional fields',
-        description: 'The optional-field count exceeds this repository’s limit. Consumers may need more null checks.',
-        advice: ['Keep required capabilities required', 'Split genuinely different shapes'],
-      },
-      'zh-CN': {
-        tab: '可选字段',
-        description: '可选字段数量超过仓库策略上限，可能增加调用方的判空负担。',
-        advice: ['必需能力恢复为必填', '不同形态拆成具体类型'],
-      },
-    },
-    source: [
-      { text: 'export interface CliDependencies {', signal: 'none' },
-      { text: '  createRuntime: (route: ModelRouteInput) => ModelRuntime;', signal: 'none' },
-      { text: '  resolveProfile?: (route: ModelRouteInput) => Promise<string>;', signal: 'finding' },
-      { text: '  stdout?: (line: string) => void;', signal: 'finding' },
-      { text: '  stderr?: (line: string) => void;', signal: 'finding' },
-      { text: '  // … 6 optional or nullable properties in total', signal: 'none' },
+      { text: 'export interface Order {', signal: 'none' },
+      { text: '  readonly total: number;', signal: 'none' },
+      { text: '  readonly currency: string;', signal: 'none' },
+      { text: '}', signal: 'none' },
+      { text: 'export function parseOrder(raw: string): Order {', signal: 'none' },
+      { text: '  const [amount, currency] = raw.trim().split(/\\s+/);', signal: 'none' },
+      { text: '  if (!amount || !currency) throw new SyntaxError("Invalid order");', signal: 'none' },
+      { text: '  return { total: Number(amount), currency };', signal: 'none' },
       { text: '}', signal: 'none' },
     ],
   },
   {
-    kind: 'guarded-projections',
-    finding: 'structure.guarded_projection',
-    file: 'src/analysis/submission.ts:64',
-    count: 7,
-    snapshot,
+    kind: 'test-integrity',
+    finding: 'test.vacuous · test.tautology',
+    file: 'tests/orders.test.ts',
+    findingsCount: 2,
     copy: {
       en: {
-        tab: 'Projections',
-        description: 'The scan records seven guarded field copies. Review their ownership and concrete field associations.',
-        advice: ['Declare concrete field associations', 'Preserve omitted fields and evaluation order'],
+        tab: 'Fake tests',
+        description: 'The test suite stays green, yet neither assertion can catch a wrong total or currency.',
+        advice: ['Replace toBeDefined() with concrete field checks', 'Compare against an independent expected value'],
       },
       'zh-CN': {
-        tab: '守卫投影',
-        description: '扫描记录了 7 次守卫式字段拷贝，需要检查映射的归属与具体字段关联。',
-        advice: ['集中声明具体字段关联', '保留缺省行为与求值顺序'],
+        tab: '无效测试',
+        description: '测试套件依然全绿，但这 2 条断言既验不出金额错误，也验不出币种错误。',
+        advice: ['把 toBeDefined() 换成具体结果断言', '对照独立的预期值而非自身属性'],
       },
     },
     source: [
-      { text: 'if (node.minItems != null) schema.minItems = node.minItems;', signal: 'finding' },
-      { text: 'if (node.maxItems != null) schema.maxItems = node.maxItems;', signal: 'finding' },
-      { text: 'if (node.minimum != null) schema.minimum = node.minimum;', signal: 'finding' },
-      { text: 'if (node.maximum != null) schema.maximum = node.maximum;', signal: 'finding' },
-      { text: '// … the same guard + copy pattern repeated 3 more times', signal: 'none' },
+      { text: 'test("parses order total", () => {', signal: 'none' },
+      { text: '  const order = parseOrder("12.50 EUR");', signal: 'none' },
+      { text: '  expect(order).toBeDefined();', signal: 'finding' },
+      { text: '  expect(order.currency).toBe(order.currency);', signal: 'finding' },
+      { text: '});', signal: 'none' },
+    ],
+  },
+  {
+    kind: 'boundary-drift',
+    finding: 'architecture.import · type.assertion',
+    file: 'src/domain/checkout.ts',
+    findingsCount: 2,
+    copy: {
+      en: {
+        tab: 'Boundary drift',
+        description: 'Domain code imports a payment adapter directly and forces the currency contract with an unchecked cast.',
+        advice: ['Keep adapter imports outside src/domain/*', 'Validate currency at ingress instead of casting'],
+      },
+      'zh-CN': {
+        tab: '架构越界',
+        description: '领域层直接引入支付适配器，并用未经校验的 as 断言强转币种类型。',
+        advice: ['禁止 src/domain/* 直接依赖适配器层', '在输入边界校验币种而非强转类型'],
+      },
+    },
+    source: [
+      { text: 'import { chargeCard } from "../adapters/stripe";', signal: 'finding' },
+      { text: '', signal: 'none' },
+      { text: 'export function settle(amount: number, unit?: string): string {', signal: 'none' },
+      { text: '  const currency = unit ?? "USD";', signal: 'none' },
+      { text: '  return chargeCard(amount, currency as Currency);', signal: 'finding' },
+      { text: '}', signal: 'none' },
     ],
   },
 ];

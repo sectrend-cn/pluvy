@@ -23,19 +23,21 @@ test('Chinese page titles get phrase breaks without changing their words', async
   const heading = html.match(/<h1\b[^>]*id="_top"[^>]*>(.*?)<\/h1>/s)?.[1];
   assert.ok(heading);
   assert.match(heading, /<wbr\b[^>]*>/);
-  assert.equal(heading.replace(/<[^>]*>/g, '').replace(/\s/g, ''), 'pluvy快速入门');
+  assert.equal(heading.replace(/<[^>]*>/g, '').replace(/\s/g, ''), 'Pluvy快速入门');
 });
 
 test('Chinese and Latin heading spacing preserves existing fragment links', async () => {
   const html = await page('zh/docs/getting-started');
+  assert.ok(html.includes('id="运行"'));
+  assert.ok(html.includes('id="agent-接入"'));
   assert.ok(html.includes('id="从-pypi-安装"'));
   assert.ok(html.includes('id="skill-获取"'));
 });
 
 test('number-unit pairs use nonbreaking spaces in the rendered demo', async () => {
   const html = await page('zh');
-  assert.ok(/7(?:\u00a0|&#160;|&nbsp;)次/.test(html), 'keep 7 and 次 together');
-  assert.ok(/6(?:\u00a0|&#160;|&nbsp;)个可选字段/.test(html), 'keep 6 and 个 together');
+  assert.ok(/3(?:\u00a0|&#160;|&nbsp;)处违规/.test(html), 'keep 3 and 处 together');
+  assert.ok(/2(?:\u00a0|&#160;|&nbsp;)条断言/.test(html), 'keep 2 and 条 together');
 });
 
 test('prose formatting leaves copyable code and English words intact', async () => {

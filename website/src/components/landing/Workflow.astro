@@ -12,7 +12,7 @@ const content = landingContent[lang].workflow;
 const base = basePath();
 const policy = `{
   "version": 2,
-  "include": ["src/*"],
+  "include": ["src/*", "tests/*"],
   "checkers": {
     "function_size": { "lines": 50, "complexity": 10 },
     "architecture.import": {
@@ -26,13 +26,13 @@ const policy = `{
 }`;
 const command = 'pluvy --base main';
 const output = [
-  { kind: 'finding', text: 'src/domain/order.py:3:1: architecture.import: domain does not depend on adapters: forbidden dependency adapters.db' },
-  { kind: 'finding', text: 'src/domain/order.py:3:1: architecture.import: domain does not depend on adapters: forbidden dependency adapters.db.save' },
-  { kind: 'finding', text: 'src/domain/order.py:6:18: type.annotation: Preserve a concrete contract instead of Any' },
-  { kind: 'finding', text: 'src/domain/order.py:6:18: type.broad: Do not erase contracts with typing.Any' },
+  { kind: 'finding', text: 'src/domain/order.py:1:1: architecture.import: domain does not depend on adapters: forbidden dependency adapters.db' },
+  { kind: 'finding', text: 'src/domain/order.py:3:22: type.annotation: Preserve a concrete contract instead of object' },
+  { kind: 'finding', text: 'src/domain/order.py:4:40: type.suppression: Fix the contract; do not suppress a checker diagnostic' },
+  { kind: 'finding', text: 'tests/test_order.py:4:5: test.tautology: Assertion in test_parse_order cannot fail because it restates the same expression or a literal true. Assert an independently produced value or outcome instead.' },
   { kind: 'summary', text: 'Diagnostic scope: affected_definitions_and_statements.' },
   { kind: 'summary', text: 'Usage reference scope: 2 files.' },
-  { kind: 'summary', text: 'Architecture base: 1 files; 4 findings.' },
+  { kind: 'summary', text: 'Architecture base: 2 files; 4 findings.' },
   { kind: 'exit', text: 'exit 1' },
 ];
 ---
@@ -45,7 +45,7 @@ const output = [
         {content.scopes.map((scope) => <li><code>{scope.flag}</code><p>{formatText(scope.use, lang)}</p></li>)}
       </ul>
       <p class="trust">{formatText(content.trust, lang)}</p>
-      <a class="text-link" href={`${base}${docsPath(lang)}/getting-started/#running`}>{content.guide}</a>
+      <a class="text-link" href={`${base}${docsPath(lang)}/getting-started/#${content.runAnchor}`}>{content.guide}</a>
     </div>
     <div class="workflow__evidence">
       <div class="evidence-block">

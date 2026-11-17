@@ -1,8 +1,11 @@
 # Shared engineering standards
 
-This policy applies to authored production code, tests, fixtures, adapters, scripts
-and temporary helpers. This policy states the enforced rules and their limits;
-supported options are recorded in [Checker configuration](checker-configuration.md).
+This document records the engineering policy used to build Pluvy itself and the
+design specification behind its checkers. Rules enforced mechanically by `pluvy`
+are listed in [Automated gate](#automated-gate) (with options in
+[Checker configuration](checker-configuration.md)); the remaining requirements
+apply during human and agent code review across production code, tests,
+fixtures, adapters, scripts and helpers.
 
 ## Ownership and architecture
 
@@ -38,8 +41,6 @@ supported options are recorded in [Checker configuration](checker-configuration.
 7. Search existing types before introducing a DTO, payload or fixture wrapper.
    Keep one canonical type per contract. A second type needs distinct domain
    meaning, external schema or lifecycle invariants and a tested transition.
-
-
 8. Organize source around the feature or domain that owns its behavior. Keep
    feature-specific rules, validation and supporting contracts with that owner;
    a technical label such as `rules`, `helpers` or `models` does not by itself
@@ -104,7 +105,7 @@ recognized console, standard-stream and imported filesystem outputs. Go recogniz
 imported JSON Marshal/MarshalIndent results with explicit byte/error separation;
 Java recognizes selected imported Gson/Jackson serializer signatures. Scoped
 instance outputs use language-owned receiver proof across all supported languages.
-See [encoding configuration](checker-configuration.md#configuring-encoding-apis)
+See [encoding configuration](serialization-boundaries.md#configuring-encoding-apis)
 for exact signatures, output slots and conservative inference limits.
 
 At an actual call into third-party code, a type-erased dictionary is permitted
@@ -129,7 +130,7 @@ need. JavaScript public contracts need concrete JSDoc or a typed boundary with
 type-aware checking. Other exceptions require explicit case-specific user approval,
 an exact path/symbol, rationale, validation and removal conditions. The gate
 supports explicit per-checker `enabled` flags in project policy; these
-are reviewable policy decisions and do not authorize type erasure or create an
+are reviewable policy decisions and do not authorize type erasure or create a
 blanket boundary exemption. Source suppression directives remain prohibited except
 for explicitly approved next-line diagnostic exceptions available in every supported
 language, described in [comment suppressions](comment-suppressions.md).
@@ -164,7 +165,7 @@ serialization filtering or forwarding helpers, and do not weaken optional-field
 types just to pass the gate. Turning assignments into conditional spreads does
 not remove the pattern, and repeated validation of already typed internal fields
 is not remediation. Exact adapter coverage and conservative inference limits are
-documented in `.agents/skills/pluvy/references/checkers/structure.guarded_projection.md`.
+documented in [structure.guarded_projection.md](../.agents/skills/pluvy/references/checkers/structure.guarded_projection.md).
 
 ## Unused declarations and results
 
@@ -258,7 +259,7 @@ These are syntax metrics, not compiler CFG metrics; case/exception semantics dif
 between languages. Formatting/line length remain language-tool checks.
 
 Third-party classification uses exact import specifiers in `third_party_modules`.
-See [Checker configuration](checker-configuration.md#third-party-boundaries-and-usage)
+See [Boundaries, usage and serialization](serialization-boundaries.md#third-party-boundaries-and-usage)
 for directional examples and semantic resolution limits.
 
 The parser-backed gate is read-only. Checker options are grouped by responsibility;

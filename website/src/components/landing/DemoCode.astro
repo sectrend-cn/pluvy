@@ -7,20 +7,19 @@ interface Props {
   highlightFindings?: boolean;
 }
 
-type TokenKind = 'keyword' | 'type' | 'string' | 'literal' | 'comment' | 'optional' | 'plain';
+type TokenKind = 'keyword' | 'type' | 'string' | 'literal' | 'comment' | 'plain';
 interface CodeToken {
   text: string;
   kind: TokenKind;
 }
 
-const tokenPattern = /(\/\/.*$)|(\/\*.*?\*\/)|("(?:[^"\\]|\\.)*")|\?(?=:)|\b(?:const|function|return|if|typeof|export|interface|as|new|in)\b|\b(?:unknown|string|void|Promise|Array|ModelRouteInput|ModelRuntime|CliDependencies|NullableJsonParser|ZodJsonParser)\b|\b(?:null|undefined|\d+)\b/g;
-const keywordPattern = /^(?:const|function|return|if|typeof|export|interface|as|new|in)$/;
-const literalPattern = /^(?:null|undefined|\d+)$/;
+const tokenPattern = /(\/\/.*$)|(\/\*.*?\*\/)|("(?:[^"\\]|\\.)*")|\b(?:import|from|export|interface|readonly|function|const|return|if|try|catch|throw|typeof|as|new|in)\b|\b(?:any|unknown|number|string|void|Promise|Array|Number|SyntaxError|Order|Currency)\b|\b(?:null|undefined|true|false|\d+(?:\.\d+)?)\b/g;
+const keywordPattern = /^(?:import|from|export|interface|readonly|function|const|return|if|try|catch|throw|typeof|as|new|in)$/;
+const literalPattern = /^(?:null|undefined|true|false|\d+(?:\.\d+)?)$/;
 
 function tokenKind(text: string): TokenKind {
   if (text.startsWith('//') || text.startsWith('/*')) return 'comment';
   if (text.startsWith('"')) return 'string';
-  if (text === '?') return 'optional';
   if (keywordPattern.test(text)) return 'keyword';
   if (literalPattern.test(text)) return 'literal';
   return 'type';
@@ -74,7 +73,6 @@ const { lines, label, highlightFindings = false } = Astro.props;
   .token-string { color: #c3df9b; }
   .token-literal { color: #ffbc8b; }
   .token-comment { color: #a1adb9; font-style: italic; }
-  .is-annotated .token-optional { color: #ffe3a3; background: #6a4726; border-radius: 2px; }
 
   @media (max-width: 767px) {
     .code-line { padding-inline: 12px; }

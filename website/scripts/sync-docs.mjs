@@ -12,6 +12,15 @@ const locales = [
   { source: sourceRoot, output: outputRoot, slugPrefix: 'docs', repositoryPrefix: '../' },
   { source: path.join(sourceRoot, 'zh'), output: path.join(outputRoot, 'zh'), slugPrefix: 'zh/docs', repositoryPrefix: '../../' },
 ];
+const publishedDocs = new Set([
+  'getting-started.md',
+  'checker-configuration.md',
+  'serialization-boundaries.md',
+  'comment-suppressions.md',
+  'engineering-standards.md',
+  'plugin-architecture.md',
+  'go-consumed-fields.md',
+]);
 
 function frontmatter(source, filename, slugPrefix) {
   const heading = source.match(/^#\s+(.+)$/m)?.[1] ?? filename;
@@ -52,7 +61,7 @@ for (const locale of locales) {
   await mkdir(locale.output, { recursive: true });
   const entries = await readdir(locale.source, { withFileTypes: true });
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+    if (!entry.isFile() || !publishedDocs.has(entry.name)) continue;
     const source = await readFile(path.join(locale.source, entry.name), 'utf8');
     const transformed = frontmatter(source, entry.name, locale.slugPrefix) + transformBody(source, locale);
     await writeFile(path.join(locale.output, entry.name), transformed);

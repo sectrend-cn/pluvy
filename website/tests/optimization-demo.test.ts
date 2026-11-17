@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -22,43 +22,51 @@ test('the recorded refactor shows the repeated guards and source commit', async 
   const [before, after] = codeBlocks(panel);
   assert.ok(before);
   assert.ok(after);
-  assert.match(before, /typeof value\.callId/);
-  assert.match(before, /typeof value\.content/);
-  assert.doesNotMatch(before, /\{ … \}/);
-  assert.match(after, /z\.object/);
-  assert.doesNotMatch(after, /function toolResultCallId/);
-  assert.match(panel, /acfa790/);
-
-  assert.doesNotMatch(panel, /RESOLVED · 305/);
+  assert.match(before, /@ts-ignore/);
+  assert.match(before, /raw: any/);
+  assert.match(before, /catch \(error\)/);
+  assert.match(after, /export interface Order/);
+  assert.doesNotMatch(after, /@ts-ignore|raw: any/);
+  assert.match(panel, /Resolved · exit 0/);
 });
 
 test('finding panels reveal annotations on the same code rather than invented fixes', async () => {
-  for (const kind of ['optional-fields', 'guarded-projections']) {
+  for (const kind of ['test-integrity', 'boundary-drift']) {
     const panel = await demoPanel(kind);
     const [source, annotated] = codeBlocks(panel);
     assert.ok(source);
     assert.equal(annotated, source);
     assert.match(panel, /code-line--finding/);
     assert.match(panel, /Diagnostics · same source/);
-    assert.match(panel, /Suggested handoff to Agent/);
+    assert.match(panel, /Gate feedback returned to Agent/);
+    assert.match(panel, /Blocked · exit 1/);
     assert.match(panel, /PLUVY/);
     assert.match(panel, /AGENT/);
-    assert.doesNotMatch(panel, /class="case-evidence/);
-    assert.doesNotMatch(panel, /Replay scan|comparison-controls/);
-    assert.match(panel, /2026-11-09/);
-    assert.match(panel, /pluvy 0\.0\.2/);
     assert.match(panel, /data-code-range/);
-    assert.doesNotMatch(panel, /After · excerpt|guardedFields|every consumer/);
+    assert.doesNotMatch(panel, /After · excerpt/);
   }
 });
 
 test('Chinese finding panels distinguish scan evidence from unverified advice', async () => {
-  for (const kind of ['optional-fields', 'guarded-projections']) {
+  for (const kind of ['test-integrity', 'boundary-drift']) {
     const panel = await demoPanel(kind, 'zh');
     assert.match(panel, /诊断标注 · 同一代码/);
-    assert.match(panel, /建议示意/);
-    assert.match(panel, /扫描演示/);
-    assert.doesNotMatch(panel, /重新扫描|comparison-controls/);
+    assert.match(panel, /门禁返回给 Agent 的修复要求/);
+    assert.match(panel, /门禁拦截 · exit 1/);
     assert.doesNotMatch(panel, /修复后 · 节选/);
   }
+});
+
+test('Chinese docs shell is localized and non-public files are excluded from build output', async () => {
+  const zhDocs = await readFile(path.join(output, 'zh/docs/getting-started/index.html'), 'utf8');
+  assert.match(zhDocs, /遇到问题？/);
+  assert.match(zhDocs, /报告误报/);
+  assert.match(zhDocs, /上一页/);
+  assert.match(zhDocs, /文档目录/);
+  assert.match(zhDocs, /本页目录/);
+  assert.match(zhDocs, /href="\/pluvy\/zh\/"\s+rel="prev"/);
+  assert.doesNotMatch(zhDocs, /github\.com\/sectrend-cn\/pluvy\/discussions/);
+  await assert.rejects(access(path.join(output, 'docs/cloudflare-pr-preview/index.html')));
+  await assert.rejects(access(path.join(output, 'animations/crocodile.html')));
+  await assert.rejects(access(path.join(output, 'images/pluvy-bird.svg')));
 });

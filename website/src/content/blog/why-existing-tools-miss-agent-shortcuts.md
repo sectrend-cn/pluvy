@@ -66,7 +66,7 @@ We ran the usual checks against this change:
 |---|---|---|---|---|---|
 | Signature widened to `Any` | pass | pass | silent | `ANN401` | `type.broad`, `type.annotation` |
 | `except Exception` swallows the failure | pass | pass | silent | silenced by the `noqa` | `flow.swallow` |
-| `# noqa` added to silence a rule | — | — | honoured | honoured | `type.suppression` |
+| `# noqa` added to silence a rule | — | — | honored | honored | `type.suppression` |
 | A test deleted | pass | pass | silent | silent | `test.deletion` |
 | `assert True` | pass | pass | silent | silent | `test.tautology` |
 
@@ -128,7 +128,7 @@ It is tempting to add these checks as plugins to a linter you already run. Three
 
 **Analysis has to compare snapshots.** Linter plugin APIs give a rule the current file. Test-deletion and assertion-erosion checks need the baseline tree too, resolved from Git, with renames and untracked files handled. That is the core of the engine, not something a per-file rule can add.
 
-**Suppression has to be outside the code's control.** A plugin runs inside a host that honours `noqa` and `eslint-disable` before the plugin ever sees the line. A gate that the inspected code can turn off is not a gate.
+**Suppression has to be outside the code's control.** A plugin runs inside a host that honors `noqa` and `eslint-disable` before the plugin ever sees the line. A gate that the inspected code can turn off is not a gate.
 
 **One policy has to span every language.** Agents work across a whole repository. Pluvy parses Python, Go, Java, JavaScript, JSX, TypeScript and TSX with tree-sitter and runs the same checkers, under the same policy, with per-language adapters behind a shared rule set. One configuration, one exit code, one place to review a policy change.
 
@@ -144,7 +144,7 @@ What it adds is the layer the existing tools were never designed to cover: the d
 uv tool install pluvy
 mkdir -p .pluvy
 echo '{"version": 2, "include": ["src/*", "tests/*"], "checkers": {}}' > .pluvy/pluvy.json
-pluvy --base main
+pluvy --base HEAD   # uncommitted edits, or pluvy --base main on a branch
 ```
 
 The [getting started guide](../../docs/getting-started/) walks through policy setup, the first audit of an existing repository and how to run the gate after every agent task.

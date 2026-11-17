@@ -58,7 +58,7 @@ ln -s /absolute/path/to/repo/.agents/skills/pluvy <agent-skills-dir>/pluvy
   bypasses it. The Git-based modes do not enumerate the disk, which hides the
   damage: on an unchanged tree `pluvy --base HEAD` still exits 0 with
   a 0-files report while every full audit (bootstrap, policy re-review, and
-  the D12 fallback row) is permanently broken; a `--base` run with changed
+  the unknown-start-commit fallback) is permanently broken; a `--base` run with changed
   files exits 2 as soon as usage evidence is read from disk. Treat the copy
   as a drifting duplicate: re-copy after every update of the source,
   otherwise the two locations diverge silently. Windows systems without
