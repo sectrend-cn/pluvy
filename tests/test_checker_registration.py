@@ -1,5 +1,7 @@
 """Checker owners compose strict typed schemas and diagnostic switches once."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import Field, ValidationError
 
@@ -84,15 +86,20 @@ def test_custom_checker_requires_explicit_composition() -> None:
         Policy.model_validate_json('{"checkers":{"project.module_size":{}}}')
 
 
-def test_python_construction_preserves_concrete_options_and_existing_aliases() -> None:
+def test_python_construction_preserves_concrete_options_and_existing_aliases(
+    tmp_path: Path,
+) -> None:
     options = _ModuleOptions(enabled=False, maximum=24)
     checkers = _ExtendedCheckers(module_size=options)
     policy = _ExtendedPolicy(checkers=checkers)
     assert policy.checkers.module_size is options
     assert policy.checkers.disabled_rules() == frozenset(_EXTENSION.rule_ids)
     assert checkers.disabled_rules() == policy.checkers.disabled_rules()
-    assert '"project.module_size"' in policy.model_dump_json(by_alias=True)
-    assert '"module_size"' not in policy.model_dump_json(by_alias=True)
+    dumped = Path(tmp_path / "policy.json")
+    dumped.write_text(policy.model_dump_json(by_alias=True))
+    text = dumped.read_text()
+    assert '"project.module_size"' in text
+    assert '"module_size"' not in text
 
 
 def test_registered_diagnostics_match_all_builtin_analyzer_coverage() -> None:

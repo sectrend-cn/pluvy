@@ -76,12 +76,22 @@ reports swallowed wide captures and coalescing chains that hide failures behind
 literal defaults. It shares no traversal or evidence with `semantics/flow.py`,
 whose carrier forwarding serves encoding output proof.
 
-`EncodingRule` consumes `EncodingSyntax`, which identifies encoders, decoders,
-argument consumers and actual output APIs. Its `argument` capability returns the
-canonical `ParameterSlot` for a payload; this lets shared semantics enforce
-configured positional/keyword output selectors without reading grammar fields.
+`EncodingRule` consumes `EncodingSyntax`, which defines `member_encoder` for
+receiver-agnostic member recognition and also identifies qualified encoders,
+decoders, argument consumers and actual output APIs. `GrammarEncoding` provides
+the default `member_encoder` implementation backed by its `member_encoders` set.
+A structural `EncodingSyntax` implementation that does not inherit
+`GrammarEncoding` must define `member_encoder` itself; registration does not
+validate protocol members, and a missing definition fails closed during analysis
+with an `AnalysisError` such as
+`Rule bundle … failed: '…' object has no attribute 'member_encoder'`. The
+`argument` capability on `EncodingSyntax` returns the canonical `ParameterSlot`
+for a payload;
+this lets shared semantics enforce configured positional/keyword output
+selectors without reading grammar fields.
 `BroadTypeOptions.encoding` owns validated additive encoder, decoder and output
-API declarations. Explicit decoder evidence wins over configured output matches. A decoder rejection takes precedence
+API declarations, including the restricted `*.member` encoder form. Explicit
+decoder evidence wins over configured output matches. A decoder rejection takes precedence
 over a configured library-input exemption. Grammar/API interpretation lives in
 `languages/`; shared semantic code imports no concrete language or grammar and
 contains no language-name dispatch.
@@ -94,7 +104,8 @@ construction of `PythonTypeRule`, `GoTypeRule`, `JavaTypeRule` or
 `TypeScriptTypeRule` must supply the encoding rule explicitly. They reuse the
 session's existing context and boundary index.
 
-Current serializer adapters cover Python `json.dumps` and JavaScript/TypeScript/TSX
+Current serializer adapters cover Python `json.dumps` plus pydantic
+`dump_json`/`model_dump_json` member names, JavaScript/TypeScript/TSX
 `JSON.stringify`, imported Go JSON Marshal/MarshalIndent and selected imported
 Gson/Jackson Java serializers. Exact scoped instance outputs are available in all
 registered languages. Java interprets invocation nodes and functional-interface

@@ -3,12 +3,21 @@
 from pathlib import Path
 
 import pytest
+import tree_sitter_python
 from pydantic import ValidationError
+from tree_sitter import Language as Grammar
+from tree_sitter import Node
 
+from pluvy.analysis.session import AnalysisSession, SemanticBinding
 from pluvy.cli import main
 from pluvy.diagnostics import Finding, Report
 from pluvy.engine import check
+from pluvy.languages.python.encoding import PythonEncodingSyntax
+from pluvy.languages.python.semantic_syntax import PythonSemanticSyntax
+from pluvy.parsing.treesitter import TreeParser
 from pluvy.policy.models import Policy
+from pluvy.semantics.aliases import QualifiedNames
+from pluvy.semantics.encoding import EncodingRule
 from pluvy.source import Language, Source
 
 _POLICY = Policy.model_validate_json("""{
@@ -26,6 +35,121 @@ def _findings(code: str, language: Language, policy: Policy = _POLICY) -> tuple[
         for f in check(Source("sample", code.encode(), language), policy)
         if f.rule == "type.broad"
     )
+
+
+def _encoder_policy(entries: tuple[str, ...]) -> Policy:
+    encoded = ", ".join(f'"{entry}"' for entry in entries)
+    return Policy.model_validate_json(
+        '{"checkers":{"type.broad":{"encoding":{"encoders":[' + encoded + "]}}}}"
+    )
+
+
+class _NonSingleResultEncodingSyntax(PythonEncodingSyntax):
+    """Deny single-result handling and offer a binding so member hits bypass both."""
+
+    def single_result(self, name: str) -> bool:
+        return False
+
+    def result_binding(self, node: Node, names: QualifiedNames) -> Node | None:
+        return node
+
+
+def _adapter_findings(code: str, syntax: PythonEncodingSyntax) -> tuple[Finding, ...]:
+    source = Source("sample.py", code.encode(), Language.PYTHON)
+    parser = TreeParser(Grammar(tree_sitter_python.language()))
+    session = AnalysisSession(Policy())
+    session.prepare((source,), {Language.PYTHON: SemanticBinding(parser, PythonSemanticSyntax())})
+    return EncodingRule(syntax).check(session.context(source, parser))
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [
+        ("*.dump_json", "*.$emit"),
+        ("codec.encode", "*.dump_json"),
+    ],
+)
+def test_restricted_member_encoder_entries_are_accepted(entries: tuple[str, ...]) -> None:
+    assert _encoder_policy(entries).checkers.type_broad.encoding.encoders == entries
+
+
+def test_configured_output_permits_pydantic_member_encoding() -> None:
+    policy = Policy.model_validate_json("""{
+      "checkers": {"type.broad": {"encoding": {
+        "outputs": [{"call": "transport.publish", "arguments": [1]}]
+      }}}
+    }""")
+    code = "import transport\ntransport.publish('out', ADAPTER.dump_json(item))"
+    assert _findings(code, Language.PYTHON, policy) == ()
+    assert len(_findings(code, Language.PYTHON, Policy())) == 1
+
+
+def test_typescript_configured_member_encoder_uses_shared_flow() -> None:
+    policy = _encoder_policy(("*.serialize",))
+    findings = _findings("const body = item.serialize();", Language.TYPESCRIPT, policy)
+    assert len(findings) == 1
+    assert "serialize" in findings[0].message
+    assert _findings("console.log(item.serialize());", Language.TYPESCRIPT, policy) == ()
+
+
+def test_java_configured_member_encoder_requires_an_explicit_receiver() -> None:
+    policy = _encoder_policy(("*.toJson",))
+    explicit = (
+        "class Codec { void toJson(String value) {} "
+        "void run(String item) { this.codec.toJson(item); } }"
+    )
+    implicit = (
+        "class Codec { void toJson(String value) {} void run(String item) { toJson(item); } }"
+    )
+    findings = _findings(explicit, Language.JAVA, policy)
+    assert len(findings) == 1
+    assert "toJson" in findings[0].message
+    assert _findings(implicit, Language.JAVA, policy) == ()
+
+
+def test_go_configured_member_encoder_uses_single_result_flow() -> None:
+    policy = _encoder_policy(("*.Encode",))
+    declaration = 'type Codec struct{}\nfunc (c Codec) Encode(v int) string { return "" }\n'
+    internal = (
+        "package sample\n"
+        + declaration
+        + "func run(c Codec) { value := c.Encode(1); consume(value) }"
+    )
+    permitted = (
+        'package sample\nimport "fmt"\n'
+        + declaration
+        + "func run(c Codec) { fmt.Println(c.Encode(1)) }"
+    )
+    findings = _findings(internal, Language.GO, policy)
+    assert len(findings) == 1
+    assert "Encode" in findings[0].message
+    assert _findings(permitted, Language.GO, policy) == ()
+
+
+def test_go_member_encoder_with_bytes_and_error_keeps_the_internal_finding() -> None:
+    policy = _encoder_policy(("*.Encode",))
+    code = (
+        "package sample\ntype Codec struct{}\n"
+        "func (c Codec) Encode(v int) ([]byte, error) { return nil, nil }\n"
+        "func run(c Codec) { value, _ := c.Encode(1); consume(value) }"
+    )
+    findings = _findings(code, Language.GO, policy)
+    assert len(findings) == 1
+    assert "Encode" in findings[0].message
+
+
+def test_member_encoder_hits_bypass_the_adapter_single_result_path() -> None:
+    syntax = _NonSingleResultEncodingSyntax()
+    assert _adapter_findings("print(codec.dump_json(item))", syntax) == ()
+    findings = _adapter_findings("value = codec.dump_json(item)", syntax)
+    assert len(findings) == 1
+    assert "dump_json" in findings[0].message
+
+
+def test_bare_encoder_entry_does_not_match_a_member_call() -> None:
+    code = "import codec\nvalue = codec.serialize(item)"
+    assert _findings(code, Language.PYTHON, _encoder_policy(("serialize",))) == ()
+    assert len(_findings(code, Language.PYTHON, _encoder_policy(("codec.serialize",)))) == 1
 
 
 @pytest.mark.parametrize(
@@ -138,7 +262,16 @@ def test_builtin_encoder_and_decoder_rules_remain_enabled() -> None:
     [
         '{"encoders":"codec.encode"}',
         '{"encoders":[""]}',
+        '{"encoders":["*"]}',
+        '{"encoders":["*."]}',
+        '{"encoders":["*.*"]}',
+        '{"encoders":["*.a.b"]}',
+        '{"encoders":["a.*"]}',
+        '{"encoders":["orjson.*"]}',
+        '{"encoders":["*dump"]}',
+        '{"encoders":["*.1x"]}',
         '{"decoders":["codec.*"]}',
+        '{"decoders":["*.x"]}',
         '{"outputs":["transport.publish"]}',
         '{"outputs":[{"call":"transport.publish"}]}',
         '{"outputs":[{"call":"transport.publish","arguments":[-1]}]}',
@@ -147,6 +280,7 @@ def test_builtin_encoder_and_decoder_rules_remain_enabled() -> None:
         '{"outputs":[{"call":"transport.publish","keywords":[""]}]}',
         '{"outputs":[{"call":"transport.publish","keywords":["body*"]}]}',
         '{"outputs":[{"call":"transport.*","arguments":[0]}]}',
+        '{"outputs":[{"call":"*.x","arguments":[0]}]}',
         '{"outputs":[{"call":"transport.publish","arguments":[0],"unknown":true}]}',
         '{"enabled":false}',
     ],
@@ -161,7 +295,7 @@ def test_cli_reads_encoding_policy_without_modifying_source(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / ".pluvy").mkdir()
-    policy = tmp_path / ".pluvy/pluvy.json"
+    policy = Path(tmp_path / ".pluvy/pluvy.json")
     policy.write_text(_POLICY.model_dump_json(by_alias=True))
     source = tmp_path / "app.py"
     content = "import codec\nvalue = codec.encode({'count': 1})\n"

@@ -230,7 +230,8 @@ Key differences:
   not export status. Go receiver methods and Java files produce no findings.
 - `type.broad` markers differ per language: `typing.Any`,
   `typing_extensions.Any` and `pydantic.JsonValue` references plus internal
-  `json.dumps` results in Python; `any`, empty interfaces and imported
+  `json.dumps` results and pydantic `dump_json`/`model_dump_json` results in
+  Python; `any`, empty interfaces and imported
   `encoding/json` results in Go; `java.lang.Object`, unbounded wildcards and
   recognized raw collections plus Gson/Jackson results in Java; `JSON.stringify`
   results in JavaScript and JSX; `any`, `unknown`, `object` and empty object
