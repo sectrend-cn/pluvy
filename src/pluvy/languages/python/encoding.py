@@ -15,6 +15,7 @@ class PythonEncodingSyntax(GrammarEncoding):
 
     names = PythonNameSyntax()
     encoders = frozenset({"json.dumps"})
+    member_encoders = frozenset({"dump_json", "model_dump_json"})
     decoders = frozenset({"json.loads"})
 
     def instance_owner(self, callee: Node, index: SemanticIndex) -> Node | None:

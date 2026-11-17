@@ -122,7 +122,7 @@ def test_cli_reports_and_can_disable_structure_check(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / ".pluvy").mkdir()
-    policy_path = tmp_path / ".pluvy/pluvy.json"
+    policy_path = Path(tmp_path / ".pluvy/pluvy.json")
     policy_path.write_text(_POLICY.model_dump_json(by_alias=True))
     (tmp_path / "src").mkdir()
     source = tmp_path / "src/python_rules.py"

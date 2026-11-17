@@ -29,6 +29,7 @@ class EncodingSyntax(Protocol):
     def result_binding(self, node: Node, names: QualifiedNames) -> Node | None: ...
     def single_result(self, name: str) -> bool: ...
     def encoder(self, name: str, callee: Node) -> bool: ...
+    def member_encoder(self, member: str) -> bool: ...
     def decoder(self, name: str) -> bool: ...
     def consumer(self, node: Node, index: SemanticIndex) -> Node | None: ...
     def terminal(self, callee: Node, value: Node, names: QualifiedNames) -> bool: ...
@@ -78,6 +79,14 @@ class EncodingDestinations:
 
 
 @dataclass(frozen=True)
+class _EncoderHit:
+    """Resolve one recognized encoder to its message identity and flow shape."""
+
+    display: str
+    member_level: bool
+
+
+@dataclass(frozen=True)
 class EncodingRule:
     """Own serialization erasure policy for any supplied grammar capability."""
 
@@ -99,9 +108,11 @@ class EncodingRule:
             if callee is None:
                 continue
             name = self.syntax.qualified(callee, names)
-            if not (self.syntax.encoder(name, callee) or name in options.encoders):
+            member = self._member(callee, index)
+            hit = self._hit(callee, name, member, options)
+            if hit is None:
                 continue
-            if self._permitted(node, name, names, outputs):
+            if self._permitted(node, hit, names, outputs):
                 continue
             findings.append(
                 Finding(
@@ -109,13 +120,32 @@ class EncodingRule:
                     line=node.start_point.row + 1,
                     column=node.start_point.column + 1,
                     rule=BROAD_TYPE.name,
-                    message=f"Preserve concrete values internally; {name} erases their contract",
+                    message=(
+                        f"Preserve concrete values internally; {hit.display} erases their contract"
+                    ),
                 )
             )
         return tuple(findings)
 
-    def _permitted(self, node: Node, name: str, names: QualifiedNames, outputs: ValueFlow) -> bool:
+    def _hit(
+        self, callee: Node, name: str, member: str, options: EncodingOptions
+    ) -> _EncoderHit | None:
+        if self.syntax.encoder(name, callee) or options.encodes(name, ""):
+            return _EncoderHit(display=name, member_level=False)
+        if member and (options.encodes("", member) or self.syntax.member_encoder(member)):
+            return _EncoderHit(display=name or member, member_level=True)
+        return None
+
+    def _member(self, callee: Node, index: SemanticIndex) -> str:
+        member = index.syntax.member_parts(callee)[1]
+        return index.text(member) if member is not None else ""
+
+    def _permitted(
+        self, node: Node, hit: _EncoderHit, names: QualifiedNames, outputs: ValueFlow
+    ) -> bool:
+        if hit.member_level:
+            return outputs.permitted(node)
         target = self.syntax.result_binding(node, names)
         if target is not None:
             return outputs.binding_permitted(target, node)
-        return self.syntax.single_result(name) and outputs.permitted(node)
+        return self.syntax.single_result(hit.display) and outputs.permitted(node)

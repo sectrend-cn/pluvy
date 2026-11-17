@@ -12,6 +12,7 @@ class GrammarEncoding:
     """Preserve argument identity across keyword and parenthesized expressions."""
 
     encoders = frozenset[str]()
+    member_encoders = frozenset[str]()
     decoders = frozenset[str]()
     argument_wrappers = frozenset({"keyword_argument", "parenthesized_expression"})
     argument_lists = frozenset({"argument_list", "arguments"})
@@ -35,6 +36,10 @@ class GrammarEncoding:
 
     def encoder(self, name: str, callee: Node) -> bool:
         return name in self.encoders
+
+    def member_encoder(self, member: str) -> bool:
+        """Recognize receiver-independent member names declared by this grammar."""
+        return member in self.member_encoders
 
     def decoder(self, name: str) -> bool:
         return name in self.decoders

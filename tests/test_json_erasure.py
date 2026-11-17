@@ -12,6 +12,55 @@ from pluvy.source import Language, Source
 
 _DEFAULT_POLICY = Policy()
 
+_ISSUE_27_CASES = """import json
+
+from pydantic import BaseModel, TypeAdapter
+
+
+class Item(BaseModel):
+    name: str
+
+
+class Sink:
+    def write(self, data: str | bytes) -> None:
+        pass
+
+
+ADAPTER = TypeAdapter(Item)
+
+
+def case1_json_dumps_to_sink(sink: Sink, item: Item) -> None:
+    sink.write(json.dumps(item.model_dump()))
+
+
+def case2_len_json_dumps(item: Item) -> int:
+    return len(json.dumps(item.model_dump()))
+
+
+def case3_dump_json_to_sink(sink: Sink, item: Item) -> None:
+    sink.write(ADAPTER.dump_json(item))
+
+
+def case4_len_dump_json(item: Item) -> int:
+    return len(ADAPTER.dump_json(item))
+
+
+def case5_model_dump_json_to_sink(sink: Sink, item: Item) -> None:
+    sink.write(item.model_dump_json())
+
+
+def case6_len_model_dump_json(item: Item) -> int:
+    return len(item.model_dump_json())"""
+
+_ISSUE_27_EXPECTATIONS = (
+    (19, "json.dumps"),
+    (23, "json.dumps"),
+    (27, "dump_json"),
+    (31, "dump_json"),
+    (35, "model_dump_json"),
+    (39, "model_dump_json"),
+)
+
 
 def _erasure(code: str, policy: Policy = _DEFAULT_POLICY) -> tuple[Finding, ...]:
     return tuple(
@@ -19,6 +68,67 @@ def _erasure(code: str, policy: Policy = _DEFAULT_POLICY) -> tuple[Finding, ...]
         for finding in check(Source("app.py", code.encode(), Language.PYTHON), policy)
         if finding.rule == "type.broad"
     )
+
+
+def test_pydantic_serialization_entry_points_report_issue_27_cases() -> None:
+    findings = _erasure(_ISSUE_27_CASES)
+    assert len(findings) == len(_ISSUE_27_EXPECTATIONS)
+    for finding, (line, identity) in zip(findings, _ISSUE_27_EXPECTATIONS, strict=True):
+        assert finding.severity == "error"
+        assert finding.line == line
+        assert finding.message == (
+            f"Preserve concrete values internally; {identity} erases their contract"
+        )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "print(ADAPTER.dump_json(item))",
+        "import sys\nsys.stdout.write(item.model_dump_json())",
+        "from pathlib import Path\nPath('out.json').write_text(ADAPTER.dump_json(item))",
+        "with open('out.json', 'w') as stream:\n    stream.write(item.model_dump_json())",
+        "body = ADAPTER.dump_json(item)\nprint(body)",
+    ],
+)
+def test_pydantic_member_encoding_reaches_proven_python_outputs(body: str) -> None:
+    assert _erasure(body) == ()
+
+
+def test_pydantic_member_encoding_reaches_a_configured_library_input() -> None:
+    code = "import vendor\nvendor.send(ADAPTER.dump_json(item))"
+    assert len(_erasure(code)) == 1
+    assert _erasure(code, Policy(third_party_modules=("vendor",))) == ()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "import json\nvalue = json.loads(item.model_dump_json())",
+        "Item.model_validate_json(ADAPTER.dump_json(item))",
+        "ADAPTER.validate_json(item.model_dump_json())",
+    ],
+)
+def test_pydantic_member_encoding_round_trips_remain_findings(body: str) -> None:
+    assert len(_erasure(body)) == 1
+    assert len(_erasure(body, Policy(third_party_modules=("pydantic",)))) == 1
+
+
+def test_model_dump_and_a_bare_imported_call_are_not_member_encoders() -> None:
+    assert _erasure("value = item.model_dump()") == ()
+    assert _erasure("from codec import dump_json\nvalue = dump_json(item)") == ()
+
+
+def test_same_named_member_call_is_reported_except_at_a_proven_output() -> None:
+    assert len(_erasure("value = codec.dump_json(item)")) == 1
+    assert _erasure("print(codec.dump_json(item))") == ()
+
+
+def test_broad_switch_disables_pydantic_member_encoding() -> None:
+    code = "value = ADAPTER.dump_json(item)"
+    policy = Policy(checkers=Checkers(type_broad=BroadTypeOptions(enabled=False)))
+    assert len(_erasure(code)) == 1
+    assert _erasure(code, policy) == ()
 
 
 @pytest.mark.parametrize(

@@ -163,6 +163,23 @@ def test_python_member_without_a_declaration_is_not_approved() -> None:
     assert len(_findings(code, language=Language.PYTHON)) == 1
 
 
+def test_python_instance_output_permits_a_pydantic_member_payload() -> None:
+    policy = Policy.model_validate_json("""{
+      "checkers": {"type.broad": {"encoding": {"instance_outputs": [
+        {"path": "src/command.py", "class_name": "Cli", "member": "out", "arguments": [0]}
+      ]}}}
+    }""")
+    code = (
+        "class Cli:\n"
+        "    def out(self, value: str) -> None:\n"
+        "        pass\n"
+        "    def run(self, item) -> None:\n"
+        "        self.out(item.model_dump_json())"
+    )
+    assert _findings(code, Language.PYTHON, "src/command.py", policy) == ()
+    assert len(_findings(code, Language.PYTHON, "src/command.py")) == 1
+
+
 @pytest.mark.parametrize(
     "declaration",
     [

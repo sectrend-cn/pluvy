@@ -87,7 +87,11 @@ snippets are source inputs, not serialized application payload carriers.
 JSON encoding uses shared alias and output-flow analysis with language-owned
 serializer/API recognition. Python JSON encoding is permitted at proven output destinations: unshadowed
 `print`, imported `sys.stdout`/`sys.stderr` writes, `pathlib.Path.write_text`, and
-text writes to a writable `open` context. A single-assignment local may forward
+text writes to a writable `open` context. Python also recognizes
+`TypeAdapter.dump_json` and `BaseModel.model_dump_json` by member name without
+import or receiver-type evidence; any same-named member call is treated as
+encoding and remains a finding unless its result reaches a permitted output.
+A single-assignment local may forward
 the encoding only when every observed use reaches permitted output. Memory
 buffers, arbitrary write-like method names, internal consumers and decoding the
 encoding back into application data do not establish egress. Other output APIs
@@ -224,7 +228,7 @@ Approvals granted in other projects do not transfer here.
 | `structure.guarded_projection` | Distinct guarded field projections in consecutive local statement/literal regions across all supported languages |
 | `type.annotation` | Recognized broad/bare Python annotations and forward annotations |
 | `type.signature` | Missing Python parameter/return annotations |
-| `type.broad` | Recognized Python typing markers and internal `json.dumps` erasure, JS/TS `JSON.stringify` erasure, recognized Go/Java serializer erasure, TS broad/empty types, Go empty interfaces/`any`, Java `Object`, unbounded wildcards and recognized raw collections |
+| `type.broad` | Recognized Python typing markers and internal `json.dumps`/pydantic `dump_json`/`model_dump_json` erasure, JS/TS `JSON.stringify` erasure, recognized Go/Java serializer erasure, TS broad/empty types, Go empty interfaces/`any`, Java `Object`, unbounded wildcards and recognized raw collections |
 | `type.nullable` | Aggregated optional or nullable properties per TypeScript/TSX type declaration and bare nullish fallbacks per innermost function body |
 | `type.union` | Non-nullish members per TypeScript/TSX union expression after removing `null` and `undefined` |
 | `type.boundary` | Recognized third-party outputs used without typed ingress conversion |

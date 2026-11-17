@@ -13,6 +13,10 @@ from pluvy.policy.contracts import (
 )
 
 type ApiIdentity = Annotated[str, Field(min_length=1, pattern=r"^[^\s*?\[\]]+$")]
+type EncoderIdentity = Annotated[
+    str,
+    Field(min_length=1, pattern=r"^(?:\*\.[A-Za-z_$][A-Za-z0-9_$]*|[^\s*?\[\]]+)$"),
+]
 type ArgumentIndex = Annotated[int, Field(ge=0)]
 
 
@@ -50,10 +54,14 @@ class InstanceOutput(Contract):
 class EncodingOptions(Contract):
     """Extend built-in serialization APIs without disabling their boundary checks."""
 
-    encoders: tuple[ApiIdentity, ...] = ()
+    encoders: tuple[EncoderIdentity, ...] = ()
     decoders: tuple[ApiIdentity, ...] = ()
     outputs: tuple[OutputApi, ...] = ()
     instance_outputs: tuple[InstanceOutput, ...] = ()
+
+    def encodes(self, name: str, member: str) -> bool:
+        """Report whether a configured encoder entry claims this call identity."""
+        return name in self.encoders or (member != "" and f"*.{member}" in self.encoders)
 
 
 class BroadTypeOptions(CheckerOptions):

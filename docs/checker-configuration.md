@@ -181,7 +181,7 @@ JSON encoding forms described in
 
 | Language | `type.broad` markers |
 | --- | --- |
-| Python | `typing.Any`, `typing_extensions.Any` and `pydantic.JsonValue` references, plus internal `json.dumps` results |
+| Python | `typing.Any`, `typing_extensions.Any` and `pydantic.JsonValue` references, plus internal `json.dumps`, `dump_json` and `model_dump_json` results |
 | Go | `any` and empty interfaces, plus imported `encoding/json` `Marshal`/`MarshalIndent` results |
 | Java | `java.lang.Object`, unbounded wildcards and recognized raw collections, plus recognized Gson/Jackson results |
 | JavaScript and JSX | `JSON.stringify` results only; JavaScript has no type annotations to check |
@@ -391,7 +391,10 @@ engine's inference limits.
 `type.broad` also reports calls to Python's `json.dumps` that replace concrete
 internal values with JSON text. It recognizes module imports, renamed imports
 and `from json import dumps`, plus single-assignment callable/module aliases such
-as `encode = json.dumps` or `codec = json`. Alias chains and local shadowing use
+as `encode = json.dumps` or `codec = json`. It also treats members named
+`dump_json` or `model_dump_json` as encoders without requiring a pydantic import
+or a resolved receiver type; any same-named member call must still reach a
+permitted output. Alias chains and local shadowing use
 the existing semantic index. Strings containing source examples and unrelated methods named
 `dumps` are not encoding calls. Other serializers can be registered in the
 encoding API configuration below.
@@ -552,8 +555,10 @@ omitted lists do not remove built-in encoders, decoders or output checks.
 The [example policy](../examples/.pluvy/pluvy.json) contains a smaller
 version of this configuration. Choose API names from the actual target project.
 
-- `encoders`: exact qualified functions whose result is serialized data. Their
-  results must flow exclusively to permitted outputs; registration is not an exemption.
+- `encoders`: exact qualified functions whose result is serialized data, or the
+  restricted receiver-agnostic member form `*.member`. Their results must flow
+  exclusively to permitted outputs; registration is not an exemption. A bare
+  method-name entry remains an exact qualified identity.
 - `decoders`: exact qualified reconstruction functions. Passing an encoding into
   these remains a finding, including via callable aliases or forwarded locals.
 - `outputs`: exact `call` identities with payload selectors. `arguments` contains
@@ -571,16 +576,20 @@ Names use resolved import identities, not local spellings. Python
 `from orjson import dumps as pack` matches `orjson.dumps`; JavaScript/TypeScript
 `import { encode as pack } from "@vendor/codec"` matches `@vendor/codec.encode`.
 Stable callable/module aliases are followed. Names are exact and case-sensitive;
-blank names, whitespace and wildcard patterns are rejected. Indexes must be
-nonnegative integers, not strings or booleans. Unknown fields are errors, even
-when `type.broad` is disabled.
+blank names, whitespace and wildcard patterns are rejected, except for the
+restricted `*.member` encoder form (a `*.` prefix followed by one ASCII
+identifier). Indexes must be nonnegative integers, not strings or booleans.
+Unknown fields are errors, even when `type.broad` is disabled.
 
 The configuration uses the same shared rule in Python, Go, Java, JavaScript,
-TypeScript and TSX. It does not install serializer libraries. Qualified API identities cannot
-resolve arbitrary instance methods, computed members, dynamic imports or global
-names without import/built-in evidence. APIs needing receiver-type or lifecycle
-proof still need a language adapter. Declare functions returning serialized data
-as encoders; in-place streaming encoders need separate API-specific interpretation.
+TypeScript and TSX. It does not install serializer libraries. Exact qualified API
+identities cannot resolve arbitrary instance methods, computed members, dynamic
+imports or global names without import/built-in evidence. A `*.member` encoder
+entry declares receiver-agnostic recognition for explicit-receiver member calls
+by that name; bare or implicit-receiver calls still need an exact identity. APIs
+needing receiver-type or lifecycle proof still need a language adapter. Declare
+functions returning serialized data as encoders; in-place streaming encoders need
+separate API-specific interpretation.
 
 `third_party_modules` remains an independent directional library-input policy.
 A module need not be listed there to register its encoder or a precise output.
@@ -723,7 +732,9 @@ Imported/declared receiver types identify one-argument `Gson.toJson`,
 `Gson.fromJson` and `ObjectMapper.readValue`/`readTree` consumers reject
 reconstruction. Explicitly typed locals, parameters, fields and direct
 constructors can establish the library receiver; a method named `toJson` alone
-cannot. Gson's multi-argument overloads include streaming APIs and are not
+cannot. A configured `*.toJson` encoder entry can declare receiver-agnostic
+recognition for explicit-receiver calls, while implicit receiver calls remain
+unproved. Gson's multi-argument overloads include streaming APIs and are not
 classified automatically without overload proof. Fully qualified type syntax,
 `var` inference, arbitrary serializer subclasses and streaming lifecycles are
 not claimed by this adapter. Exact configured imported/static API identities
