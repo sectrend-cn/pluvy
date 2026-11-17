@@ -10,7 +10,7 @@ tree-sitter and fails the build when a change erases type contracts, swallows
 errors, weakens or deletes tests, or crosses the architecture boundaries your
 repository declares.
 
-Website: [sectrend-cn.github.io/pluvy](https://sectrend-cn.github.io/pluvy/)
+Website: [sectrend-cn.github.io/pluvy](https://sectrend-cn.github.io/pluvy/) · Agent docs: [llms.txt](https://sectrend-cn.github.io/pluvy/llms.txt) · [llms-full.txt](https://sectrend-cn.github.io/pluvy/llms-full.txt)
 
 ```text
 $ pluvy --all
@@ -93,7 +93,7 @@ Add `--root /path/to/project` to run from another directory and
 
 [Getting started](docs/getting-started.md) covers installation options, building
 up a policy, triaging the first audit of an existing repository and per-task
-gating. A [Chinese translation](docs/zh/getting-started.md) is available.
+gating.
 
 ## Adopting on an existing repository
 

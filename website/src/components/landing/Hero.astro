@@ -1,5 +1,5 @@
 ---
-import { basePath, docsPath, landingContent, type Language } from '../../i18n.ts';
+import { basePath, landingContent, type Language } from '../../i18n.ts';
 import TextSegments from '../TextSegments.astro';
 import OptimizationDemo from './OptimizationDemo.astro';
 import { formatText } from '../../typography/chinese-text.ts';
@@ -23,7 +23,7 @@ const base = basePath();
       <div class="hero__intro">
         <p data-zh-prose={lang === 'zh-CN'}>{formatText(content.description, lang)}</p>
         <div class="hero__actions">
-          <a class="button button--primary" href={`${base}${docsPath(lang)}/getting-started/`}>
+          <a class="button button--primary" href={`${base}docs/getting-started/`}>
             {content.getStarted} <span aria-hidden="true">→</span>
           </a>
           <a class="text-link" href="https://github.com/sectrend-cn/pluvy">{content.viewGithub}</a>

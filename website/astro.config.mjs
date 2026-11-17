@@ -58,33 +58,25 @@ export default defineConfig({
         Pagination: './src/components/docs/DocsPagination.astro',
       },
       disable404Route: true,
-      defaultLocale: 'root',
-      locales: {
-        root: { label: 'English', lang: 'en' },
-        zh: { label: '简体中文', lang: 'zh-CN' },
-      },
       sidebar: [
         {
           label: 'Start',
-          translations: { 'zh-CN': '开始' },
-          items: [{ label: 'Getting started', translations: { 'zh-CN': '快速入门' }, slug: 'docs/getting-started' }],
+          items: [{ label: 'Getting started', slug: 'docs/getting-started' }],
         },
         {
           label: 'Configure & Run',
-          translations: { 'zh-CN': '配置与运行' },
           items: [
-            { label: 'Checker configuration', translations: { 'zh-CN': '检查器配置' }, slug: 'docs/checker-configuration' },
-            { label: 'Boundaries & serialization', translations: { 'zh-CN': '边界、引用与序列化' }, slug: 'docs/serialization-boundaries' },
-            { label: 'Diagnostic exceptions', translations: { 'zh-CN': '逐行诊断抑制' }, slug: 'docs/comment-suppressions' },
+            { label: 'Checker configuration', slug: 'docs/checker-configuration' },
+            { label: 'Boundaries & serialization', slug: 'docs/serialization-boundaries' },
+            { label: 'Diagnostic exceptions', slug: 'docs/comment-suppressions' },
           ],
         },
         {
           label: 'Design & Reference',
-          translations: { 'zh-CN': '设计与参考' },
           items: [
-            { label: 'Engineering standards', translations: { 'zh-CN': '工程规范' }, slug: 'docs/engineering-standards' },
-            { label: 'Plugin architecture', translations: { 'zh-CN': '插件架构' }, slug: 'docs/plugin-architecture' },
-            { label: 'Go field consumption', translations: { 'zh-CN': 'Go 字段隐式消费' }, slug: 'docs/go-consumed-fields' },
+            { label: 'Engineering standards', slug: 'docs/engineering-standards' },
+            { label: 'Plugin architecture', slug: 'docs/plugin-architecture' },
+            { label: 'Go field consumption', slug: 'docs/go-consumed-fields' },
           ],
         },
       ],

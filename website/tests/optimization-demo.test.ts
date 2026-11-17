@@ -57,15 +57,35 @@ test('Chinese finding panels distinguish scan evidence from unverified advice', 
   }
 });
 
-test('Chinese docs shell is localized and non-public files are excluded from build output', async () => {
-  const zhDocs = await readFile(path.join(output, 'zh/docs/getting-started/index.html'), 'utf8');
-  assert.match(zhDocs, /遇到问题？/);
-  assert.match(zhDocs, /报告误报/);
-  assert.match(zhDocs, /上一页/);
-  assert.match(zhDocs, /文档目录/);
-  assert.match(zhDocs, /本页目录/);
-  assert.match(zhDocs, /href="\/pluvy\/zh\/"\s+rel="prev"/);
-  assert.doesNotMatch(zhDocs, /github\.com\/sectrend-cn\/pluvy\/discussions/);
+test('docs are English-only with agent-friendly llms.txt and raw Markdown outputs', async () => {
+  const zhLanding = await readFile(path.join(output, 'zh/index.html'), 'utf8');
+  assert.match(zhLanding, /href="\/pluvy\/docs\/getting-started\/"/);
+  assert.doesNotMatch(zhLanding, /\/zh\/docs\//);
+
+  const enDocs = await readFile(path.join(output, 'docs/getting-started/index.html'), 'utf8');
+  assert.match(enDocs, /For agents:/);
+  assert.match(enDocs, /href="\/pluvy\/docs\/getting-started\.md"/);
+  assert.match(enDocs, /href="\/pluvy\/llms\.txt"/);
+  assert.match(enDocs, /href="\/pluvy\/llms-full\.txt"/);
+  assert.doesNotMatch(enDocs, /github\.com\/sectrend-cn\/pluvy\/discussions/);
+
+  const llmsTxt = await readFile(path.join(output, 'llms.txt'), 'utf8');
+  assert.match(llmsTxt, /^# Pluvy/m);
+  assert.match(llmsTxt, /https:\/\/sectrend-cn\.github\.io\/pluvy\/llms-full\.txt/);
+  assert.match(llmsTxt, /https:\/\/sectrend-cn\.github\.io\/pluvy\/docs\/getting-started\.md/);
+  assert.match(llmsTxt, /https:\/\/sectrend-cn\.github\.io\/pluvy\/docs\/serialization-boundaries\.md/);
+
+  const llmsFull = await readFile(path.join(output, 'llms-full.txt'), 'utf8');
+  assert.match(llmsFull, /# Pluvy getting started/);
+  assert.match(llmsFull, /# Checker configuration/);
+  assert.match(llmsFull, /# Boundaries, usage and serialization/);
+  assert.match(llmsFull, /# Approved next-line diagnostic exceptions/);
+
+  const rawDoc = await readFile(path.join(output, 'docs/getting-started.md'), 'utf8');
+  assert.match(rawDoc, /^# Pluvy getting started/m);
+  assert.match(rawDoc, /https:\/\/sectrend-cn\.github\.io\/pluvy\/docs\/checker-configuration\.md/);
+
+  await assert.rejects(access(path.join(output, 'zh/docs/getting-started/index.html')));
   await assert.rejects(access(path.join(output, 'docs/cloudflare-pr-preview/index.html')));
   await assert.rejects(access(path.join(output, 'animations/crocodile.html')));
   await assert.rejects(access(path.join(output, 'images/pluvy-bird.svg')));

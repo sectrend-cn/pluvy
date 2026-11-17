@@ -7,9 +7,6 @@ triaging existing findings, and running the gate after every code task.
 Pluvy is a read-only, parser-backed engineering policy gate: no run mode modifies, stages,
 restores, deletes or rewrites source files, and none of them changes Git configuration.
 
-A Chinese translation of this page is available at
-[zh/getting-started.md](zh/getting-started.md).
-
 ## Quick start
 
 From the root of the Git repository you want to check:
@@ -287,4 +284,7 @@ first read `.agents/skills/pluvy/SKILL.md` and follow it.
 ```
 
 For the general integration paths and limits, see
-[agent integration notes](../.agents/skills/pluvy/references/agent-integration.md).
+[agent integration notes](../.agents/skills/pluvy/references/agent-integration.md). Agents reading
+the published documentation over HTTP can fetch `/llms.txt` for a structured index, `/llms-full.txt`
+for the single-file plain-text corpus, or append `.md` to any documentation URL (for example
+`/docs/getting-started.md`).

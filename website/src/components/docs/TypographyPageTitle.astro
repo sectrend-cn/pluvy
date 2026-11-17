@@ -1,10 +1,23 @@
 ---
 import TextSegments from '../TextSegments.astro';
+import { basePath } from '../../i18n.ts';
 
-const { entry, lang } = Astro.locals.starlightRoute;
+const { entry, id } = Astro.locals.starlightRoute;
+const base = basePath();
+const markdownHref = `${base}${id.replace(/\/+$/, '')}.md`;
 ---
 
-<h1 id="_top"><TextSegments text={entry.data.title} lang={lang.startsWith('zh') ? 'zh-CN' : 'en'} /></h1>
+<div class="docs-title-group">
+  <h1 id="_top"><TextSegments text={entry.data.title} lang="en" /></h1>
+  <nav class="docs-agent-bar" aria-label="Agent-readable documentation formats">
+    <span>For agents:</span>
+    <a href={markdownHref}>Markdown (.md)</a>
+    <span aria-hidden="true">·</span>
+    <a href={`${base}llms.txt`}>llms.txt</a>
+    <span aria-hidden="true">·</span>
+    <a href={`${base}llms-full.txt`}>llms-full.txt</a>
+  </nav>
+</div>
 
 <style>
   @layer starlight.core {
@@ -14,6 +27,26 @@ const { entry, lang } = Astro.locals.starlightRoute;
       line-height: var(--sl-line-height-headings);
       font-weight: 600;
       color: var(--sl-color-white);
+    }
+
+    .docs-agent-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+      color: var(--sl-color-gray-3);
+      font-family: var(--sl-font-system-mono);
+      font-size: var(--sl-text-xs);
+    }
+
+    .docs-agent-bar a {
+      color: var(--sl-color-text-accent);
+      text-decoration: none;
+    }
+
+    .docs-agent-bar a:hover {
+      text-decoration: underline;
     }
   }
 </style>

@@ -30,7 +30,6 @@ const englishLanding = {
     ],
     trust: 'Safe in CI, hooks and agent sessions: Pluvy reports findings and never edits your code.',
     guide: 'Read the run guide',
-    runAnchor: 'running',
     policy: 'POLICY',
     run: 'RUN',
   },
@@ -38,7 +37,6 @@ const englishLanding = {
     titleA: 'Put a gate after',
     titleB: 'every agent task.',
     connectAgent: 'Connect your agent',
-    agentAnchor: 'agent-integration',
   },
 };
 
@@ -76,7 +74,6 @@ export const landingContent: Record<Language, LandingContent> = {
       ],
       trust: '可以放心跑在 CI、hook 和 Agent 会话里：Pluvy 只报告问题，从不改动你的代码。',
       guide: '查看运行指南',
-      runAnchor: '运行',
       policy: '策略',
       run: '运行',
     },
@@ -84,7 +81,6 @@ export const landingContent: Record<Language, LandingContent> = {
       titleA: '在每个 Agent 任务后',
       titleB: '设一道门禁。',
       connectAgent: '接入你的 Agent',
-      agentAnchor: 'agent-接入',
     },
   },
 };
@@ -111,10 +107,6 @@ export const headerContent: Record<Language, typeof englishHeader> = {
     theme: '切换到深色模式',
   },
 };
-
-export function docsPath(lang: Language): string {
-  return lang === 'zh-CN' ? 'zh/docs' : 'docs';
-}
 
 export function basePath(): string {
   const base = import.meta.env.BASE_URL;

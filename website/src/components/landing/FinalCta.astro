@@ -1,5 +1,5 @@
 ---
-import { basePath, docsPath, landingContent, type Language } from '../../i18n.ts';
+import { basePath, landingContent, type Language } from '../../i18n.ts';
 import TextSegments from '../TextSegments.astro';
 
 interface Props {
@@ -15,7 +15,7 @@ const base = basePath();
   <div class="final-cta__inner landing-shell">
     <h2><TextSegments text={content.titleA} lang={lang} />{' '}<br /><em><TextSegments text={content.titleB} lang={lang} /></em></h2>
     <div class="final-cta__actions">
-      <a class="button button--acid" href={`${base}${docsPath(lang)}/getting-started/#${content.agentAnchor}`}>
+      <a class="button button--acid" href={`${base}docs/getting-started/#agent-integration`}>
         {content.connectAgent} <span aria-hidden="true">→</span>
       </a>
     </div>
