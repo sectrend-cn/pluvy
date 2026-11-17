@@ -32,5 +32,5 @@ Production deployments are disabled for this Cloudflare Pages project. The
 existing production website workflow, `.github/workflows/deploy-website.yml`,
 is unchanged by the preview cleanup.
 
-The website documentation sync copies this file from `docs/` during its build,
-so this file is the source for the published preview documentation.
+This operational note lives under `.github/` rather than `docs/` so `sync-docs`
+does not publish it as a user-facing documentation page.

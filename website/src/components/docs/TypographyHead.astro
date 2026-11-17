@@ -1,7 +1,13 @@
 ---
 import Head from '@astrojs/starlight/components/Head.astro';
 import Typography from '../Typography.astro';
+import { basePath } from '../../i18n.ts';
+
+const base = basePath();
+const routeId = Astro.locals.starlightRoute.id.replace(/\/+$/, '');
 ---
 
 <Head />
+<link rel="alternate" type="text/plain" href={`${base}llms.txt`} title="Pluvy documentation index for LLMs and agents" />
+<link rel="alternate" type="text/markdown" href={`${base}${routeId}.md`} title="Markdown source for this page" />
 <Typography />

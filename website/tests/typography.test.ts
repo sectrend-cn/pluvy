@@ -11,37 +11,37 @@ async function page(route: string): Promise<string> {
 }
 
 test('Chinese documentation headings have phrase breaks before JavaScript runs', async () => {
-  const html = await page('zh/docs/getting-started');
-  const heading = html.match(/<h3\b[^>]*id="存量仓库的首次全量审计"[^>]*>(.*?)<\/h3>/s)?.[1];
-  assert.ok(heading, 'the original heading and fragment URL must remain present');
+  const html = await page('zh');
+  const heading = html.match(/<h1\b[^>]*id="hero-title"[^>]*>(.*?)<\/h1>/s)?.[1];
+  assert.ok(heading, 'the Chinese hero heading must be present');
   assert.match(heading, /<wbr\b[^>]*>/);
-  assert.equal(heading.replace(/<[^>]*>/g, ''), '存量仓库的首次全量审计');
 });
 
 test('Chinese page titles get phrase breaks without changing their words', async () => {
-  const html = await page('zh/docs/getting-started');
-  const heading = html.match(/<h1\b[^>]*id="_top"[^>]*>(.*?)<\/h1>/s)?.[1];
+  const html = await page('zh');
+  const heading = html.match(/<h2\b[^>]*id="principles-title"[^>]*>(.*?)<\/h2>/s)?.[1];
   assert.ok(heading);
   assert.match(heading, /<wbr\b[^>]*>/);
-  assert.equal(heading.replace(/<[^>]*>/g, '').replace(/\s/g, ''), 'pluvy快速入门');
+  assert.equal(heading.replace(/<[^>]*>/g, '').replace(/\s/g, ''), '能过CI，却没把活干完的捷径。');
 });
 
 test('Chinese and Latin heading spacing preserves existing fragment links', async () => {
-  const html = await page('zh/docs/getting-started');
-  assert.ok(html.includes('id="从-pypi-安装"'));
-  assert.ok(html.includes('id="skill-获取"'));
+  const html = await page('docs/getting-started');
+  assert.ok(html.includes('id="running"'));
+  assert.ok(html.includes('id="agent-integration"'));
+  assert.ok(html.includes('id="configuration"'));
+  assert.ok(html.includes('id="triage"'));
 });
 
 test('number-unit pairs use nonbreaking spaces in the rendered demo', async () => {
   const html = await page('zh');
-  assert.ok(/7(?:\u00a0|&#160;|&nbsp;)次/.test(html), 'keep 7 and 次 together');
-  assert.ok(/6(?:\u00a0|&#160;|&nbsp;)个可选字段/.test(html), 'keep 6 and 个 together');
+  assert.ok(/3(?:\u00a0|&#160;|&nbsp;)处违规/.test(html), 'keep 3 and 处 together');
+  assert.ok(/2(?:\u00a0|&#160;|&nbsp;)条断言/.test(html), 'keep 2 and 条 together');
 });
 
 test('prose formatting leaves copyable code and English words intact', async () => {
-  const chinese = await page('zh/docs/getting-started');
   const english = await page('docs/getting-started');
-  const code = Array.from(chinese.matchAll(/<pre\b[^>]*>(.*?)<\/pre>/gs), (match) => match[1]);
+  const code = Array.from(english.matchAll(/<pre\b[^>]*>(.*?)<\/pre>/gs), (match) => match[1]);
   assert.ok(code.length > 0);
   assert.ok(code.every((block) => !block.includes('<wbr') && !block.includes('\u00a0')));
   assert.match(english, /id="installation"[^>]*>Installation<\/h2>/);

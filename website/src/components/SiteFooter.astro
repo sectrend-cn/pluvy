@@ -1,6 +1,6 @@
 ---
 import logo from '../assets/pluvy-natural-neck.svg';
-import { basePath, docsPath, headerContent, type Language } from '../i18n.ts';
+import { basePath, headerContent, type Language } from '../i18n.ts';
 
 interface Props {
   lang?: Language;
@@ -19,10 +19,11 @@ const base = basePath();
       <strong>PLUVY</strong>
     </div>
     <div class="site-footer__links">
-      <a href={`${base}${docsPath(lang)}/getting-started/`}>{content.documentation}</a>
+      <a href={`${base}docs/getting-started/`}>{content.documentation}</a>
       <a href={`${base}blog/`}>{content.blog}</a>
       <a href="https://github.com/sectrend-cn/pluvy">GitHub</a>
       <a href="https://github.com/sectrend-cn/pluvy/releases">{content.releases}</a>
+      <a href={`${base}llms.txt`}>llms.txt</a>
     </div>
   </div>
 </footer>

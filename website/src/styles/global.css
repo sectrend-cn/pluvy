@@ -134,7 +134,7 @@ svg {
   }
 }
 
-.landing-content :is(h1, .display-title, .final-cta h2) {
+.landing-content :is(.display-title, .final-cta h2) {
   margin-inline-start: -0.035em;
 }
 

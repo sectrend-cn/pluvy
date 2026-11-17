@@ -7,8 +7,8 @@ export const GET: APIRoute = async ({ site }) => {
   const posts = await getCollection('blog', ({ data }) => !data.draft);
   const base = basePath();
   return rss({
-    title: 'Pluvy Journal',
-    description: 'Engineering notes, practical guides and release context from Pluvy.',
+    title: 'Pluvy Blog',
+    description: 'Design decisions and engineering essays from Pluvy.',
     site: site ?? new URL('https://sectrend-cn.github.io/pluvy/'),
     items: posts.map((post) => ({
       title: post.data.title,
