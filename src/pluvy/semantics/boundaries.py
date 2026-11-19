@@ -104,9 +104,10 @@ class BoundaryEvidence:
     def _carriers(self) -> None:
         for symbol in self.index.symbols():
             annotation = symbol.annotation
-            if annotation is not None and self.index.syntax.dictionary(
-                annotation, self.index.context
-            ):
+            if annotation is None:
+                continue
+            owner = self.index.owner_index(annotation)
+            if owner.syntax.dictionary(annotation, owner.context):
                 self._carrier(symbol, annotation)
 
     def _carrier(self, symbol: Symbol, annotation: Node) -> None:
@@ -121,17 +122,20 @@ class BoundaryEvidence:
                 self.exemptions.append(annotation)
 
     def _converted(self, node: Node) -> bool:
-        callee = self.index.syntax.conversion(node)
+        owner = self.index.owner_index(node)
+        callee = owner.syntax.conversion(node)
         return callee is not None and self._typed_converter(callee)
 
     def _typed_converter(self, callee: Node) -> bool:
-        target = self.index.resolve(callee)
+        owner = self.index.owner_index(callee)
+        target = owner.resolve(callee)
         if target is None:
-            return self.index.syntax.builtin_converter(self.index.text(callee))
+            return owner.syntax.builtin_converter(owner.text(callee))
         if target.kind == "class":
             return True
         if target.kind == "function" and target.annotation is not None:
-            return self.index.syntax.concrete_result(target, self.index.context)
+            result_owner = self.index.owner_index(target.annotation)
+            return result_owner.syntax.concrete_result(target, result_owner.context)
         return False
 
     def _incoming(self) -> None:

@@ -32,7 +32,12 @@ class SemanticIndex:
         self._reads()
 
     def text(self, node: Node) -> str:
-        return spelling(node, self.context.source)
+        """Read a node's spelling from the snapshot that owns its syntax tree."""
+        return spelling(node, self.owner_index(node).context.source)
+
+    def owner_index(self, node: Node) -> "SemanticIndex":
+        """Locate the snapshot index that owns the node's syntax tree."""
+        return self.snapshot_indexes.get(self._root(node).id, self)
 
     def symbols(self) -> tuple[Symbol, ...]:
         """Collect each declaration and attached method this snapshot owns once."""
@@ -61,17 +66,25 @@ class SemanticIndex:
         return self.peer_symbols.get(name)
 
     def resolve(self, node: Node) -> Symbol | None:
+        """Resolve a node in the index that owns its syntax tree."""
+        owner = self.owner_index(node)
+        if owner is not self:
+            return owner.resolve(node)
         if self.syntax.reference(node):
-            symbol = self.lookup(self.text(node), self.locations.get(node.id, 0))
-            seen: set[int] = set()
-            while symbol is not None and symbol.target is not None and symbol.node.id not in seen:
-                seen.add(symbol.node.id)
-                symbol = symbol.target
-            return symbol
+            return self._resolved_reference(node)
         if self.syntax.member_expression(node):
             return self._member(node)
         child = self.syntax.wrapped_value(node)
         return self.resolve(child) if child is not None else None
+
+    def _resolved_reference(self, node: Node) -> Symbol | None:
+        """Follow local declarations and import aliases inside one snapshot."""
+        symbol = self.lookup(self.text(node), self.locations.get(node.id, 0))
+        seen: set[int] = set()
+        while symbol is not None and symbol.target is not None and symbol.node.id not in seen:
+            seen.add(symbol.node.id)
+            symbol = symbol.target
+        return symbol
 
     def _bind(self, name: Node, kind: SymbolKind, scope: int, static: bool = False) -> Symbol:
         symbol = Symbol(self.text(name), name, kind, scope)
@@ -153,9 +166,20 @@ class SemanticIndex:
         for scope_id, scope in enumerate(self.scopes):
             self._implicit_receiver(scope_id, scope)
             self._explicit_receivers(scope_id, scope)
-            for symbol in (*scope.symbols.values(), *scope.static_symbols.values()):
-                symbol.type_name = symbol.type_name or self._declared_type(symbol.annotation)
-                symbol.class_scope = symbol.class_scope or self._annotation_scope(symbol.annotation)
+            self._refresh_scope(scope)
+        for function in self.functions.values():
+            self._refresh_symbol_type(function)
+
+    def _refresh_scope(self, scope: Scope) -> None:
+        """Refresh declared type evidence for every binding one scope owns."""
+        for symbol in (*scope.symbols.values(), *scope.static_symbols.values()):
+            self._refresh_symbol_type(symbol)
+
+    def _refresh_symbol_type(self, symbol: Symbol) -> None:
+        """Evaluate a symbol's annotation in the snapshot that declares it."""
+        owner = self.owner_index(symbol.node)
+        symbol.type_name = symbol.type_name or owner._declared_type(symbol.annotation)
+        symbol.class_scope = symbol.class_scope or owner._annotation_scope(symbol.annotation)
 
     def _implicit_receiver(self, scope_id: int, scope: Scope) -> None:
         parent = self.scopes[scope.parent] if scope.parent is not None else None
@@ -187,6 +211,8 @@ class SemanticIndex:
             self.attached_members[method.node.id] = method
 
     def _annotation_scope(self, node: Node | None) -> Scope | None:
+        if node is not None and (owner := self.owner_index(node)) is not self:
+            return owner._annotation_scope(node)
         if node is None:
             return None
         node = self.syntax.element_type(node) or node
@@ -197,6 +223,8 @@ class SemanticIndex:
         return self.class_scope(self._declared_type(node))
 
     def _declared_type(self, node: Node | None) -> str:
+        if node is not None and (owner := self.owner_index(node)) is not self:
+            return owner._declared_type(node)
         if node is None:
             return ""
         return next(
@@ -287,10 +315,14 @@ class SemanticIndex:
 
     def _same_tree(self, node: Node) -> bool:
         """Report whether the node belongs to this snapshot's syntax tree."""
+        return self._root(node) == self.context.root
+
+    def _root(self, node: Node) -> Node:
+        """Walk to the root of the syntax tree that owns a node."""
         root = node
         while root.parent is not None:
             root = root.parent
-        return root == self.context.root
+        return root
 
     def _assignment_symbol(self, target: Node) -> Symbol | None:
         scope = self.locations.get(target.id, 0)
@@ -311,6 +343,8 @@ class SemanticIndex:
         return self.syntax.declares_local(target)
 
     def _value_type(self, value: Node | None) -> str:
+        if value is not None and (owner := self.owner_index(value)) is not self:
+            return owner._value_type(value)
         if value is None:
             return ""
         value = self.syntax.single_value(value)
@@ -399,6 +433,8 @@ class SemanticIndex:
         return self.scopes[local] if local is not None else self.imported_classes.get(name)
 
     def value_scope(self, value: Node | None) -> Scope | None:
+        if value is not None and (owner := self.owner_index(value)) is not self:
+            return owner.value_scope(value)
         if value is None:
             return None
         value = self.syntax.single_value(value)
