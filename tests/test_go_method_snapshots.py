@@ -27,6 +27,22 @@ _SAME_NAME_METHODS = (
     "func (a alpha) render() { println(&a) }\n\n"
     "func (b beta) render() { println(&b) }\n"
 )
+_CROSS_TYPES = (
+    "package main\n\n"
+    "// x\n"
+    "func main() {\n"
+    '\tprintln("中文")\n'
+    '\tsvc := service{label: "y"}\n'
+    '\tsvc.label = "z"\n'
+    "\t_ = svc.load().title\n"
+    "}\n\n"
+    "type summary struct{ title string }\n"
+)
+_CROSS_METHODS = (
+    "package main\n\n"
+    "type service struct{ label string }\n\n"
+    "func (s *service) load() summary { return summary{title: s.label} }\n"
+)
 
 
 def _git(root: Path, *arguments: str) -> None:
@@ -66,6 +82,12 @@ def _revise(root: Path, types: str) -> None:
     _git(root, "add", "types.go", "methods.go")
 
 
+@pytest.fixture
+def cross_file_repository(tmp_path: Path) -> Path:
+    """Build a package whose receiver method and result type live in peer files."""
+    return _repository(tmp_path, {"types.go": "package main\n", "methods.go": "package main\n"})
+
+
 @pytest.mark.parametrize("mode", [("--all",), ("--base", "HEAD"), ("--staged",)])
 def test_chained_method_call_is_not_reported_in_every_snapshot_mode(
     repository: Path,
@@ -90,6 +112,23 @@ def test_unused_method_across_files_is_reported_once_in_every_snapshot_mode(
     assert [(f.path, f.line, f.column, f.rule) for f in report.findings] == [
         ("methods.go", 3, 19, "unused.function")
     ]
+
+
+@pytest.mark.parametrize("mode", [("--all",), ("--base", "HEAD"), ("--staged",)])
+def test_cross_file_receiver_return_type_is_resolved_in_every_snapshot_mode(
+    cross_file_repository: Path,
+    capsys: pytest.CaptureFixture[str],
+    mode: tuple[str, ...],
+) -> None:
+    """Resolve a peer-file return type whose byte offset lands inside a UTF-8 sequence."""
+    offset = _CROSS_METHODS.encode().index(b"string")
+    with pytest.raises(UnicodeDecodeError):
+        _CROSS_TYPES.encode()[offset : offset + len(b"string")].decode("utf-8")
+    (cross_file_repository / "types.go").write_text(_CROSS_TYPES)
+    (cross_file_repository / "methods.go").write_text(_CROSS_METHODS)
+    _git(cross_file_repository, "add", "types.go", "methods.go")
+    assert main(["--root", str(cross_file_repository), *mode, "--format", "json"]) == 0
+    assert Report.model_validate_json(capsys.readouterr().out).findings == ()
 
 
 @pytest.mark.parametrize("mode", [("--all",), ("--base", "HEAD"), ("--staged",)])
