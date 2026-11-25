@@ -52,81 +52,60 @@ ln -s /absolute/path/to/repo/.agents/skills/pluvy <agent-skills-dir>/pluvy
 ```
 
 - Inside the repository root (`--root`), apart from built-in infrastructure
-  directories such as `node_modules`, `.venv` or `__pycache__`, which are
-  always skipped regardless of policy, a directory symlink is allowed during
-  directory enumeration only when the policy proves no selected file can exist
-  below the symlink's own path or an ancestor directory; Pluvy never resolves
-  the symlink target when deciding scope. That holds when no `include` pattern
-  can reach below that path (for example `include: ["src/*", "tests/*"]`) or
-  when an `exclude` pattern covers every descendant below it (for example
-  `exclude: [".claude/*"]`, which prunes `.claude` even though the pattern
-  matches descendants rather than `.claude` itself). Otherwise — including
-  under the default policy (`include: ["**"]`, `exclude: []`) — copy the
-  directory instead.
+  directories such as `node_modules` or `.venv`, which are always skipped
+  regardless of policy, a directory symlink is allowed during directory
+  enumeration only if the policy proves no selected file can exist below its
+  path or an ancestor. Either no `include` pattern reaches below it or an
+  `exclude` pattern covers all descendants (`include: ["src/*", "tests/*"]` or
+  `exclude: [".claude/*"]`). Pluvy never resolves symlink targets when deciding
+  scope. Otherwise, including under the default `include: ["**"]`, copy the
+  directory as a drifting duplicate and re-copy it after every update. Windows
+  systems without usable symlinks use the copy form everywhere. Patterns are
+  case-sensitive `fnmatchcase` (`*` spans `/`; `**` is not special), and pruning
+  is conservative and happens before the symlink check:
 
-  During disk traversal, Pluvy checks whether a directory can contain selected
-  files before refusing symlinks (prune first, then check directory symlinks).
-  `include` and `exclude` use case-sensitive shell matching (`fnmatchcase`)
-  where `*` spans `/` and `**` has no special meaning. Pruning is conservative:
-  a directory is pruned only when it is proved that no selected file can exist
-  below it, and any directory that cannot be proved stays in scope. Each
-  pattern's head is compared character by character against the start of the
-  directory prefix (`<directory>/`), with `?` matching one character, stopping
-  at `*`, `[` or the end of the directory prefix:
-
-  - **`include` pruning**: a pattern can reach below the directory whenever its
-    head matches the start of the directory prefix and its remaining tail is
-    non-empty (so `src/*/` keeps `src`, `src/*` and `src/**` reach only `src`
-    and its descendants, leading-star patterns such as `**` and `*.py` reach
-    every directory, and stopping at `[` prevents character classes from
-    proving a directory unreachable). Under `include` alone, a directory is
-    pruned only when no `include` pattern can reach below it.
-  - **`exclude` pruning**: a pattern covers every path below the directory only
-    when its head matches the start of the directory prefix (allowing `?`, such
-    as `src/?endor/*`) and its remaining tail is non-empty and consists purely
-    of stars (such as `src/vendor/*`, `src/vendor/**`, `.claude/*` or `**`).
-    Patterns containing `[` and structured patterns such as `src/*.py` or
-    `src/*/*` never prune directories.
+  - **Head/tail**: Each pattern's head is compared character by character with
+    the start of `<directory>/`, where `?` matches one character. It stops at
+    `*`, `[` or the prefix end, and the rest is the tail.
+  - **`include`**: A pattern reaches below a directory if its head matches with
+    a non-empty tail. `src/*/` keeps `src`; `src/*` and `src/**` reach `src` and
+    its descendants; leading stars (`**`, `*.py`) reach all directories.
+    Stopping at `[` means a character class can never prove a directory
+    unreachable. Under `include` alone, a directory is pruned only if no include
+    pattern reaches below it.
+  - **`exclude`**: A pattern covers all paths below a directory only if its head
+    matches (`?` is allowed, as in `src/?endor/*`) and its tail is one or more
+    stars. Examples are `src/vendor/*`, `src/vendor/**`, `.claude/*` and `**`.
+    Patterns with `[` or structured tails (`src/*.py`, `src/*/*`) never prune.
 
   Pruned directories are never entered, so directory symlinks and unreadable
-  directories at or inside pruned directories (as well as dangling symlinks
-  inside them) do not affect `--all` or `--base` directory enumeration and emit
-  no warning. Any directory symlink that stays in scope is rejected with exit
-  code 2
-  (`Architecture gate error: Refusing to traverse symlink directory: ...`),
-  never skipped or downgraded to a warning. Neither `--all` nor `--base` usage
-  traversal consults `.gitignore`, so a Git-ignored directory symlink that
-  stays in scope fails with exit code 2 unless `exclude` proves no selected
-  file can exist below its path.
+  directories at or inside them, and dangling symlinks inside them, never
+  affect `--all` or `--base` directory enumeration and emit no warning. Neither
+  walk consults `.gitignore`, so a Git-ignored directory symlink is treated
+  like any other. Any directory symlink that stays in scope fails with exit
+  code `2` (`Architecture gate error: Refusing to traverse symlink directory:
+  ...`) and is never skipped or downgraded to a warning.
 
-  Pruning applies only to directory enumeration, not direct source reads: with
-  `include: ["src/*"]`, if Git reports a selected changed or untracked path
-  whose own entry is a symlink (for example a directory symlink named
-  `src/link.py`), `--base` rejects reading that source with exit code 2
-  (`Architecture gate error: Refusing source/config symlink: ...`) even when
-  `exclude: ["src/link.py/*"]` covers every descendant; `--all` prunes that
-  directory entry only because such an `exclude` covers its descendants, and
-  without that `exclude` `--all` also exits 2 with
-  `Refusing to traverse symlink directory`. For `--base <commit>`, changed and
-  untracked paths come from Git, and disk traversal for usage evidence runs
-  only when at least one selected current source is present (changed or
-  untracked; deletions alone do not count) and at least one of the four
-  `unused.*` checkers (`unused.parameter`, `unused.function`, `unused.field`,
-  `unused.return`) is enabled. With no selected current sources (`0 files`, for
-  example `pluvy --base HEAD` on an unchanged tree), `--base` still reads the
-  policy and, when `test.deletion` is enabled, checks Git deletions (which can
-  exit 1), but skips the usage directory walk, so it does not surface an
-  in-scope directory symlink. If current source changes were expected, an
-  exit-0 `0 files` report does not validate them (see
-  [post-run checks](../SKILL.md#post-run-checks)). Disabling all four
-  `unused.*` checkers skips only the usage directory walk (JSON output reports
-  `usage_files` as `0`; text output omits the usage reference line); it does
-  not prevent the direct source-read refusal described above. `--staged` never
-  walks the disk.
+  Pruning covers enumeration, not direct reads. With `include: ["src/*"]`, Git
+  can report a selected changed or untracked path whose entry is a symlink,
+  such as the directory symlink `src/link.py`. `--base` exits `2`
+  (`Architecture gate error: Refusing source/config symlink: ...`) even if
+  `exclude: ["src/link.py/*"]` covers all descendants. `--all` prunes it only
+  with that `exclude`, and otherwise exits `2` (`Refusing to traverse symlink
+  directory`).
 
-  When using a copy, treat it as a drifting duplicate: re-copy after every
-  update of the source, otherwise the two locations diverge silently. Windows
-  systems without usable symlinks use the copy form everywhere.
+  In `--base <commit>`, changed and untracked paths come from Git; usage
+  traversal runs only when at least one selected current source is present
+  (changed or untracked; deletions alone do not count) and at least one
+  `unused.*` checker is enabled. With `0 files` (for example `pluvy --base
+  HEAD` on an unchanged tree), `--base` still reads the policy and checks Git
+  deletions if `test.deletion` is enabled. That deletion check can exit `1`;
+  because the usage walk is skipped, an in-scope directory symlink is not
+  surfaced. If current source changes were expected, an exit-`0` `0 files`
+  report does not validate them ([post-run
+  checks](../SKILL.md#post-run-checks)). Disabling all four `unused.*`
+  checkers skips only that walk; it does not prevent the direct source-read
+  refusal. `--staged` never walks the disk.
 
 ## Team / CI usage
 
