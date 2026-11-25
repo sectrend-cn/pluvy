@@ -10,7 +10,7 @@ from pluvy.diagnostics import GateError
 from pluvy.engine import registry
 from pluvy.plugins.registry import AnalyzerRegistry
 from pluvy.policy.models import Policy
-from pluvy.policy.paths import matches
+from pluvy.policy.paths import matches, prunable
 from pluvy.source import Source
 
 _ENVIRONMENT = frozenset(
@@ -64,10 +64,24 @@ def selected(path: str, policy: Policy, analyzers: AnalyzerRegistry) -> bool:
     )
 
 
+def _retained_children(root: Path, directory: str, names: list[str], policy: Policy) -> list[str]:
+    """Drop infrastructure and policy-pruned directories before any symlink check."""
+    return [
+        name
+        for name in names
+        if name not in _ENVIRONMENT
+        and not prunable(
+            (Path(directory) / name).relative_to(root).as_posix(),
+            policy.include,
+            policy.exclude,
+        )
+    ]
+
+
 def _disk_paths(root: Path, policy: Policy, analyzers: AnalyzerRegistry) -> tuple[str, ...]:
     result: list[str] = []
     for directory, children, filenames in os.walk(root, onerror=_walk_error):
-        children[:] = [name for name in children if name not in _ENVIRONMENT]
+        children[:] = _retained_children(root, directory, children, policy)
         for name in children:
             if (Path(directory) / name).is_symlink():
                 raise GateError(f"Refusing to traverse symlink directory: {directory}/{name}")
