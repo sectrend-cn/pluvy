@@ -268,10 +268,24 @@ The skill bundle lives under `.agents/skills/pluvy/` in a repository checkout (`
    skills directory so compatible agents discover and load it automatically.
 2. **Agent-specific directory adaptation**: when an agent reads instructions only from its own
    directory, choose copy versus symlink based on where that directory lives:
-   - **Inside the repository (`--root`)**: **copy** the directory; never place a directory symlink
-     inside `--root`. Both `--all` and `--base` walk the working tree before `include`/`exclude`
-     filtering and exit `2` on any directory symlink (`exclude` does not bypass this check). Re-copy
-     the skill directory whenever its upstream source updates.
+   - **Inside the repository (`--root`)**: apart from built-in infrastructure directories such as
+     `node_modules` or `.venv`, which are always skipped, a directory symlink is tolerated during
+     directory enumeration only if the policy proves no selected file can exist below its path or
+     an ancestor. Either no `include` pattern reaches below it or an `exclude` pattern covers every
+     descendant (`include: ["src/*", "tests/*"]` or `exclude: [".claude/*"]`). Pluvy never resolves
+     the symlink target when deciding scope. Otherwise, including under the default
+     `include: ["**"]`, copy the directory and re-copy it when its source updates. Out-of-scope
+     directory symlinks never affect `--all` or `--base` enumeration and emit no warning. An
+     in-scope directory symlink fails with exit code `2` (`Refusing to traverse symlink directory`)
+     and is never skipped or downgraded to a warning. Pruning does not cover direct reads, so
+     `--base` still refuses a symlink that Git lists as a selected changed or untracked source.
+     Neither `--all` nor `--base` usage traversal consults `.gitignore` ([Running](#running)), so a
+     Git-ignored in-scope directory symlink still fails with exit code `2`; `--staged` never walks
+     the disk. `--base` walks the disk for usage evidence only when at least one selected changed
+     or untracked current source is present (deletions alone do not count) and an `unused.*`
+     checker is enabled; a `0 files` run skips that walk, and an exit-`0` `0 files` report does not
+     validate expected changes ([Per-task gating](#per-task-gating)). See the agent integration
+     notes for exact pruning rules.
    - **Outside `--root`** (such as a user-level skills directory): a symlink works cleanly and keeps
      a single source of truth.
 3. **AGENTS.md pointer snippet**: for agents that read `AGENTS.md`, paste the snippet below into
